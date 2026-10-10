@@ -39,30 +39,81 @@ final class YamlBlockPropSchemaProvider implements BlockPropSchemaProviderInterf
             return $this->cache[$cacheKey];
         }
 
-        $blockData = [];
+        // Directories are provided in priority order from base to override: [base, override]
+        /** @var array<string, array<string, mixed>> $mergedTabs */
+        $mergedTabs = [];
+
         foreach ($this->schemaDirectories as $dir) {
-            $schemaFile = \rtrim($dir, '/') . '/' . $normalizedType . '.yaml';
-            if (\is_file($schemaFile)) {
-                $blockData = $this->loadYamlFile($schemaFile);
-                break;
+            $basePath = \rtrim($dir, '/');
+            $candidateFiles = [
+                $basePath . '/' . $normalizedType . '.yaml',
+                $basePath . '/' . $normalizedType . '.yml',
+                $basePath . '/props/' . $normalizedType . '.yaml',
+                $basePath . '/props/' . $normalizedType . '.yml',
+            ];
+
+            foreach ($candidateFiles as $file) {
+                if (\is_file($file)) {
+                    $data = $this->loadYamlFile($file);
+                    if (isset($data['tabs']) && \is_array($data['tabs'])) {
+                        foreach ($data['tabs'] as $tabId => $tabConfig) {
+                            if (!\is_array($tabConfig)) {
+                                continue;
+                            }
+                            $tabIdStr = (string) $tabId;
+                            if (!isset($mergedTabs[$tabIdStr])) {
+                                $mergedTabs[$tabIdStr] = $tabConfig;
+                            } else {
+                                if (isset($tabConfig['title'])) {
+                                    $mergedTabs[$tabIdStr]['title'] = $tabConfig['title'];
+                                }
+                                if (isset($tabConfig['fields']) && \is_array($tabConfig['fields'])) {
+                                    if (!isset($mergedTabs[$tabIdStr]['fields']) || !\is_array($mergedTabs[$tabIdStr]['fields'])) {
+                                        $mergedTabs[$tabIdStr]['fields'] = [];
+                                    }
+                                    foreach ($tabConfig['fields'] as $fieldKey => $fieldConfig) {
+                                        if (\is_array($fieldConfig)) {
+                                            $fieldKeyStr = (string) $fieldKey;
+                                            if (isset($mergedTabs[$tabIdStr]['fields'][$fieldKeyStr]) && \is_array($mergedTabs[$tabIdStr]['fields'][$fieldKeyStr])) {
+                                                $mergedTabs[$tabIdStr]['fields'][$fieldKeyStr] = \array_replace_recursive(
+                                                    $mergedTabs[$tabIdStr]['fields'][$fieldKeyStr],
+                                                    $fieldConfig
+                                                );
+                                            } else {
+                                                $mergedTabs[$tabIdStr]['fields'][$fieldKeyStr] = $fieldConfig;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
             }
         }
 
-        $mergedTabs = [];
-        if (isset($blockData['tabs']) && \is_array($blockData['tabs'])) {
-            $mergedTabs = $blockData['tabs'];
-        }
-
         foreach ($this->schemaDirectories as $dir) {
-            $commonFile = \rtrim($dir, '/') . '/common.yaml';
-            if (\is_file($commonFile)) {
-                $commonData = $this->loadYamlFile($commonFile);
-                if (isset($commonData['tabs']) && \is_array($commonData['tabs'])) {
-                    foreach ($commonData['tabs'] as $tabKey => $tabConfig) {
-                        if (!isset($mergedTabs[$tabKey]) && \is_array($tabConfig)) {
-                            $mergedTabs[$tabKey] = $tabConfig;
+            $basePath = \rtrim($dir, '/');
+            $commonCandidates = [
+                $basePath . '/common.yaml',
+                $basePath . '/common.yml',
+                $basePath . '/props/common.yaml',
+                $basePath . '/props/common.yml',
+            ];
+
+            foreach ($commonCandidates as $commonFile) {
+                if (\is_file($commonFile)) {
+                    $commonData = $this->loadYamlFile($commonFile);
+                    if (isset($commonData['tabs']) && \is_array($commonData['tabs'])) {
+                        foreach ($commonData['tabs'] as $tabKey => $tabConfig) {
+                            $tabKeyStr = (string) $tabKey;
+                            if (!isset($mergedTabs[$tabKeyStr]) && \is_array($tabConfig)) {
+                                $mergedTabs[$tabKeyStr] = $tabConfig;
+                            }
                         }
                     }
+                    break;
                 }
             }
         }
@@ -78,10 +129,6 @@ final class YamlBlockPropSchemaProvider implements BlockPropSchemaProviderInterf
         $tabs = [];
 
         foreach ($mergedTabs as $tabId => $tabConfig) {
-            if (!\is_array($tabConfig)) {
-                continue;
-            }
-
             $rawTitle = $tabConfig['title'] ?? (string) $tabId;
             $title = $this->resolveLocalizedText($rawTitle, $locale, (string) $tabId);
 

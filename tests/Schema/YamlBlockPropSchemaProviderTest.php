@@ -118,6 +118,86 @@ YAML;
         }
     }
 
+    public function testDeepCascadeMergesTabsAndFieldsAndSupportsYmlExtension(): void
+    {
+        $secondDir = \sys_get_temp_dir() . '/sulu_block_props_cascade_' . \uniqid();
+        \mkdir($secondDir, 0777, true);
+
+        try {
+            // Base dir (e.g. bundle) defines alert with appearance tab having variant & dismissible
+            $baseAlertYaml = <<<YAML
+tabs:
+  appearance:
+    title: "Appearance Base"
+    fields:
+      variant:
+        type: select
+        label: "Variant"
+        options:
+          - { value: 'soft', label: 'Soft' }
+          - { value: 'solid', label: 'Solid' }
+      dismissible:
+        type: checkbox
+        label: "Dismissible"
+YAML;
+            \file_put_contents($this->tempDir . '/alert.yaml', $baseAlertYaml);
+
+            // Project dir defines alert.yml (testing .yml extension!) overriding variant options and adding custom_glow field + new animation tab
+            $projectAlertYml = <<<YAML
+tabs:
+  appearance:
+    fields:
+      variant:
+        options:
+          - { value: 'soft', label: 'Soft' }
+          - { value: 'solid', label: 'Solid' }
+          - { value: 'custom_glow', label: 'Custom Glow' }
+      custom_glow_intensity:
+        type: select
+        label: "Glow Intensity"
+        options:
+          - { value: 'low', label: 'Low' }
+          - { value: 'high', label: 'High' }
+  animation:
+    title: "Animation"
+    fields:
+      fade_in:
+        type: checkbox
+        label: "Fade In"
+YAML;
+            \file_put_contents($secondDir . '/alert.yml', $projectAlertYml);
+
+            $provider = new YamlBlockPropSchemaProvider([$this->tempDir, $secondDir]);
+            $schema = $provider->getSchema('alert', 'en');
+
+            $this->assertCount(2, $schema['tabs']);
+            $tabIds = \array_column($schema['tabs'], 'id');
+            $this->assertSame(['appearance', 'animation'], $tabIds);
+
+            // Verify appearance tab preserved dismissible, updated variant options, and added custom_glow_intensity
+            $appearanceFields = $schema['tabs'][0]['fields'];
+            $fieldNames = \array_column($appearanceFields, 'name');
+            $this->assertContains('variant', $fieldNames);
+            $this->assertContains('dismissible', $fieldNames);
+            $this->assertContains('custom_glow_intensity', $fieldNames);
+
+            // Check variant has 3 options now (custom_glow merged in)
+            $variantField = null;
+            foreach ($appearanceFields as $f) {
+                if ('variant' === $f['name']) {
+                    $variantField = $f;
+                    break;
+                }
+            }
+            $this->assertNotNull($variantField);
+            $this->assertArrayHasKey('options', $variantField);
+            $this->assertCount(3, $variantField['options']);
+            $this->assertSame('custom_glow', $variantField['options'][2]['value']);
+        } finally {
+            $this->removeDirectory($secondDir);
+        }
+    }
+
     private function removeDirectory(string $dir): void
     {
         if (!\is_dir($dir)) {

@@ -58,10 +58,18 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
         $presetsMap = [];
 
         foreach ($this->yamlDirectories as $dir) {
-            $filePath = \rtrim($dir, '/') . '/' . $blockType . '.yaml';
-            if (\is_file($filePath)) {
-                try {
-                    $parsed = Yaml::parseFile($filePath);
+            $basePath = \rtrim($dir, '/');
+            $candidateFiles = [
+                $basePath . '/' . $blockType . '.yaml',
+                $basePath . '/' . $blockType . '.yml',
+                $basePath . '/presets/' . $blockType . '.yaml',
+                $basePath . '/presets/' . $blockType . '.yml',
+            ];
+
+            foreach ($candidateFiles as $filePath) {
+                if (\is_file($filePath)) {
+                    try {
+                        $parsed = Yaml::parseFile($filePath);
                     if (\is_array($parsed)) {
                         /** @var mixed $rawPresets */
                         $rawPresets = null;
@@ -113,8 +121,10 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
                 } catch (ParseException) {
                     // Fallback gracefully on YAML parse error
                 }
+                break;
             }
         }
+    }
 
         /** @var list<array{id: string, title: string, description: ?string, preview_image: ?string, props: array<string, mixed>, values?: array<string, mixed>}> $presets */
         $presets = \array_values($presetsMap);
