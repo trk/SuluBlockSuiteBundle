@@ -72,7 +72,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.get_version.outputs.version }}"
-          CLEAN_VER="${{ steps.get_version.outputs.version }}"
           REPO=${{ github.repository }}
           echo "Processing Tag & Release for: $TAG"
 
@@ -84,26 +83,8 @@ jobs:
             git push origin "$TAG"
           fi
 
-          # Initialize release notes
-          echo "## Release $TAG" > release_notes.md
-          echo "" >> release_notes.md
-
-          # Include curated section from CHANGELOG.md if present
-          if [ -f CHANGELOG.md ]; then
-            php -r '
-              $ver = preg_quote($argv[1], "/");
-              $content = file_get_contents("CHANGELOG.md");
-              if (preg_match("/## \[" . $ver . "\](.*?)(?=\n## \[|$)/s", $content, $matches)) {
-                  echo trim($matches[1]) . PHP_EOL;
-              }
-            ' "$CLEAN_VER" > changelog_section.md
-            if [ -s changelog_section.md ]; then
-              cat changelog_section.md >> release_notes.md
-              echo "" >> release_notes.md
-            fi
-          fi
-
-          echo "## What's Changed" >> release_notes.md
+          # Custom Release Notes Generator
+          echo "## What's Changed" > release_notes.md
           echo "" >> release_notes.md
 
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
