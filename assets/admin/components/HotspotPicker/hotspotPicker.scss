@@ -2,12 +2,12 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
     font-family: inherit;
     box-sizing: border-box;
 
@@ -16,56 +16,135 @@
     }
 }
 
+/* 1. Header Toolbar */
 .header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
     background: #f8fafc;
     border-bottom: 1px solid #e2e8f0;
 }
 
-.headerTitle {
+.headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.headerTitleWrap {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #1e293b;
+    flex-shrink: 0;
 }
 
-.coordBadge {
+.headerIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: #e0e7ff;
+    color: #4338ca;
+    font-size: 13px;
+}
+
+.headerTitle {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+
+.coordChip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 2px 8px;
-    background: #e2e8f0;
-    border-radius: 12px;
+    gap: 5px;
+    padding: 3px 10px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
     color: #334155;
-    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
-.headerActions {
+.coordLabel {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.coordVal {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.coordSep {
+    color: #94a3b8;
+    margin: 0 2px;
+}
+
+.headerRight {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
+.toolBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+
+    &:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #0f172a;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    &:active {
+        transform: translateY(0);
+        background: #f1f5f9;
+    }
+}
+
+.toolBtnText {
+    margin-left: 2px;
+}
+
+/* 2. Interactive Canvas */
 .canvasWrapper {
     position: relative;
     width: 100%;
-    min-height: 240px;
-    max-height: 440px;
-    background-color: #0f172a;
+    min-height: 280px;
+    max-height: 480px;
+    background-color: #0b0f19;
     background-image: 
-        linear-gradient(45deg, #1e293b 25%, transparent 25%), 
-        linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
-        linear-gradient(45deg, transparent 75%, #1e293b 75%), 
-        linear-gradient(-45deg, transparent 75%, #1e293b 75%);
-    background-size: 20px 20px;
-    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+    background-size: 16px 16px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -74,10 +153,62 @@
     cursor: crosshair;
 }
 
+.canvasDragging {
+    cursor: grabbing !important;
+}
+
+.canvasGuideBadge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 15;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #e2e8f0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.canvasHoverBadge {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    z-index: 15;
+    padding: 3px 8px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    font-size: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 600;
+    color: #38bdf8;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.imageContainer {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    max-height: 480px;
+    line-height: 0;
+    user-select: none;
+}
+
 .canvasImage {
     display: block;
     max-width: 100%;
-    max-height: 440px;
+    max-height: 480px;
     width: auto;
     height: auto;
     object-fit: contain;
@@ -91,21 +222,22 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    height: 240px;
+    height: 260px;
     color: #94a3b8;
     text-align: center;
-    padding: 20px;
+    padding: 24px;
 }
 
 .placeholderIcon {
-    font-size: 32px;
-    margin-bottom: 8px;
-    opacity: 0.6;
+    font-size: 36px;
+    margin-bottom: 10px;
+    color: #64748b;
 }
 
 .placeholderText {
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
+    color: #cbd5e1;
     max-width: 380px;
     line-height: 1.4;
 }
@@ -113,76 +245,83 @@
 .placeholderHint {
     font-size: 11px;
     color: #64748b;
-    margin-top: 4px;
+    margin-top: 6px;
 }
 
+/* 3. Marker & Crosshair */
 .marker {
     position: absolute;
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    z-index: 10;
+    z-index: 20;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.05s ease-out;
+    transition: transform 0.1s ease-out;
+}
+
+.markerActive {
+    transform: translate(-50%, -50%) scale(1.2);
 }
 
 .markerInner {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     color: #ffffff;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    border: 2px solid #ffffff;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    border: 2.5px solid #ffffff;
     transition: all 0.2s ease;
+    z-index: 2;
 }
 
 .pulseRing {
     position: absolute;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    animation: hotspotPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    animation: radarPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     pointer-events: none;
+    z-index: 1;
 }
 
-@keyframes hotspotPulse {
+@keyframes radarPulse {
     0% {
         transform: scale(0.6);
         opacity: 0.9;
     }
     70% {
-        transform: scale(1.4);
+        transform: scale(1.6);
         opacity: 0;
     }
     100% {
-        transform: scale(1.4);
+        transform: scale(1.6);
         opacity: 0;
     }
 }
 
-/* Marker Colors */
+/* Marker Color Schemes */
 .colorPrimary .markerInner {
     background-color: #2563eb;
 }
 .colorPrimary .pulseRing {
     border: 2px solid #3b82f6;
-    background-color: rgba(59, 130, 246, 0.25);
+    background-color: rgba(59, 130, 246, 0.3);
 }
 
 .colorDark .markerInner {
     background-color: #0f172a;
 }
 .colorDark .pulseRing {
-    border: 2px solid #475569;
-    background-color: rgba(15, 23, 42, 0.3);
+    border: 2px solid #64748b;
+    background-color: rgba(15, 23, 42, 0.35);
 }
 
 .colorLight .markerInner {
@@ -192,7 +331,7 @@
 }
 .colorLight .pulseRing {
     border: 2px solid #ffffff;
-    background-color: rgba(255, 255, 255, 0.35);
+    background-color: rgba(255, 255, 255, 0.4);
 }
 
 .colorAccent .markerInner {
@@ -200,7 +339,7 @@
 }
 .colorAccent .pulseRing {
     border: 2px solid #fbbf24;
-    background-color: rgba(245, 158, 11, 0.3);
+    background-color: rgba(245, 158, 11, 0.35);
 }
 
 .colorSuccess .markerInner {
@@ -208,7 +347,7 @@
 }
 .colorSuccess .pulseRing {
     border: 2px solid #34d399;
-    background-color: rgba(16, 185, 129, 0.3);
+    background-color: rgba(16, 185, 129, 0.35);
 }
 
 .colorDanger .markerInner {
@@ -216,7 +355,7 @@
 }
 .colorDanger .pulseRing {
     border: 2px solid #f87171;
-    background-color: rgba(239, 68, 68, 0.3);
+    background-color: rgba(239, 68, 68, 0.35);
 }
 
 .crosshairX {
@@ -224,8 +363,10 @@
     top: 0;
     bottom: 0;
     width: 1px;
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
     pointer-events: none;
+    z-index: 10;
 }
 
 .crosshairY {
@@ -233,64 +374,126 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
     pointer-events: none;
+    z-index: 10;
 }
 
 .markerTooltip {
     position: absolute;
-    bottom: calc(100% + 4px);
+    bottom: calc(100% + 6px);
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(15, 23, 42, 0.85);
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     color: #ffffff;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
     font-size: 10px;
-    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 700;
     white-space: nowrap;
     pointer-events: none;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    z-index: 25;
+    opacity: 0.95;
+    transition: opacity 0.15s ease;
 }
 
+/* 4. Controls Area */
 .controlsArea {
-    padding: 12px 14px;
+    padding: 16px 20px;
     background: #ffffff;
     border-top: 1px solid #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
-.controlsGrid {
+.controlsSection {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sectionHeading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.coordsGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 12px;
-    align-items: flex-end;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.optionsGrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
 }
 
 .fieldGroup {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
+    min-width: 0;
 }
 
 .fieldLabel {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.actionGroup {
-    display: flex;
-    align-items: flex-end;
-    gap: 6px;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .infoFootnote {
-    margin-top: 8px;
-    font-size: 11px;
-    color: #64748b;
     display: flex;
     align-items: center;
     gap: 6px;
+    padding-top: 4px;
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .headerLeft {
+        justify-content: space-between;
+    }
+
+    .headerRight {
+        margin-left: 0;
+        justify-content: flex-end;
+    }
+
+    .optionsGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .coordsGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .optionsGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }

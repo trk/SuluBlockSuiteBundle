@@ -2,7 +2,6 @@
 import React from 'react';
 import {action, observable, toJS} from 'mobx';
 import {observer} from 'mobx-react';
-import Button from 'sulu-admin-bundle/components/Button';
 import Icon from 'sulu-admin-bundle/components/Icon';
 import NumberField from 'sulu-admin-bundle/components/Number';
 import SingleSelect from 'sulu-admin-bundle/components/SingleSelect';
@@ -33,10 +32,11 @@ export default class HotspotPicker extends React.Component<Props> {
     @observable imageUrl: ?string = null;
     @observable imageLoading: boolean = false;
     @observable lastResolvedMediaId: ?(string | number) = null;
+    @observable isDragging: boolean = false;
+    @observable hoverCoords: ?{x: number, y: number} = null;
 
     canvasRef: {current: null | HTMLElement} = React.createRef();
     imageRef: {current: null | HTMLElement} = React.createRef();
-    isDragging: boolean = false;
 
     componentDidMount() {
         this.loadImage();
@@ -232,7 +232,9 @@ export default class HotspotPicker extends React.Component<Props> {
 
     handleCanvasMouseDown = (e: SyntheticMouseEvent<HTMLElement>) => {
         e.preventDefault();
-        this.isDragging = true;
+        action(() => {
+            this.isDragging = true;
+        })();
         this.updateCoordsFromMouseEvent(e.nativeEvent);
 
         window.addEventListener('mousemove', this.handleWindowMouseMove);
@@ -246,7 +248,9 @@ export default class HotspotPicker extends React.Component<Props> {
 
     handleWindowMouseUp = (e: MouseEvent) => {
         if (!this.isDragging) return;
-        this.isDragging = false;
+        action(() => {
+            this.isDragging = false;
+        })();
         this.removeDragListeners();
         this.updateCoordsFromMouseEvent(e);
 
@@ -275,6 +279,31 @@ export default class HotspotPicker extends React.Component<Props> {
         y = Math.max(0.0, Math.min(100.0, Math.round(y * 10) / 10));
 
         this.emitChange({x, y}, false);
+    };
+
+    handleCanvasHoverMove = (e: SyntheticMouseEvent<HTMLElement>) => {
+        if (this.isDragging) return;
+        const target = this.imageRef.current || this.canvasRef.current;
+        if (!target) return;
+
+        const rect = target.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+
+        let x = ((e.clientX - rect.left) / rect.width) * 100;
+        let y = ((e.clientY - rect.top) / rect.height) * 100;
+
+        x = Math.max(0.0, Math.min(100.0, Math.round(x * 10) / 10));
+        y = Math.max(0.0, Math.min(100.0, Math.round(y * 10) / 10));
+
+        action(() => {
+            this.hoverCoords = {x, y};
+        })();
+    };
+
+    handleCanvasHoverLeave = () => {
+        action(() => {
+            this.hoverCoords = null;
+        })();
     };
 
     handleResetCenter = () => {
@@ -308,16 +337,25 @@ export default class HotspotPicker extends React.Component<Props> {
     renderMarkerIcon(type: string) {
         switch (type) {
             case 'plus':
-                return '+';
+                return (
+                    <svg fill="none" height="12" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" width="12">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                );
             case 'number':
                 return '1';
             case 'dot':
-                return '•';
+                return <span style={{display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ffffff'}} />;
             case 'pin':
-                return <Icon name="su-location" />;
+                return (
+                    <svg fill="none" height="12" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="12">
+                        <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
+                        <circle cx="12" cy="10" r="3" />
+                    </svg>
+                );
             case 'pulse':
             default:
-                return null;
+                return <span style={{display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffffff'}} />;
         }
     }
 
@@ -331,48 +369,93 @@ export default class HotspotPicker extends React.Component<Props> {
 
         return (
             <div className={styles.container}>
+                {/* 1. Top Header Toolbar */}
                 <div className={styles.header}>
-                    <div className={styles.headerTitle}>
-                        <Icon name="su-location" />
-                        <span>{translate('sulu_block_suite.hotspot_picker.title') || 'Interactive Hotspot Marker'}</span>
-                        <span className={styles.coordBadge}>
-                            X: {x.toFixed(1)}% | Y: {y.toFixed(1)}%
-                        </span>
+                    <div className={styles.headerLeft}>
+                        <div className={styles.headerTitleWrap}>
+                            <span className={styles.headerIcon}>
+                                <Icon name="su-location" />
+                            </span>
+                            <span className={styles.headerTitle}>
+                                {translate('sulu_block_suite.hotspot_picker.title') || 'Interactive Hotspot Marker'}
+                            </span>
+                        </div>
+                        <div className={styles.coordChip}>
+                            <span className={styles.coordLabel}>X:</span>
+                            <span className={styles.coordVal}>{x.toFixed(1)}%</span>
+                            <span className={styles.coordSep}>•</span>
+                            <span className={styles.coordLabel}>Y:</span>
+                            <span className={styles.coordVal}>{y.toFixed(1)}%</span>
+                        </div>
                     </div>
-                    <div className={styles.headerActions}>
-                        <Button
+
+                    <div className={styles.headerRight}>
+                        <button
+                            className={styles.toolBtn}
                             onClick={this.loadImage}
-                            size="small"
-                            skin="secondary"
+                            title={translate('sulu_block_suite.hotspot_picker.refresh_image') || 'Refresh Image'}
+                            type="button"
                         >
                             <Icon name="su-sync" />
-                            {translate('sulu_block_suite.hotspot_picker.refresh_image') || 'Refresh Image'}
-                        </Button>
-                        <Button
+                            <span className={styles.toolBtnText}>
+                                {translate('sulu_block_suite.hotspot_picker.refresh_image') || 'Yenile'}
+                            </span>
+                        </button>
+                        <button
+                            className={styles.toolBtn}
                             onClick={this.handleResetCenter}
-                            size="small"
-                            skin="secondary"
+                            title={translate('sulu_block_suite.hotspot_picker.center') || 'Center (50%, 50%)'}
+                            type="button"
                         >
-                            {translate('sulu_block_suite.hotspot_picker.center') || 'Center (50%, 50%)'}
-                        </Button>
+                            <Icon name="su-location" />
+                            <span className={styles.toolBtnText}>
+                                {translate('sulu_block_suite.hotspot_picker.center') || 'Ortala'}
+                            </span>
+                        </button>
                     </div>
                 </div>
 
+                {/* 2. Interactive Canvas */}
                 <div
-                    className={styles.canvasWrapper}
+                    className={`${styles.canvasWrapper} ${this.isDragging ? styles.canvasDragging : ''}`}
                     onMouseDown={this.handleCanvasMouseDown}
+                    onMouseLeave={this.handleCanvasHoverLeave}
+                    onMouseMove={this.handleCanvasHoverMove}
                     ref={this.canvasRef}
                 >
+                    {/* Floating guide badge */}
+                    <div className={styles.canvasGuideBadge}>
+                        <Icon name="su-location" />
+                        <span>{translate('sulu_block_suite.hotspot_picker.hint') || 'Click or drag on image to reposition'}</span>
+                    </div>
+
+                    {/* Live hover coordinates badge */}
+                    {this.hoverCoords && (
+                        <div className={styles.canvasHoverBadge}>
+                            {this.hoverCoords.x.toFixed(1)}%, {this.hoverCoords.y.toFixed(1)}%
+                        </div>
+                    )}
+
                     {this.imageUrl ? (
-                        <div style={{position: 'relative', display: 'inline-block', lineHeight: 0}}>
+                        <div className={styles.imageContainer}>
                             <img
                                 alt="Hotspot Target"
                                 className={styles.canvasImage}
                                 ref={this.imageRef}
                                 src={this.imageUrl}
                             />
+
+                            {/* Active crosshair guides */}
+                            {this.isDragging && (
+                                <React.Fragment>
+                                    <div className={styles.crosshairX} style={{left: `${x}%`}} />
+                                    <div className={styles.crosshairY} style={{top: `${y}%`}} />
+                                </React.Fragment>
+                            )}
+
+                            {/* Marker Pin */}
                             <div
-                                className={`${styles.marker} ${colorClass}`}
+                                className={`${styles.marker} ${colorClass} ${this.isDragging ? styles.markerActive : ''}`}
                                 style={{left: `${x}%`, top: `${y}%`}}
                             >
                                 <div className={styles.pulseRing} />
@@ -380,21 +463,21 @@ export default class HotspotPicker extends React.Component<Props> {
                                     {this.renderMarkerIcon(activeMarkerType)}
                                 </div>
                                 <div className={styles.markerTooltip}>
-                                    {x.toFixed(1)}% , {y.toFixed(1)}%
+                                    {x.toFixed(1)}%, {y.toFixed(1)}%
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <div className={styles.placeholderArea} style={{position: 'relative'}}>
+                        <div className={styles.placeholderArea}>
                             <div className={styles.placeholderIcon}>
                                 <Icon name="su-image" />
                             </div>
                             <div className={styles.placeholderText}>
                                 {translate('sulu_block_suite.hotspot_picker.no_image')
-                                    || 'No background image detected. Click on the canvas grid or adjust coordinates below.'}
+                                    || 'No background image detected. Click canvas grid or enter coordinates directly.'}
                             </div>
                             <div className={styles.placeholderHint}>
-                                {translate('sulu_block_suite.hotspot_picker.hint')
+                                {translate('sulu_block_suite.hotspot_picker.footnote')
                                     || 'Hotspot will automatically align when the background image is selected.'}
                             </div>
 
@@ -407,102 +490,119 @@ export default class HotspotPicker extends React.Component<Props> {
                                     {this.renderMarkerIcon(activeMarkerType)}
                                 </div>
                                 <div className={styles.markerTooltip}>
-                                    {x.toFixed(1)}% , {y.toFixed(1)}%
+                                    {x.toFixed(1)}%, {y.toFixed(1)}%
                                 </div>
                             </div>
                         </div>
                     )}
                 </div>
 
+                {/* 3. Controls Area */}
                 <div className={styles.controlsArea}>
-                    <div className={styles.controlsGrid}>
-                        <div className={styles.fieldGroup}>
-                            <label className={styles.fieldLabel}>
-                                {translate('sulu_block_suite.hotspot_picker.x') || 'X Position (%)'}
-                            </label>
-                            <NumberField
-                                max={100}
-                                min={0}
-                                onChange={this.handleManualXChange}
-                                step={0.5}
-                                value={x}
-                            />
+                    {/* Coordinates Section */}
+                    <div className={styles.controlsSection}>
+                        <div className={styles.sectionHeading}>
+                            <Icon name="su-location" />
+                            <span>{translate('sulu_block_suite.hotspot_picker.coords_heading') || 'Coordinates'}</span>
                         </div>
+                        <div className={styles.coordsGrid}>
+                            <div className={styles.fieldGroup}>
+                                <label className={styles.fieldLabel}>
+                                    {translate('sulu_block_suite.hotspot_picker.x') || 'Horizontal (X)'} (%)
+                                </label>
+                                <NumberField
+                                    max={100}
+                                    min={0}
+                                    onChange={this.handleManualXChange}
+                                    step={0.5}
+                                    value={x}
+                                />
+                            </div>
 
-                        <div className={styles.fieldGroup}>
-                            <label className={styles.fieldLabel}>
-                                {translate('sulu_block_suite.hotspot_picker.y') || 'Y Position (%)'}
-                            </label>
-                            <NumberField
-                                max={100}
-                                min={0}
-                                onChange={this.handleManualYChange}
-                                step={0.5}
-                                value={y}
-                            />
+                            <div className={styles.fieldGroup}>
+                                <label className={styles.fieldLabel}>
+                                    {translate('sulu_block_suite.hotspot_picker.y') || 'Vertical (Y)'} (%)
+                                </label>
+                                <NumberField
+                                    max={100}
+                                    min={0}
+                                    onChange={this.handleManualYChange}
+                                    step={0.5}
+                                    value={y}
+                                />
+                            </div>
                         </div>
+                    </div>
 
-                        <div className={styles.fieldGroup}>
-                            <label className={styles.fieldLabel}>
-                                {translate('sulu_block_suite.hotspot_picker.marker_type') || 'Marker Style'}
-                            </label>
-                            <SingleSelect onChange={this.handleMarkerTypeChange} value={activeMarkerType}>
-                                <SingleSelect.Option value="pulse">
-                                    {translate('sulu_block_suite.hotspot_picker.type_pulse') || 'Pulse Ring'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="plus">
-                                    {translate('sulu_block_suite.hotspot_picker.type_plus') || 'Plus (+)'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="number">
-                                    {translate('sulu_block_suite.hotspot_picker.type_number') || 'Number (1)'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="dot">
-                                    {translate('sulu_block_suite.hotspot_picker.type_dot') || 'Solid Dot'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="pin">
-                                    {translate('sulu_block_suite.hotspot_picker.type_pin') || 'Map Pin'}
-                                </SingleSelect.Option>
-                            </SingleSelect>
+                    {/* Appearance & Behavior Section */}
+                    <div className={styles.controlsSection}>
+                        <div className={styles.sectionHeading}>
+                            <Icon name="su-sliders" />
+                            <span>{translate('sulu_block_suite.hotspot_picker.appearance_heading') || 'Marker & Behavior'}</span>
                         </div>
+                        <div className={styles.optionsGrid}>
+                            <div className={styles.fieldGroup}>
+                                <label className={styles.fieldLabel}>
+                                    {translate('sulu_block_suite.hotspot_picker.marker_type') || 'Marker Style'}
+                                </label>
+                                <SingleSelect onChange={this.handleMarkerTypeChange} value={activeMarkerType}>
+                                    <SingleSelect.Option value="pulse">
+                                        {translate('sulu_block_suite.hotspot_picker.type_pulse') || 'Radar (Pulse)'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="plus">
+                                        {translate('sulu_block_suite.hotspot_picker.type_plus') || 'Artı (+)'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="number">
+                                        {translate('sulu_block_suite.hotspot_picker.type_number') || 'Numara (1)'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="dot">
+                                        {translate('sulu_block_suite.hotspot_picker.type_dot') || 'Nokta (Dot)'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="pin">
+                                        {translate('sulu_block_suite.hotspot_picker.type_pin') || 'İğne (Pin)'}
+                                    </SingleSelect.Option>
+                                </SingleSelect>
+                            </div>
 
-                        <div className={styles.fieldGroup}>
-                            <label className={styles.fieldLabel}>
-                                {translate('sulu_block_suite.hotspot_picker.marker_color') || 'Marker Color'}
-                            </label>
-                            <SingleSelect onChange={this.handleMarkerColorChange} value={activeMarkerColor}>
-                                <SingleSelect.Option value="primary">
-                                    {translate('sulu_block_suite.hotspot_picker.color_primary') || 'Primary (Blue)'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="dark">
-                                    {translate('sulu_block_suite.hotspot_picker.color_dark') || 'Dark (Neutral)'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="light">
-                                    {translate('sulu_block_suite.hotspot_picker.color_light') || 'Light (White)'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="accent">
-                                    {translate('sulu_block_suite.hotspot_picker.color_accent') || 'Accent (Amber)'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="success">
-                                    {translate('sulu_block_suite.hotspot_picker.color_success') || 'Success (Green)'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="danger">
-                                    {translate('sulu_block_suite.hotspot_picker.color_danger') || 'Danger (Red)'}
-                                </SingleSelect.Option>
-                            </SingleSelect>
-                        </div>
+                            <div className={styles.fieldGroup}>
+                                <label className={styles.fieldLabel}>
+                                    {translate('sulu_block_suite.hotspot_picker.marker_color') || 'Marker Color'}
+                                </label>
+                                <SingleSelect onChange={this.handleMarkerColorChange} value={activeMarkerColor}>
+                                    <SingleSelect.Option value="primary">
+                                        {translate('sulu_block_suite.hotspot_picker.color_primary') || 'Mavi (Primary)'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="dark">
+                                        {translate('sulu_block_suite.hotspot_picker.color_dark') || 'Koyu Gri'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="light">
+                                        {translate('sulu_block_suite.hotspot_picker.color_light') || 'Açık / Beyaz'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="accent">
+                                        {translate('sulu_block_suite.hotspot_picker.color_accent') || 'Sarı / Vurgu'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="success">
+                                        {translate('sulu_block_suite.hotspot_picker.color_success') || 'Yeşil'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="danger">
+                                        {translate('sulu_block_suite.hotspot_picker.color_danger') || 'Kırmızı'}
+                                    </SingleSelect.Option>
+                                </SingleSelect>
+                            </div>
 
-                        <div className={styles.fieldGroup}>
-                            <label className={styles.fieldLabel}>
-                                {translate('sulu_block_suite.hotspot_picker.trigger') || 'Trigger'}
-                            </label>
-                            <SingleSelect onChange={this.handleTriggerChange} value={activeTrigger}>
-                                <SingleSelect.Option value="click">
-                                    {translate('sulu_block_suite.hotspot_picker.trigger_click') || 'On Click'}
-                                </SingleSelect.Option>
-                                <SingleSelect.Option value="hover">
-                                    {translate('sulu_block_suite.hotspot_picker.trigger_hover') || 'On Hover'}
-                                </SingleSelect.Option>
-                            </SingleSelect>
+                            <div className={styles.fieldGroup}>
+                                <label className={styles.fieldLabel}>
+                                    {translate('sulu_block_suite.hotspot_picker.trigger') || 'Açılma Şekli'}
+                                </label>
+                                <SingleSelect onChange={this.handleTriggerChange} value={activeTrigger}>
+                                    <SingleSelect.Option value="click">
+                                        {translate('sulu_block_suite.hotspot_picker.trigger_click') || 'Tıklama (Click)'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="hover">
+                                        {translate('sulu_block_suite.hotspot_picker.trigger_hover') || 'Hover (Üzerine Gelme)'}
+                                    </SingleSelect.Option>
+                                </SingleSelect>
+                            </div>
                         </div>
                     </div>
 
@@ -510,7 +610,7 @@ export default class HotspotPicker extends React.Component<Props> {
                         <Icon name="su-info-circle" />
                         <span>
                             {translate('sulu_block_suite.hotspot_picker.footnote')
-                                || 'Click or drag on the image canvas to adjust position. All values save automatically.'}
+                                || 'Click or drag on the image canvas to adjust position.'}
                         </span>
                     </div>
                 </div>
