@@ -3,7 +3,7 @@
     "description": "Component block props, visual presets, reusable global blocks, and template layout engine for Sulu CMS",
     "type": "symfony-bundle",
     "license": "MIT",
-    "homepage": "https://github.com/trk/sulu-block-suite-bundle",
+    "homepage": "https://github.com/trk/SuluBlockSuiteBundle",
     "keywords": [
         "sulu",
         "sulu-bundle",
@@ -15,13 +15,13 @@
     ],
     "authors": [
         {
-            "name": "TOTOGLU",
+            "name": "Iskender TOTOGLU",
             "homepage": "https://github.com/trk"
         }
     ],
     "support": {
-        "issues": "https://github.com/trk/sulu-block-suite-bundle/issues",
-        "source": "https://github.com/trk/sulu-block-suite-bundle"
+        "issues": "https://github.com/trk/SuluBlockSuiteBundle/issues",
+        "source": "https://github.com/trk/SuluBlockSuiteBundle"
     },
     "require": {
         "php": ">=8.2",
