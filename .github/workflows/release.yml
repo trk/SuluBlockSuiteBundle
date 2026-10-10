@@ -1,26 +1,24 @@
-name: Release
+name: "Tag, Release"
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches:
+      - main
+    paths:
+      - "composer.json"
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Version tag to create and release (e.g. v1.0.1)'
-        required: true
-        type: string
-
-permissions:
-  contents: write
 
 jobs:
-  quality-check:
-    name: Pre-Release Quality Checks
+  tag_and_release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -29,70 +27,136 @@ jobs:
           extensions: mbstring, intl, pdo, xml, json
           tools: composer:v2
 
-      - name: Validate composer.json
-        run: composer validate --strict
-
-      - name: Install Dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
-
-      - name: Run PHPUnit Tests
-        run: vendor/bin/phpunit --colors=always
-
-      - name: Run PHPStan
-        run: vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --no-progress
-
-  create-release:
-    name: Publish GitHub Release
-    needs: quality-check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Determine Version
-        id: version
+      - name: Extract version from composer.json
+        id: get_version
         run: |
-          TAG="${{ github.ref_name }}"
-          if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then
-            TAG="${{ inputs.tag }}"
+          VERSION=$(php -r "echo json_decode(file_get_contents('composer.json'))->version ?? '';")
+
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not find 'version' field in composer.json"
+            exit 1
           fi
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          CLEAN_VER="${TAG#v}"
-          echo "clean_version=$CLEAN_VER" >> $GITHUB_OUTPUT
 
-      - name: Create Git Tag (for workflow_dispatch)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
-          git push origin "${{ steps.version.outputs.tag }}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Extract Changelog Entry
-        id: changelog
+      - name: Check if tag exists
+        id: check_tag
         run: |
-          CLEAN_VER="${{ steps.version.outputs.clean_version }}"
-          echo "Extracting release notes for version: $CLEAN_VER"
+          TAG="v${{ steps.get_version.outputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag $TAG already exists on remote. Skipping release."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pre-Release Quality Checks
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          composer validate --strict --no-check-version
+          composer install --prefer-dist --no-interaction --no-progress
+          vendor/bin/phpunit --colors=always
+          vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --no-progress
+
+      - name: Configure Git User
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Create Git Tag and GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.get_version.outputs.version }}"
+          CLEAN_VER="${{ steps.get_version.outputs.version }}"
+          REPO=${{ github.repository }}
+          echo "Generated Tag: $TAG"
+          git tag $TAG
+          git push origin $TAG
+
+          # Initialize release notes
+          echo "## Release $TAG" > release_notes.md
+          echo "" >> release_notes.md
+
+          # Include curated section from CHANGELOG.md if present
           if [ -f CHANGELOG.md ]; then
-            # Extract content between ## [$CLEAN_VER] and the next ## header
             awk -v ver="## \\[$CLEAN_VER\\]" '
               $0 ~ ver {flag=1; next}
               /^## \\[/ {flag=0}
               flag {print}
-            ' CHANGELOG.md > RELEASE_NOTES.md
-          fi
-          if [ ! -s RELEASE_NOTES.md ]; then
-            echo "Release ${{ steps.version.outputs.tag }}" > RELEASE_NOTES.md
+            ' CHANGELOG.md > changelog_section.md
+            if [ -s changelog_section.md ]; then
+              cat changelog_section.md >> release_notes.md
+              echo "" >> release_notes.md
+            fi
           fi
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Release ${{ steps.version.outputs.tag }}
-          body_path: RELEASE_NOTES.md
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+          echo "## What's Changed" >> release_notes.md
+          echo "" >> release_notes.md
+
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log --format="%H" $PREV_TAG..HEAD)
+            COMPARE_URL="https://github.com/$REPO/compare/$PREV_TAG...$TAG"
+          else
+            COMMITS=$(git log --format="%H" HEAD)
+            COMPARE_URL="https://github.com/$REPO/commits/$TAG"
+          fi
+
+          SEEN_AUTHORS=()
+          CONTRIBUTORS_HTML=""
+
+          for SHA in $COMMITS; do
+             TITLE=$(git log --format="%s" -n 1 $SHA)
+             SHORT_SHA=$(git rev-parse --short $SHA)
+             
+             LOGIN=$(gh api repos/$REPO/commits/$SHA --jq '.author.login // empty' 2>/dev/null || echo "")
+             if [ -z "$LOGIN" ]; then
+                LOGIN=$(git log --format="%an" -n 1 $SHA)
+             fi
+             AVATAR=$(gh api repos/$REPO/commits/$SHA --jq '.author.avatar_url // empty' 2>/dev/null || echo "")
+             
+             if [[ "$LOGIN" == *" "* ]]; then
+               echo "* $TITLE by **$LOGIN** in $SHORT_SHA" >> release_notes.md
+             else
+               echo "* $TITLE by @$LOGIN in $SHORT_SHA" >> release_notes.md
+             fi
+             
+             # Check if seen
+             SEEN=false
+             for SA in "${SEEN_AUTHORS[@]}"; do
+                if [ "$SA" == "$LOGIN" ]; then
+                   SEEN=true
+                   break
+                fi
+             done
+             
+             if [ "$SEEN" = false ]; then
+                SEEN_AUTHORS+=("$LOGIN")
+                
+                if [ -n "$AVATAR" ]; then
+                   ITEM="<img src=\"$AVATAR\" width=\"24\" height=\"24\" style=\"border-radius: 50%; vertical-align: middle;\" alt=\"\"> $LOGIN"
+                else
+                   ITEM="$LOGIN"
+                fi
+                
+                if [ -z "$CONTRIBUTORS_HTML" ]; then
+                   CONTRIBUTORS_HTML="$ITEM"
+                else
+                   CONTRIBUTORS_HTML="$CONTRIBUTORS_HTML, $ITEM"
+                fi
+             fi
+          done
+
+          if [ -n "$CONTRIBUTORS_HTML" ]; then
+            echo "" >> release_notes.md
+            echo "### Contributors" >> release_notes.md
+            echo "$CONTRIBUTORS_HTML" >> release_notes.md
+          fi
+
+          echo "" >> release_notes.md
+          echo "**Full Changelog**: $COMPARE_URL" >> release_notes.md
+
+          gh release create $TAG -F release_notes.md --title "$TAG"
