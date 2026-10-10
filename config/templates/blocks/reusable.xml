@@ -1,0 +1,42 @@
+<?xml version="1.0" ?>
+<template xmlns="http://schemas.sulu.io/template/template"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/template-1.0.xsd">
+    <key>reusable</key>
+    <meta>
+        <title lang="en">Reusable Block / Section</title>
+        <title lang="tr">Ortak Paylaşılan Blok</title>
+        <title lang="de">Wiederverwendbarer Block / Abschnitt</title>
+        <title lang="ru">Повторно используемый блок / секция</title>
+        <title lang="es">Bloque / Sección Reutilizable</title>
+        <title lang="fr">Bloc / Section Réutilisable</title>
+    </meta>
+    <properties>
+        <property name="snippet" type="single_reusable_block_selection" mandatory="true">
+            <tag name="sulu.block_preview" priority="100"/>
+            <meta>
+                <title lang="en">Reusable Block</title>
+                <title lang="tr">Ortak Paylaşılan Blok</title>
+                <title lang="de">Wiederverwendbarer Block</title>
+                <title lang="ru">Повторно используемый блок</title>
+                <title lang="es">Bloque Reutilizable</title>
+                <title lang="fr">Bloc Réutilisable</title>
+                <info_text lang="en">Select a shared reusable block section from Block Suite</info_text>
+                <info_text lang="tr">Ortak Bloklar menüsünde oluşturulmuş bir bölümü seçin</info_text>
+                <info_text lang="de">Wählen Sie einen vorgefertigten Abschnitt aus der Block Suite</info_text>
+                <info_text lang="ru">Выберите готовый раздел из набора блоков</info_text>
+                <info_text lang="es">Seleccione una sección prediseñada de la Suite de Bloques</info_text>
+                <info_text lang="fr">Sélectionnez une section prédéfinie dans la Suite de Blocs</info_text>
+            </meta>
+            <params>
+                <param name="templateKeys" value="reusable_block"/>
+            </params>
+        </property>
+
+        <property name="props" type="block_props" colspan="12">
+            <params>
+                <param name="component_type" value="reusable"/>
+            </params>
+        </property>
+    </properties>
+</template>

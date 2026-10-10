@@ -1,0 +1,104 @@
+<?xml version="1.0" ?>
+<template xmlns="http://schemas.sulu.io/template/template"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/template-1.0.xsd">
+    <key>block_preset</key>
+    <meta>
+        <title lang="en">Block Preset</title>
+        <title lang="tr">Hazır Blok Şablonu</title>
+        <title lang="de">Block-Vorlage</title>
+        <title lang="ru">Предустановка блока</title>
+        <title lang="es">Ajuste de Bloque</title>
+        <title lang="fr">Préréglage de Bloc</title>
+    </meta>
+    <properties>
+        <property name="title" type="text_line" mandatory="true">
+            <meta>
+                <title lang="en">Preset Title</title>
+                <title lang="tr">Hazır Şablon Başlığı</title>
+                <title lang="de">Vorlagentitel</title>
+                <title lang="ru">Название предустановки</title>
+                <title lang="es">Título del Ajuste</title>
+                <title lang="fr">Titre du Préréglage</title>
+                <info_text lang="en">Name of this preset (e.g. Hero Primary Button, Dark Highlight Card)</info_text>
+                <info_text lang="tr">Bu hazır şablonun adı (ör. Hero Birincil Buton, Koyu Vurgulu Kart)</info_text>
+                <info_text lang="de">Name der Vorlage (z. B. Hero Primärer Button, Dunkel Hervorgehobene Karte)</info_text>
+                <info_text lang="ru">Название предустановки (например, Основная кнопка Hero, Темная карточка)</info_text>
+                <info_text lang="es">Nombre del ajuste (ej. Botón Principal Hero, Tarjeta Oscura Destacada)</info_text>
+                <info_text lang="fr">Nom du préréglage (ex. Bouton Principal Hero, Carte Sombre Mise en Avant)</info_text>
+            </meta>
+            <params>
+                <param name="headline" value="true"/>
+            </params>
+        </property>
+
+        <property name="description" type="text_area">
+            <meta>
+                <title lang="en">Description / Usage Note</title>
+                <title lang="tr">Açıklama / Kullanım Notu</title>
+                <title lang="de">Beschreibung / Nutzungshinweis</title>
+                <title lang="ru">Описание / Примечание по использованию</title>
+                <title lang="es">Descripción / Nota de uso</title>
+                <title lang="fr">Description / Note d'utilisation</title>
+                <info_text lang="en">Short description explaining where and when to use this preset</info_text>
+                <info_text lang="tr">Bu hazır şablonun nerede ve nasıl kullanılacağını açıklayan kısa not</info_text>
+                <info_text lang="de">Kurze Beschreibung, wo und wann diese Vorlage verwendet werden soll</info_text>
+                <info_text lang="ru">Краткое описание, объясняющее, где и когда использовать эту предустановку</info_text>
+                <info_text lang="es">Breve descripción que explica dónde y cuándo utilizar este ajuste</info_text>
+                <info_text lang="fr">Brève description expliquant où et quand utiliser ce préréglage</info_text>
+            </meta>
+        </property>
+
+        <property name="preview_image" type="single_media_selection">
+            <meta>
+                <title lang="en">Preview Image</title>
+                <title lang="tr">Önizleme Görseli</title>
+                <title lang="de">Vorschaubild</title>
+                <title lang="ru">Изображение для предпросмотра</title>
+                <title lang="es">Imagen de Vista Previa</title>
+                <title lang="fr">Image d'Aperçu</title>
+                <info_text lang="en">Visual screenshot or graphic preview of this preset</info_text>
+                <info_text lang="tr">Bu hazır şablonun görsel önizleme veya ekran görüntüsü</info_text>
+                <info_text lang="de">Visueller Screenshot oder grafische Vorschau dieser Vorlage</info_text>
+                <info_text lang="ru">Визуальный скриншот или графический предварительный просмотр</info_text>
+                <info_text lang="es">Captura de pantalla visual o vista previa gráfica de este ajuste</info_text>
+                <info_text lang="fr">Capture d'écran visuelle ou aperçu graphique de ce préréglage</info_text>
+            </meta>
+            <params>
+                <param name="types" value="image"/>
+            </params>
+        </property>
+
+        <property name="block" type="block" minOccurs="1" maxOccurs="1" mandatory="true">
+            <meta>
+                <title lang="en">Preset Block Configuration</title>
+                <title lang="tr">Hazır Blok Yapılandırması</title>
+                <title lang="de">Block-Konfiguration der Vorlage</title>
+                <title lang="ru">Конфигурация блока предустановки</title>
+                <title lang="es">Configuración de Bloque del Ajuste</title>
+                <title lang="fr">Configuration de Bloc du Préréglage</title>
+                <info_text lang="en">Choose the target block type and configure its ready-to-use content and styling values.</info_text>
+                <info_text lang="tr">Hedef blok tipini seçin ve hazır gelecek içerik ile stil alanlarını doldurun.</info_text>
+                <info_text lang="de">Wählen Sie den Zielblocktyp aus und konfigurieren Sie die vorgefertigten Inhalts- und Stilwerte.</info_text>
+                <info_text lang="ru">Выберите целевой тип блока и настройте готовые значения содержимого и стиля.</info_text>
+                <info_text lang="es">Elija el tipo de bloque de destino y configure su contenido listo para usar y valores de estilo.</info_text>
+                <info_text lang="fr">Choisissez le type de bloc cible et configurez ses valeurs de contenu et de style prêtes à l'emploi.</info_text>
+            </meta>
+            <types>
+                <type name="default">
+                    <meta>
+                        <title lang="en">Block Content</title>
+                        <title lang="tr">Blok İçeriği</title>
+                        <title lang="de">Block-Inhalt</title>
+                        <title lang="ru">Содержимое блока</title>
+                        <title lang="es">Contenido del Bloque</title>
+                        <title lang="fr">Contenu du Bloc</title>
+                    </meta>
+                    <properties>
+                        <property name="props" type="block_props" colspan="12"/>
+                    </properties>
+                </type>
+            </types>
+        </property>
+    </properties>
+</template>

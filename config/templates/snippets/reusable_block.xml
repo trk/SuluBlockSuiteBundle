@@ -1,0 +1,98 @@
+<?xml version="1.0" ?>
+<template xmlns="http://schemas.sulu.io/template/template"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/template-1.0.xsd">
+    <key>reusable_block</key>
+    <meta>
+        <title lang="en">Reusable Block Section</title>
+        <title lang="tr">Ortak Paylaşılan Blok</title>
+        <title lang="de">Wiederverwendbarer Blockabschnitt</title>
+        <title lang="ru">Повторно используемая секция блоков</title>
+        <title lang="es">Sección de Bloque Reutilizable</title>
+        <title lang="fr">Section de Blocs Réutilisables</title>
+    </meta>
+    <properties>
+        <property name="title" type="text_line" mandatory="true">
+            <meta>
+                <title lang="en">Internal Title</title>
+                <title lang="tr">Blok Adı / Başlık</title>
+                <title lang="de">Interner Titel</title>
+                <title lang="ru">Внутренний заголовок</title>
+                <title lang="es">Título Interno</title>
+                <title lang="fr">Titre Interne</title>
+                <info_text lang="en">Descriptive name for internal management</info_text>
+                <info_text lang="tr">Yönetim panelinde bu bloğu tanımak için açıklayıcı isim</info_text>
+                <info_text lang="de">Beschreibender Name für die interne Verwaltung</info_text>
+                <info_text lang="ru">Описательное имя для внутреннего управления</info_text>
+                <info_text lang="es">Nombre descriptivo para la gestión interna</info_text>
+                <info_text lang="fr">Nom descriptif pour la gestion interne</info_text>
+            </meta>
+            <params>
+                <param name="headline" value="true"/>
+            </params>
+        </property>
+
+        <property name="description" type="text_area">
+            <meta>
+                <title lang="en">Description / Usage Note</title>
+                <title lang="tr">Açıklama / Kullanım Notu</title>
+                <title lang="de">Beschreibung / Nutzungshinweis</title>
+                <title lang="ru">Описание / Примечание по использованию</title>
+                <title lang="es">Descripción / Nota de uso</title>
+                <title lang="fr">Description / Note d'utilisation</title>
+            </meta>
+        </property>
+
+        <property name="preview_image" type="single_media_selection">
+            <meta>
+                <title lang="en">Preview Image</title>
+                <title lang="tr">Önizleme Görseli</title>
+                <title lang="de">Vorschaubild</title>
+                <title lang="ru">Изображение для предпросмотра</title>
+                <title lang="es">Imagen de Vista Previa</title>
+                <title lang="fr">Image d'Aperçu</title>
+                <info_text lang="en">Visual thumbnail preview of this reusable block</info_text>
+                <info_text lang="tr">Bu ortak bloğun görsel önizlemesi</info_text>
+                <info_text lang="de">Visuelle Miniaturvorschau dieses wiederverwendbaren Blocks</info_text>
+                <info_text lang="ru">Визуальный предпросмотр этого повторно используемого блока</info_text>
+                <info_text lang="es">Vista previa visual de este bloque reutilizable</info_text>
+                <info_text lang="fr">Aperçu visuel de ce bloc réutilisable</info_text>
+            </meta>
+            <params>
+                <param name="types" value="image"/>
+            </params>
+        </property>
+
+        <property name="blocks" type="block">
+            <meta>
+                <title lang="en">Section Content Blocks</title>
+                <title lang="tr">Bölüm İçerik Blokları</title>
+                <title lang="de">Abschnitt-Inhaltsblöcke</title>
+                <title lang="ru">Блоки содержимого секции</title>
+                <title lang="es">Bloques de Contenido de la Sección</title>
+                <title lang="fr">Blocs de Contenu de la Section</title>
+            </meta>
+            <types>
+                <type ref="headline"/>
+                <type ref="button"/>
+                <type ref="text"/>
+                <type ref="image"/>
+                <type ref="card"/>
+                <type ref="video"/>
+                <type name="default">
+                    <meta>
+                        <title lang="en">Block Content</title>
+                        <title lang="tr">Blok İçeriği</title>
+                        <title lang="de">Block-Inhalt</title>
+                        <title lang="ru">Содержимое блока</title>
+                        <title lang="es">Contenido del Bloque</title>
+                        <title lang="fr">Contenu du Bloc</title>
+                    </meta>
+                    <properties>
+                        <property name="props" type="block_props" colspan="12"/>
+                    </properties>
+                </type>
+            </types>
+        </property>
+    </properties>
+</template>

@@ -1,0 +1,54 @@
+@import 'sulu-admin-bundle/containers/Application/variables.scss';
+@import 'sulu-admin-bundle/containers/Application/colors.scss';
+
+.previewContainer {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    vertical-align: middle;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 18px;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    background: #ede9fe;
+    color: #6d28d9;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+
+    span {
+        font-size: 11px;
+    }
+}
+
+.title {
+    font-weight: 600;
+    color: $charcoal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.description {
+    color: $doveGray;
+    font-style: italic;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.loading {
+    color: $doveGray;
+    font-style: italic;
+    font-size: 11px;
+}

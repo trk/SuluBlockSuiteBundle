@@ -1,0 +1,216 @@
+// @flow
+import React from 'react';
+import {action, observable, toJS} from 'mobx';
+import {observer} from 'mobx-react';
+import {
+    Button,
+    Dialog,
+    Form,
+    Input,
+} from 'sulu-admin-bundle/components';
+import {translate} from 'sulu-admin-bundle/utils';
+import {Requester} from 'sulu-admin-bundle/services';
+import blockPropsStyles from './blockProps.scss';
+
+type ReusableSnippet = {
+    description?: ?string,
+    id: string,
+    preview_image?: ?string,
+    title: string,
+};
+
+type ReusableCardProps = {
+    locale?: string,
+    onChangeSnippet?: () => void,
+    snippet: ReusableSnippet,
+};
+
+@observer
+export class ReusableCard extends React.Component<ReusableCardProps> {
+    handleOpenInNewTab = () => {
+        const {locale, snippet} = this.props;
+        const normalizedLocale = encodeURIComponent(locale || 'en');
+        const id = encodeURIComponent(snippet.id);
+        const adminBase = window.location.pathname.replace(/\/$/, '');
+        window.open(`${adminBase}/#/block-suite/reusable/${normalizedLocale}/${id}/content`, '_blank');
+    };
+
+    render() {
+        const {onChangeSnippet, snippet} = this.props;
+        const openInNewTabLabel = translate('sulu_block_suite.open_in_new_tab') || 'Edit in New Tab';
+        const changeLabel = translate('sulu_block_suite.change_reusable_block') || 'Change';
+
+        return (
+            <div className={blockPropsStyles.reusableCard}>
+                {snippet.preview_image && (
+                    <img
+                        alt={snippet.title}
+                        className={blockPropsStyles.reusablePreviewImage}
+                        src={snippet.preview_image}
+                    />
+                )}
+                <div className={blockPropsStyles.reusableInfo}>
+                    <span className={blockPropsStyles.reusableTitle}>{snippet.title}</span>
+                    {snippet.description && (
+                        <span className={blockPropsStyles.reusableDesc}>{snippet.description}</span>
+                    )}
+                </div>
+                <div className={blockPropsStyles.actionGroup} style={{marginLeft: 'auto'}}>
+                    <Button icon="su-pen" onClick={this.handleOpenInNewTab} skin="link">
+                        {openInNewTabLabel}
+                    </Button>
+                    {onChangeSnippet && (
+                        <Button icon="su-sync" onClick={onChangeSnippet} skin="link">
+                            {changeLabel}
+                        </Button>
+                    )}
+                </div>
+            </div>
+        );
+    }
+}
+
+type SaveReusableDialogProps = {
+    blockData: Object,
+    componentType: string,
+    locale: string,
+    onCancel: () => void,
+    onSuccess: (createdSnippet: Object) => void,
+    open: boolean,
+    propsValues: Object,
+};
+
+@observer
+export class SaveReusableDialog extends React.Component<SaveReusableDialogProps> {
+    @observable title: string = '';
+    @observable description: string = '';
+    @observable saving: boolean = false;
+    @observable error: ?string = null;
+
+    componentDidUpdate(prevProps: SaveReusableDialogProps) {
+        if (this.props.open && !prevProps.open) {
+            this.resetForm();
+        }
+    }
+
+    @action resetForm() {
+        this.title = '';
+        this.description = '';
+        this.saving = false;
+        this.error = null;
+    }
+
+    @action handleTitleChange = (val: ?string) => {
+        this.title = val || '';
+        this.error = null;
+    };
+
+    @action handleDescriptionChange = (val: ?string) => {
+        this.description = val || '';
+    };
+
+    @action handleConfirm = () => {
+        const title = this.title.trim();
+        if (!title) {
+            return;
+        }
+
+        const {blockData, componentType, locale, onSuccess, propsValues} = this.props;
+        if (!componentType || componentType === 'general') {
+            return;
+        }
+
+        this.saving = true;
+        this.error = null;
+
+        const currentProps = {...toJS(propsValues)};
+        delete currentProps._preset;
+
+        const payloadBlockData = {
+            ...(blockData ? toJS(blockData) : {}),
+            type: componentType,
+            props: currentProps,
+        };
+
+        const payload = {
+            title,
+            description: this.description.trim() || null,
+            locale,
+            block: payloadBlockData,
+        };
+
+        Requester.post('/admin/api/reusable-blocks', payload)
+            .then(action((createdSnippet) => {
+                this.saving = false;
+                onSuccess(createdSnippet);
+            }))
+            .catch(action((errorResponse) => {
+                this.saving = false;
+                const defaultErr = translate('sulu_block_suite.save_reusable_error') || 'Failed to save reusable block';
+                if (errorResponse && errorResponse.json) {
+                    errorResponse.json().then(action((err) => {
+                        this.error = err.error || defaultErr;
+                    })).catch(action(() => {
+                        this.error = defaultErr;
+                    }));
+                } else {
+                    this.error = defaultErr;
+                }
+            }));
+    };
+
+    render() {
+        const {onCancel, open} = this.props;
+        if (!open) {
+            return null;
+        }
+
+        const titleText = translate('sulu_block_suite.save_reusable_title') || 'Save as Reusable Block';
+        const titleLabel = translate('sulu_block_suite.reusable_title_label') || 'Reusable Block Title';
+        const descLabel = translate('sulu_block_suite.reusable_desc_label') || 'Description / Note (Optional)';
+        const cancelButton = translate('sulu_admin.cancel') || 'Cancel';
+        const saveButton = translate('sulu_admin.save') || 'Save';
+
+        return (
+            <Dialog
+                align="left"
+                cancelText={cancelButton}
+                confirmDisabled={!this.title.trim() || this.saving}
+                confirmLoading={this.saving}
+                confirmText={saveButton}
+                onCancel={onCancel}
+                onConfirm={this.handleConfirm}
+                onSnackbarCloseClick={action(() => {
+                    this.error = null;
+                })}
+                open={open}
+                size="small"
+                snackbarMessage={this.error || undefined}
+                snackbarType="error"
+                title={titleText}
+            >
+                <div className={blockPropsStyles.savePresetDialogForm}>
+                    <Form>
+                        <Form.Field colSpan={12} label={titleLabel} required={true}>
+                            <Input
+                                onChange={this.handleTitleChange}
+                                value={this.title}
+                            />
+                        </Form.Field>
+                        <Form.Field colSpan={12} label={descLabel}>
+                            <Input
+                                onChange={this.handleDescriptionChange}
+                                value={this.description}
+                            />
+                        </Form.Field>
+                    </Form>
+                </div>
+            </Dialog>
+        );
+    }
+}
+
+export default {
+    Card: ReusableCard,
+    SaveDialog: SaveReusableDialog,
+};
