@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag to create and release (e.g. v1.0.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  quality-check:
+    name: Pre-Release Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, intl, pdo, xml, json
+          tools: composer:v2
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Install Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Run PHPUnit Tests
+        run: vendor/bin/phpunit --colors=always
+
+      - name: Run PHPStan
+        run: vendor/bin/phpstan analyse --configuration=phpstan.neon.dist --no-progress
+
+  create-release:
+    name: Publish GitHub Release
+    needs: quality-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Version
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then
+            TAG="${{ inputs.tag }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          CLEAN_VER="${TAG#v}"
+          echo "clean_version=$CLEAN_VER" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag (for workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Extract Changelog Entry
+        id: changelog
+        run: |
+          CLEAN_VER="${{ steps.version.outputs.clean_version }}"
+          echo "Extracting release notes for version: $CLEAN_VER"
+          if [ -f CHANGELOG.md ]; then
+            # Extract content between ## [$CLEAN_VER] and the next ## header
+            awk -v ver="## \\[$CLEAN_VER\\]" '
+              $0 ~ ver {flag=1; next}
+              /^## \\[/ {flag=0}
+              flag {print}
+            ' CHANGELOG.md > RELEASE_NOTES.md
+          fi
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Release ${{ steps.version.outputs.tag }}" > RELEASE_NOTES.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true
