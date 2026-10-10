@@ -89,9 +89,10 @@ YAML;
         // Check fallback to English when requested in English
         $schemaEn = $provider->getSchema('button', 'en');
         $this->assertSame('Appearance', $schemaEn['tabs'][0]['title']);
-        $this->assertSame('Variant', $schemaEn['tabs'][0]['fields'][0]['label']);
-        $this->assertArrayHasKey('options', $schemaEn['tabs'][0]['fields'][0]);
-        $this->assertSame('Solid', $schemaEn['tabs'][0]['fields'][0]['options'][0]['label']);
+        $variantFieldEn = $schemaEn['tabs'][0]['fields'][0];
+        $this->assertSame('Variant', $variantFieldEn['label']);
+        $this->assertArrayHasKey('options', $variantFieldEn);
+        $this->assertSame('Solid', $variantFieldEn['options'][0]['label']);
     }
 
     public function testCascadesMultipleDirectoriesAndMergesCommon(): void
