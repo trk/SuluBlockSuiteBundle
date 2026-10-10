@@ -70,61 +70,61 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
                 if (\is_file($filePath)) {
                     try {
                         $parsed = Yaml::parseFile($filePath);
-                    if (\is_array($parsed)) {
-                        /** @var mixed $rawPresets */
-                        $rawPresets = null;
-                        if (isset($parsed['presets']) && \is_array($parsed['presets'])) {
-                            $rawPresets = $parsed['presets'];
-                        } elseif (isset($parsed[$blockType]) && \is_array($parsed[$blockType]) && isset($parsed[$blockType]['presets']) && \is_array($parsed[$blockType]['presets'])) {
-                            $rawPresets = $parsed[$blockType]['presets'];
-                        }
+                        if (\is_array($parsed)) {
+                            /** @var mixed $rawPresets */
+                            $rawPresets = null;
+                            if (isset($parsed['presets']) && \is_array($parsed['presets'])) {
+                                $rawPresets = $parsed['presets'];
+                            } elseif (isset($parsed[$blockType]) && \is_array($parsed[$blockType]) && isset($parsed[$blockType]['presets']) && \is_array($parsed[$blockType]['presets'])) {
+                                $rawPresets = $parsed[$blockType]['presets'];
+                            }
 
-                        if (\is_array($rawPresets)) {
-                            foreach ($rawPresets as $presetId => $presetConfig) {
-                                if (!\is_string($presetId) || !\is_array($presetConfig)) {
-                                    continue;
-                                }
-
-                                $title = $this->resolveLocalizedText($presetConfig['title'] ?? null, $locale, $presetId);
-                                $description = $this->resolveLocalizedText($presetConfig['description'] ?? null, $locale, null);
-                                $previewImage = isset($presetConfig['preview_image']) && \is_string($presetConfig['preview_image'])
-                                    ? $presetConfig['preview_image']
-                                    : null;
-
-                                /** @var array<string, mixed> $props */
-                                $props = [];
-                                if (isset($presetConfig['props']) && \is_array($presetConfig['props'])) {
-                                    foreach ($presetConfig['props'] as $k => $v) {
-                                        $props[(string) $k] = $v;
+                            if (\is_array($rawPresets)) {
+                                foreach ($rawPresets as $presetId => $presetConfig) {
+                                    if (!\is_string($presetId) || !\is_array($presetConfig)) {
+                                        continue;
                                     }
-                                }
 
-                                /** @var array<string, mixed> $values */
-                                $values = [];
-                                if (isset($presetConfig['values']) && \is_array($presetConfig['values'])) {
-                                    foreach ($presetConfig['values'] as $k => $v) {
-                                        $values[(string) $k] = $v;
+                                    $title = $this->resolveLocalizedText($presetConfig['title'] ?? null, $locale, $presetId);
+                                    $description = $this->resolveLocalizedText($presetConfig['description'] ?? null, $locale, null);
+                                    $previewImage = isset($presetConfig['preview_image']) && \is_string($presetConfig['preview_image'])
+                                        ? $presetConfig['preview_image']
+                                        : null;
+
+                                    /** @var array<string, mixed> $props */
+                                    $props = [];
+                                    if (isset($presetConfig['props']) && \is_array($presetConfig['props'])) {
+                                        foreach ($presetConfig['props'] as $k => $v) {
+                                            $props[(string) $k] = $v;
+                                        }
                                     }
-                                }
 
-                                $presetsMap[$presetId] = [
-                                    'id' => $presetId,
-                                    'title' => $title ?? $presetId,
-                                    'description' => $description,
-                                    'preview_image' => $previewImage,
-                                    'props' => $props,
-                                    'values' => $values,
-                                ];
+                                    /** @var array<string, mixed> $values */
+                                    $values = [];
+                                    if (isset($presetConfig['values']) && \is_array($presetConfig['values'])) {
+                                        foreach ($presetConfig['values'] as $k => $v) {
+                                            $values[(string) $k] = $v;
+                                        }
+                                    }
+
+                                    $presetsMap[$presetId] = [
+                                        'id' => $presetId,
+                                        'title' => $title ?? $presetId,
+                                        'description' => $description,
+                                        'preview_image' => $previewImage,
+                                        'props' => $props,
+                                        'values' => $values,
+                                    ];
+                                }
                             }
                         }
+                    } catch (ParseException) {
+                        // Fallback gracefully on YAML parse error
                     }
-                } catch (ParseException) {
-                    // Fallback gracefully on YAML parse error
+                    break;
                 }
-                break;
             }
         }
-    }
 
         /** @var list<array{id: string, title: string, description: ?string, preview_image: ?string, props: array<string, mixed>, values?: array<string, mixed>}> $presets */
         $presets = \array_values($presetsMap);

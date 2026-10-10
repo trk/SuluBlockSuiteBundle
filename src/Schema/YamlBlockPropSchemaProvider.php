@@ -77,7 +77,7 @@ final class YamlBlockPropSchemaProvider implements BlockPropSchemaProviderInterf
                                             if (isset($mergedTabs[$tabIdStr]['fields'][$fieldKeyStr]) && \is_array($mergedTabs[$tabIdStr]['fields'][$fieldKeyStr])) {
                                                 $mergedTabs[$tabIdStr]['fields'][$fieldKeyStr] = \array_replace_recursive(
                                                     $mergedTabs[$tabIdStr]['fields'][$fieldKeyStr],
-                                                    $fieldConfig
+                                                    $fieldConfig,
                                                 );
                                             } else {
                                                 $mergedTabs[$tabIdStr]['fields'][$fieldKeyStr] = $fieldConfig;
