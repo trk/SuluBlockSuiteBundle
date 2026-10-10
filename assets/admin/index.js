@@ -2,6 +2,7 @@
 import fieldRegistry from 'sulu-admin-bundle/containers/Form/registries/fieldRegistry';
 import {blockPreviewTransformerRegistry} from 'sulu-admin-bundle/containers/FieldBlocks';
 import BlockProps from './components/BlockProps';
+import HotspotPicker from './components/HotspotPicker';
 import SingleReusableBlockSelection, {
     SingleReusableBlockSelectionBlockPreviewTransformer,
 } from './components/SingleReusableBlockSelection';
@@ -12,6 +13,9 @@ if (!fieldRegistry.has('block_props')) {
 if (!fieldRegistry.has('single_reusable_block_selection')) {
     fieldRegistry.add('single_reusable_block_selection', SingleReusableBlockSelection);
 }
+if (!fieldRegistry.has('hotspot_picker')) {
+    fieldRegistry.add('hotspot_picker', HotspotPicker);
+}
 if (!blockPreviewTransformerRegistry.has('single_reusable_block_selection')) {
     blockPreviewTransformerRegistry.add(
         'single_reusable_block_selection',
@@ -20,5 +24,5 @@ if (!blockPreviewTransformerRegistry.has('single_reusable_block_selection')) {
     );
 }
 
-export {BlockProps, SingleReusableBlockSelection, SingleReusableBlockSelectionBlockPreviewTransformer};
+export {BlockProps, HotspotPicker, SingleReusableBlockSelection, SingleReusableBlockSelectionBlockPreviewTransformer};
 export default BlockProps;

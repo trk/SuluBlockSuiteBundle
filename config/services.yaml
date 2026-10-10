@@ -65,6 +65,9 @@ services:
     Totoglu\SuluBlockSuiteBundle\Content\Type\SingleReusableBlockSelectionPropertyResolver:
         tags: ['sulu.content.property_resolver']
 
+    Totoglu\SuluBlockSuiteBundle\Content\Type\HotspotPickerPropertyResolver:
+        tags: ['sulu.content.property_resolver']
+
     Totoglu\SuluBlockSuiteBundle\Controller\Admin\ReusableBlockUsageController:
         arguments:
             $referenceRepository: '@?sulu_reference.reference_repository'

@@ -1,0 +1,296 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-bottom: 16px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    font-family: inherit;
+    box-sizing: border-box;
+
+    * {
+        box-sizing: border-box;
+    }
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.headerTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.coordBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    background: #e2e8f0;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #334155;
+    font-variant-numeric: tabular-nums;
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.canvasWrapper {
+    position: relative;
+    width: 100%;
+    min-height: 240px;
+    max-height: 440px;
+    background-color: #0f172a;
+    background-image: 
+        linear-gradient(45deg, #1e293b 25%, transparent 25%), 
+        linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #1e293b 75%), 
+        linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    user-select: none;
+    cursor: crosshair;
+}
+
+.canvasImage {
+    display: block;
+    max-width: 100%;
+    max-height: 440px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+.placeholderArea {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 240px;
+    color: #94a3b8;
+    text-align: center;
+    padding: 20px;
+}
+
+.placeholderIcon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    opacity: 0.6;
+}
+
+.placeholderText {
+    font-size: 13px;
+    font-weight: 500;
+    max-width: 380px;
+    line-height: 1.4;
+}
+
+.placeholderHint {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 4px;
+}
+
+.marker {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.05s ease-out;
+}
+
+.markerInner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    border: 2px solid #ffffff;
+    transition: all 0.2s ease;
+}
+
+.pulseRing {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    animation: hotspotPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    pointer-events: none;
+}
+
+@keyframes hotspotPulse {
+    0% {
+        transform: scale(0.6);
+        opacity: 0.9;
+    }
+    70% {
+        transform: scale(1.4);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1.4);
+        opacity: 0;
+    }
+}
+
+/* Marker Colors */
+.colorPrimary .markerInner {
+    background-color: #2563eb;
+}
+.colorPrimary .pulseRing {
+    border: 2px solid #3b82f6;
+    background-color: rgba(59, 130, 246, 0.25);
+}
+
+.colorDark .markerInner {
+    background-color: #0f172a;
+}
+.colorDark .pulseRing {
+    border: 2px solid #475569;
+    background-color: rgba(15, 23, 42, 0.3);
+}
+
+.colorLight .markerInner {
+    background-color: #ffffff;
+    color: #0f172a;
+    border-color: #0f172a;
+}
+.colorLight .pulseRing {
+    border: 2px solid #ffffff;
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+.colorAccent .markerInner {
+    background-color: #f59e0b;
+}
+.colorAccent .pulseRing {
+    border: 2px solid #fbbf24;
+    background-color: rgba(245, 158, 11, 0.3);
+}
+
+.colorSuccess .markerInner {
+    background-color: #10b981;
+}
+.colorSuccess .pulseRing {
+    border: 2px solid #34d399;
+    background-color: rgba(16, 185, 129, 0.3);
+}
+
+.colorDanger .markerInner {
+    background-color: #ef4444;
+}
+.colorDanger .pulseRing {
+    border: 2px solid #f87171;
+    background-color: rgba(239, 68, 68, 0.3);
+}
+
+.crosshairX {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.25);
+    pointer-events: none;
+}
+
+.crosshairY {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.25);
+    pointer-events: none;
+}
+
+.markerTooltip {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.85);
+    color: #ffffff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.controlsArea {
+    padding: 12px 14px;
+    background: #ffffff;
+    border-top: 1px solid #f1f5f9;
+}
+
+.controlsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.fieldGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fieldLabel {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.actionGroup {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.infoFootnote {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
