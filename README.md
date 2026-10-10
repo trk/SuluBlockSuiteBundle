@@ -120,7 +120,7 @@ An enterprise-grade, modular, and developer-friendly **Sulu CMS 3.x / 2.5+** bun
 
 #### Option A: Packagist Installation (Standard)
 ```bash
-composer require totoglu/sulu-block-suite-bundle
+composer require trk/sulu-block-suite-bundle
 ```
 
 #### Option B: Local / Monorepo Path Repository
@@ -134,13 +134,13 @@ In your root `composer.json`:
         }
     ],
     "require": {
-        "totoglu/sulu-block-suite-bundle": "@dev"
+        "trk/sulu-block-suite-bundle": "@dev"
     }
 }
 ```
 Then run:
 ```bash
-composer update totoglu/sulu-block-suite-bundle
+composer update trk/sulu-block-suite-bundle
 ```
 
 ### 2. Enable the Bundle

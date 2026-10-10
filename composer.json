@@ -1,5 +1,5 @@
 {
-    "name": "totoglu/sulu-block-suite-bundle",
+    "name": "trk/sulu-block-suite-bundle",
     "description": "Component block props, visual presets, reusable global blocks, and template layout engine for Sulu CMS",
     "type": "symfony-bundle",
     "license": "MIT",
