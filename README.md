@@ -118,29 +118,8 @@ An enterprise-grade, modular, and developer-friendly **Sulu CMS 3.x / 2.5+** bun
 
 ### 1. Composer Package
 
-#### Option A: Packagist Installation (Standard)
 ```bash
 composer require trk/sulu-block-suite-bundle
-```
-
-#### Option B: Local / Monorepo Path Repository
-In your root `composer.json`:
-```json
-{
-    "repositories": [
-        {
-            "type": "path",
-            "url": "packages/sulu-block-suite-bundle"
-        }
-    ],
-    "require": {
-        "trk/sulu-block-suite-bundle": "@dev"
-    }
-}
-```
-Then run:
-```bash
-composer update trk/sulu-block-suite-bundle
 ```
 
 ### 2. Enable the Bundle
@@ -164,7 +143,7 @@ The bundle provides a compiled-ready React 17 + MobX frontend component for the 
    ```json
    {
      "dependencies": {
-       "sulu-block-suite-bundle": "file:../../packages/sulu-block-suite-bundle/assets/admin"
+       "sulu-block-suite-bundle": "file:../../vendor/trk/sulu-block-suite-bundle/assets/admin"
      }
    }
    ```
@@ -518,8 +497,8 @@ The bundle adheres to the highest Symfony and Sulu CMS engineering standards:
 
 - **PHP 8.5 Strict Typing**: Every PHP file enforces `declare(strict_types=1);`.
 - **PHPStan Level Max**: 100% clean static analysis with zero errors.
-- **PHPUnit 12 Tested**: 91 tests, 457 assertions passing with 0 notices.
-- **Full Verification Suite**: Validated across PHP-CS-Fixer, Rector, Twig Lint, Twig CS Fixer, YAML Lint, Container integrity, Composer, and Doctrine ORM 3 mapping.
+- **PHPUnit 12 Tested**: 75 tests, 275 assertions passing with 0 notices.
+- **Strict Typing**: Enforces `declare(strict_types=1);` and PHPStan Level Max with zero errors.
 
 ```bash
 # Run PHPUnit test suite
@@ -528,8 +507,8 @@ composer test
 # Run PHPStan static analysis at level max
 composer phpstan
 
-# Run full project verification suite
-composer lint
+# Run coding standards check
+composer cs-check
 ```
 
 ---
