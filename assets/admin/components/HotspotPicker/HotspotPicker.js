@@ -325,53 +325,7 @@ export default class HotspotPicker extends React.Component<Props> {
 
         return (
             <div className={styles.container}>
-                {/* 1. Header Toolbar */}
-                <div className={styles.header}>
-                    <div className={styles.headerLeft}>
-                        <div className={styles.headerTitleWrap}>
-                            <span className={styles.headerIcon}>
-                                <Icon name="su-location" />
-                            </span>
-                            <span className={styles.headerTitle}>
-                                {translate('sulu_block_suite.hotspot_picker.title') || 'Interactive Hotspot Marker'}
-                            </span>
-                        </div>
-                        <div className={styles.coordChip}>
-                            <span className={styles.coordLabel}>X:</span>
-                            <span className={styles.coordVal}>{x.toFixed(1)}%</span>
-                            <span className={styles.coordSep}>•</span>
-                            <span className={styles.coordLabel}>Y:</span>
-                            <span className={styles.coordVal}>{y.toFixed(1)}%</span>
-                        </div>
-                    </div>
-
-                    <div className={styles.headerRight}>
-                        <button
-                            className={styles.toolBtn}
-                            onClick={this.loadImage}
-                            title={translate('sulu_block_suite.hotspot_picker.refresh_image') || 'Refresh Image'}
-                            type="button"
-                        >
-                            <Icon name="su-sync" />
-                            <span className={styles.toolBtnText}>
-                                {translate('sulu_block_suite.hotspot_picker.refresh_image') || 'Yenile'}
-                            </span>
-                        </button>
-                        <button
-                            className={styles.toolBtn}
-                            onClick={this.handleResetCenter}
-                            title={translate('sulu_block_suite.hotspot_picker.center') || 'Center (50%, 50%)'}
-                            type="button"
-                        >
-                            <Icon name="su-location" />
-                            <span className={styles.toolBtnText}>
-                                {translate('sulu_block_suite.hotspot_picker.center') || 'Ortala'}
-                            </span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* 2. Interactive Canvas */}
+                {/* 1. Interactive Canvas */}
                 <div
                     className={`${styles.canvasWrapper} ${this.isDragging ? styles.canvasDragging : ''}`}
                     onMouseDown={this.handleCanvasMouseDown}
@@ -379,10 +333,24 @@ export default class HotspotPicker extends React.Component<Props> {
                     onMouseMove={this.handleCanvasHoverMove}
                     ref={this.canvasRef}
                 >
-                    {/* Floating guide badge */}
-                    <div className={styles.canvasGuideBadge}>
-                        <Icon name="su-location" />
-                        <span>{translate('sulu_block_suite.hotspot_picker.hint') || 'Click or drag on image to reposition'}</span>
+                    {/* Floating canvas actions (Refresh, Center) */}
+                    <div className={styles.canvasActions}>
+                        <button
+                            className={styles.canvasActionBtn}
+                            onClick={this.loadImage}
+                            title={translate('sulu_block_suite.hotspot_picker.refresh_image') || 'Yenile'}
+                            type="button"
+                        >
+                            <Icon name="su-sync" />
+                        </button>
+                        <button
+                            className={styles.canvasActionBtn}
+                            onClick={this.handleResetCenter}
+                            title={translate('sulu_block_suite.hotspot_picker.center') || 'Ortala (50%, 50%)'}
+                            type="button"
+                        >
+                            <Icon name="su-location" />
+                        </button>
                     </div>
 
                     {/* Live hover coordinates badge */}
@@ -432,10 +400,6 @@ export default class HotspotPicker extends React.Component<Props> {
                                 {translate('sulu_block_suite.hotspot_picker.no_image')
                                     || 'No background image detected. Click canvas grid or enter coordinates directly.'}
                             </div>
-                            <div className={styles.placeholderHint}>
-                                {translate('sulu_block_suite.hotspot_picker.footnote')
-                                    || 'Hotspot will automatically align when the background image is selected.'}
-                            </div>
 
                             <div
                                 className={`${styles.marker} ${colorClass}`}
@@ -453,48 +417,34 @@ export default class HotspotPicker extends React.Component<Props> {
                     )}
                 </div>
 
-                {/* 3. Precision Coordinate Inputs */}
+                {/* 2. Precision Coordinate Inputs */}
                 <div className={styles.controlsArea}>
-                    <div className={styles.controlsSection}>
-                        <div className={styles.sectionHeading}>
-                            <Icon name="su-location" />
-                            <span>{translate('sulu_block_suite.hotspot_picker.coords_heading') || 'Coordinates'}</span>
+                    <div className={styles.coordsGrid}>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.fieldLabel}>
+                                {translate('sulu_block_suite.hotspot_picker.x') || 'Yatay (X)'} (%)
+                            </label>
+                            <NumberField
+                                max={100}
+                                min={0}
+                                onChange={this.handleManualXChange}
+                                step={0.5}
+                                value={x}
+                            />
                         </div>
-                        <div className={styles.coordsGrid}>
-                            <div className={styles.fieldGroup}>
-                                <label className={styles.fieldLabel}>
-                                    {translate('sulu_block_suite.hotspot_picker.x') || 'Horizontal (X)'} (%)
-                                </label>
-                                <NumberField
-                                    max={100}
-                                    min={0}
-                                    onChange={this.handleManualXChange}
-                                    step={0.5}
-                                    value={x}
-                                />
-                            </div>
 
-                            <div className={styles.fieldGroup}>
-                                <label className={styles.fieldLabel}>
-                                    {translate('sulu_block_suite.hotspot_picker.y') || 'Vertical (Y)'} (%)
-                                </label>
-                                <NumberField
-                                    max={100}
-                                    min={0}
-                                    onChange={this.handleManualYChange}
-                                    step={0.5}
-                                    value={y}
-                                />
-                            </div>
+                        <div className={styles.fieldGroup}>
+                            <label className={styles.fieldLabel}>
+                                {translate('sulu_block_suite.hotspot_picker.y') || 'Dikey (Y)'} (%)
+                            </label>
+                            <NumberField
+                                max={100}
+                                min={0}
+                                onChange={this.handleManualYChange}
+                                step={0.5}
+                                value={y}
+                            />
                         </div>
-                    </div>
-
-                    <div className={styles.infoFootnote}>
-                        <Icon name="su-info-circle" />
-                        <span>
-                            {translate('sulu_block_suite.hotspot_picker.footnote')
-                                || 'Click or drag on the image canvas to adjust position.'}
-                        </span>
                     </div>
                 </div>
             </div>

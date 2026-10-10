@@ -2,12 +2,12 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     font-family: inherit;
     box-sizing: border-box;
 
@@ -16,134 +16,14 @@
     }
 }
 
-/* 1. Header Toolbar */
-.header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 12px 16px;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-.headerLeft {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.headerTitleWrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.headerIcon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
-    background: #e0e7ff;
-    color: #4338ca;
-    font-size: 13px;
-}
-
-.headerTitle {
-    font-size: 13px;
-    font-weight: 700;
-    color: #0f172a;
-    letter-spacing: -0.01em;
-    white-space: nowrap;
-}
-
-.coordChip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #334155;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.coordLabel {
-    color: #64748b;
-    font-weight: 500;
-}
-
-.coordVal {
-    color: #0f172a;
-    font-weight: 700;
-}
-
-.coordSep {
-    color: #94a3b8;
-    margin: 0 2px;
-}
-
-.headerRight {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    margin-left: auto;
-}
-
-.toolBtn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #334155;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    white-space: nowrap;
-
-    &:hover {
-        background: #f8fafc;
-        border-color: #94a3b8;
-        color: #0f172a;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    }
-
-    &:active {
-        transform: translateY(0);
-        background: #f1f5f9;
-    }
-}
-
-.toolBtnText {
-    margin-left: 2px;
-}
-
-/* 2. Interactive Canvas */
+/* 1. Interactive Canvas */
 .canvasWrapper {
     position: relative;
     width: 100%;
-    min-height: 280px;
+    min-height: 240px;
     max-height: 480px;
     background-color: #0b0f19;
-    background-image: 
-        radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
     background-size: 16px 16px;
     display: flex;
     align-items: center;
@@ -157,31 +37,47 @@
     cursor: grabbing !important;
 }
 
-.canvasGuideBadge {
+.canvasActions {
     position: absolute;
-    top: 12px;
-    left: 12px;
+    top: 10px;
+    right: 10px;
     z-index: 15;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
+}
+
+.canvasActionBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
     background: rgba(15, 23, 42, 0.75);
     backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 500;
-    color: #e2e8f0;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+
+    &:hover {
+        background: rgba(15, 23, 42, 0.95);
+        border-color: rgba(255, 255, 255, 0.4);
+        transform: translateY(-1px);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
 }
 
 .canvasHoverBadge {
     position: absolute;
-    bottom: 12px;
-    right: 12px;
+    bottom: 10px;
+    right: 10px;
     z-index: 15;
     padding: 3px 8px;
     background: rgba(15, 23, 42, 0.85);
@@ -222,7 +118,7 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    height: 260px;
+    height: 240px;
     color: #94a3b8;
     text-align: center;
     padding: 24px;
@@ -230,7 +126,7 @@
 
 .placeholderIcon {
     font-size: 36px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     color: #64748b;
 }
 
@@ -238,21 +134,15 @@
     font-size: 13px;
     font-weight: 600;
     color: #cbd5e1;
-    max-width: 380px;
+    max-width: 360px;
     line-height: 1.4;
 }
 
-.placeholderHint {
-    font-size: 11px;
-    color: #64748b;
-    margin-top: 6px;
-}
-
-/* 3. Marker & Crosshair */
+/* 2. Marker Pin & Pulse */
 .marker {
     position: absolute;
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     transform: translate(-50%, -50%);
     pointer-events: none;
     z-index: 20;
@@ -270,22 +160,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     color: #ffffff;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-    border: 2.5px solid #ffffff;
+    border: 2px solid #ffffff;
     transition: all 0.2s ease;
     z-index: 2;
 }
 
 .pulseRing {
     position: absolute;
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     animation: radarPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     pointer-events: none;
@@ -298,16 +188,16 @@
         opacity: 0.9;
     }
     70% {
-        transform: scale(1.6);
+        transform: scale(1.5);
         opacity: 0;
     }
     100% {
-        transform: scale(1.6);
+        transform: scale(1.5);
         opacity: 0;
     }
 }
 
-/* Marker Color Schemes */
+/* Colors */
 .colorPrimary .markerInner {
     background-color: #2563eb;
 }
@@ -389,8 +279,8 @@
     backdrop-filter: blur(6px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: #ffffff;
-    padding: 3px 8px;
-    border-radius: 6px;
+    padding: 2px 7px;
+    border-radius: 5px;
     font-size: 10px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-weight: 700;
@@ -398,102 +288,33 @@
     pointer-events: none;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
     z-index: 25;
-    opacity: 0.95;
-    transition: opacity 0.15s ease;
 }
 
-/* 4. Controls Area */
+/* 3. Minimal Precision Inputs */
 .controlsArea {
-    padding: 16px 20px;
+    padding: 10px 14px;
     background: #ffffff;
     border-top: 1px solid #f1f5f9;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.controlsSection {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.sectionHeading {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 
 .coordsGrid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-}
-
-.optionsGrid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
+    gap: 12px;
 }
 
 .fieldGroup {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
     min-width: 0;
 }
 
 .fieldLabel {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    color: #334155;
+    color: #475569;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.infoFootnote {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding-top: 4px;
-    font-size: 11px;
-    color: #64748b;
-    line-height: 1.4;
-}
-
-/* Responsive Breakpoints */
-@media (max-width: 768px) {
-    .header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .headerLeft {
-        justify-content: space-between;
-    }
-
-    .headerRight {
-        margin-left: 0;
-        justify-content: flex-end;
-    }
-
-    .optionsGrid {
-        grid-template-columns: 1fr;
-    }
-
-    .coordsGrid {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (min-width: 769px) and (max-width: 1024px) {
-    .optionsGrid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
 }
