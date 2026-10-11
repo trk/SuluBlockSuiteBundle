@@ -89,20 +89,54 @@
             </meta>
         </property>
 
-        <property name="override_meta" type="text_line" colspan="6">
+        <property name="override_headline" type="text_line" colspan="6">
             <meta>
-                <title lang="en">Custom Meta (Optional)</title>
-                <title lang="tr">Özel Meta / Alt Başlık (İsteğe Bağlı)</title>
-                <title lang="de">Benutzerdefiniertes Meta (Optional)</title>
-                <title lang="ru">Своя мета (Необязательно)</title>
-                <title lang="es">Meta Personalizada (Opcional)</title>
-                <title lang="fr">Méta Personnalisée (Optionnel)</title>
-                <info_text lang="en">Leave empty to use current page meta tag</info_text>
-                <info_text lang="tr">Mevcut sayfa meta etiketini kullanmak için boş bırakın</info_text>
-                <info_text lang="de">Leer lassen, um das aktuelle Seiten-Meta zu verwenden</info_text>
-                <info_text lang="ru">Оставьте пустым для использования мета страницы</info_text>
-                <info_text lang="es">Dejar vacío para usar la meta de la página actual</info_text>
-                <info_text lang="fr">Laissez vide pour utiliser la méta de la page actuelle</info_text>
+                <title lang="en">Custom Headline (Optional)</title>
+                <title lang="tr">Özel Başlık / Manşet (İsteğe Bağlı)</title>
+                <title lang="de">Benutzerdefinierter Anzeigetitel (Optional)</title>
+                <title lang="ru">Свой заголовок / Маншет (Необязательно)</title>
+                <title lang="es">Titular Personalizado (Opcional)</title>
+                <title lang="fr">Titre Personnalisé (Optionnel)</title>
+                <info_text lang="en">Leave empty to use current page headline</info_text>
+                <info_text lang="tr">Mevcut sayfa manşetini kullanmak için boş bırakın</info_text>
+                <info_text lang="de">Leer lassen, um die aktuelle Seitenschlagzeile zu verwenden</info_text>
+                <info_text lang="ru">Оставьте пустым для использования заголовка страницы</info_text>
+                <info_text lang="es">Dejar vacío para usar el titular de la página actual</info_text>
+                <info_text lang="fr">Laissez vide pour utiliser le titre de la page actuelle</info_text>
+            </meta>
+        </property>
+
+        <property name="override_summary" type="text_area" colspan="12">
+            <meta>
+                <title lang="en">Custom Summary / Teaser (Optional)</title>
+                <title lang="tr">Özel Özet / Spot (İsteğe Bağlı)</title>
+                <title lang="de">Benutzerdefinierte Zusammenfassung (Optional)</title>
+                <title lang="ru">Своё краткое описание (Необязательно)</title>
+                <title lang="es">Resumen Personalizado (Opcional)</title>
+                <title lang="fr">Résumé Personnalisé (Optionnel)</title>
+                <info_text lang="en">Leave empty to use current page summary</info_text>
+                <info_text lang="tr">Mevcut sayfa özetini kullanmak için boş bırakın</info_text>
+                <info_text lang="de">Leer lassen, um den aktuellen Seitenteaser zu verwenden</info_text>
+                <info_text lang="ru">Оставьте пустым для использования описания страницы</info_text>
+                <info_text lang="es">Dejar vacío para usar el resumen de la página actual</info_text>
+                <info_text lang="fr">Laissez vide pour utiliser le résumé de la page actuelle</info_text>
+            </meta>
+        </property>
+
+        <property name="override_meta" type="text_line" colspan="12">
+            <meta>
+                <title lang="en">Custom Meta Tag / Eyebrow (Optional)</title>
+                <title lang="tr">Özel Meta Etiket / Rozet (İsteğe Bağlı)</title>
+                <title lang="de">Benutzerdefiniertes Meta-Tag (Optional)</title>
+                <title lang="ru">Свой мета-тег (Необязательно)</title>
+                <title lang="es">Etiqueta Meta Personalizada (Opcional)</title>
+                <title lang="fr">Balise Méta Personnalisée (Optionnel)</title>
+                <info_text lang="en">Optional badge/eyebrow above or below the title</info_text>
+                <info_text lang="tr">Başlığın üstünde veya altında isteğe bağlı rozet/etiket</info_text>
+                <info_text lang="de">Optionales Badge über oder unter dem Titel</info_text>
+                <info_text lang="ru">Необязательный бейдж над или под заголовком</info_text>
+                <info_text lang="es">Insignia opcional encima o debajo del título</info_text>
+                <info_text lang="fr">Badge optionnel au-dessus ou au-dessous du titre</info_text>
             </meta>
         </property>
 
