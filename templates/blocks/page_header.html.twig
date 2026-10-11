@@ -1,0 +1,12 @@
+<twig:PageHeader
+    title="{{ block.override_title|default(page.title|default('')) }}"
+    meta="{{ block.override_meta|default(page.meta|default('')) }}"
+    content="{{ block.override_content|default(page.content|default('')) }}"
+    image="{{ page.image|default(null) }}"
+    hover_image="{{ page.hover_image|default(null) }}"
+    video="{{ page.video|default(null) }}"
+    hover_video="{{ page.hover_video|default(null) }}"
+    icon="{{ page.icon|default(null) }}"
+    show_breadcrumbs="{{ block.show_breadcrumbs|default(true) }}"
+    layout="{{ block.header_layout|default('standard') }}"
+/>

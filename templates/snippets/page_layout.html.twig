@@ -1,10 +1,41 @@
+{% set has_content_slot = false %}
+{% for block in content.blocks|default([]) %}
+    {% if block.type|default('') in ['main_content', 'page_blocks'] %}
+        {% set has_content_slot = true %}
+    {% endif %}
+{% endfor %}
+
 {% if content.blocks is defined and content.blocks is iterable %}
     {% for block in content.blocks %}
         {% if block.type is defined %}
-            {{ include('blocks/' ~ block.type ~ '.html.twig', {
-                block: block,
-                loop: loop
-            }, with_context: false) }}
+            {% if block.type in ['main_content', 'page_blocks'] %}
+                {{ include(['blocks/main_content.html.twig', '@SuluBlockSuite/blocks/main_content.html.twig'], {
+                    block: block,
+                    page: page|default(null),
+                    page_blocks: page_blocks|default([])
+                }, with_context: false, ignore_missing: true) }}
+            {% elseif block.type == 'page_header' %}
+                {{ include(['blocks/page_header.html.twig', '@SuluBlockSuite/blocks/page_header.html.twig'], {
+                    block: block,
+                    page: page|default(null)
+                }, with_context: false, ignore_missing: true) }}
+            {% elseif block.type == 'breadcrumbs' %}
+                {{ include(['blocks/breadcrumbs.html.twig', '@SuluBlockSuite/blocks/breadcrumbs.html.twig'], {
+                    block: block
+                }, with_context: false, ignore_missing: true) }}
+            {% else %}
+                {{ include(['blocks/' ~ block.type ~ '.html.twig', '@SuluPrelineBlocks/blocks/' ~ block.type ~ '.html.twig'], {
+                    block: block,
+                    page: page|default(null),
+                    loop: loop
+                }, with_context: false, ignore_missing: true) }}
+            {% endif %}
         {% endif %}
     {% endfor %}
+{% endif %}
+
+{% if not has_content_slot and page_blocks|default([])|length > 0 %}
+    {{ include('includes/blocks_renderer.html.twig', {
+        blocks: page_blocks
+    }, with_context: false) }}
 {% endif %}

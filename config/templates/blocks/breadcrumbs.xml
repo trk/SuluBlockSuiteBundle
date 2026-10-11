@@ -1,0 +1,81 @@
+<?xml version="1.0" ?>
+<template xmlns="http://schemas.sulu.io/template/template"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/template-1.0.xsd">
+    <key>breadcrumbs</key>
+    <meta>
+        <title lang="en">Breadcrumbs Navigation</title>
+        <title lang="tr">Sayfa Yolu (Breadcrumbs)</title>
+        <title lang="de">Brotkrümelnavigation</title>
+        <title lang="ru">Навигационная цепочка (Breadcrumbs)</title>
+        <title lang="es">Migas de Pan (Breadcrumbs)</title>
+        <title lang="fr">Fil d'Ariane (Breadcrumbs)</title>
+    </meta>
+    <properties>
+        <property name="show_home" type="checkbox" colspan="6">
+            <meta>
+                <title lang="en">Include Home Link</title>
+                <title lang="tr">Ana Sayfa Bağlantısını Ekle</title>
+                <title lang="de">Startseiten-Link einbinden</title>
+                <title lang="ru">Включить ссылку на главную</title>
+                <title lang="es">Incluir Enlace de Inicio</title>
+                <title lang="fr">Inclure le Lien d'Accueil</title>
+            </meta>
+            <params>
+                <param name="default_value" value="true"/>
+            </params>
+        </property>
+
+        <property name="align" type="single_select" colspan="6">
+            <meta>
+                <title lang="en">Alignment</title>
+                <title lang="tr">Hizalama</title>
+                <title lang="de">Ausrichtung</title>
+                <title lang="ru">Выравнивание</title>
+                <title lang="es">Alineación</title>
+                <title lang="fr">Alignement</title>
+            </meta>
+            <params>
+                <param name="default_value" value="left"/>
+                <param name="values" type="collection">
+                    <param name="left">
+                        <meta>
+                            <title lang="en">Left</title>
+                            <title lang="tr">Sola</title>
+                            <title lang="de">Links</title>
+                            <title lang="ru">Слева</title>
+                            <title lang="es">Izquierda</title>
+                            <title lang="fr">Gauche</title>
+                        </meta>
+                    </param>
+                    <param name="center">
+                        <meta>
+                            <title lang="en">Center</title>
+                            <title lang="tr">Ortala</title>
+                            <title lang="de">Zentriert</title>
+                            <title lang="ru">По центру</title>
+                            <title lang="es">Centro</title>
+                            <title lang="fr">Centre</title>
+                        </meta>
+                    </param>
+                    <param name="right">
+                        <meta>
+                            <title lang="en">Right</title>
+                            <title lang="tr">Sağa</title>
+                            <title lang="de">Rechts</title>
+                            <title lang="ru">Справа</title>
+                            <title lang="es">Derecha</title>
+                            <title lang="fr">Droite</title>
+                        </meta>
+                    </param>
+                </param>
+            </params>
+        </property>
+
+        <property name="props" type="block_props" colspan="12">
+            <params>
+                <param name="component_type" value="breadcrumbs"/>
+            </params>
+        </property>
+    </properties>
+</template>

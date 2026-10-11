@@ -77,6 +77,9 @@
                 <title lang="fr">Blocs de la Mise en Page</title>
             </meta>
             <types>
+                <type ref="main_content"/>
+                <type ref="page_header"/>
+                <type ref="breadcrumbs"/>
                 <type ref="reusable"/>
                 <type ref="headline"/>
                 <type ref="button"/>
