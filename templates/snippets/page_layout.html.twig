@@ -1,41 +1,38 @@
 {% set has_content_slot = false %}
-{% for block in content.blocks|default([]) %}
+{% set layout_blocks = content.blocks|default([])|hydrate_blocks(_context) %}
+
+{% for block in layout_blocks %}
     {% if block.type|default('') in ['main_content', 'page_blocks'] %}
         {% set has_content_slot = true %}
     {% endif %}
 {% endfor %}
 
-{% if content.blocks is defined and content.blocks is iterable %}
-    {% for block in content.blocks %}
+{% if layout_blocks is iterable %}
+    {% for block in layout_blocks %}
         {% if block.type is defined %}
             {% if block.type in ['main_content', 'page_blocks'] %}
-                {{ include(['blocks/main_content.html.twig', '@SuluBlockSuite/blocks/main_content.html.twig'], {
-                    block: block,
+                {{ sulu_block_render(block|merge({type: 'main_content'}), _context|merge({
                     page: page|default(null),
-                    page_blocks: page_blocks|default([])
-                }, with_context: false, ignore_missing: true) }}
-            {% elseif block.type == 'page_header' %}
-                {{ include(['blocks/page_header.html.twig', '@SuluBlockSuite/blocks/page_header.html.twig'], {
-                    block: block,
-                    page: page|default(null)
-                }, with_context: false, ignore_missing: true) }}
-            {% elseif block.type == 'breadcrumbs' %}
-                {{ include(['blocks/breadcrumbs.html.twig', '@SuluBlockSuite/blocks/breadcrumbs.html.twig'], {
-                    block: block
-                }, with_context: false, ignore_missing: true) }}
+                    page_blocks: page_blocks|default([]),
+                    view: view|default(_context.view|default(null)),
+                    extension: extension|default(_context.extension|default(null)),
+                })) }}
             {% else %}
-                {{ include(['blocks/' ~ block.type ~ '.html.twig', '@SuluPrelineBlocks/blocks/' ~ block.type ~ '.html.twig'], {
-                    block: block,
+                {{ sulu_block_render(block, _context|merge({
                     page: page|default(null),
-                    loop: loop
-                }, with_context: false, ignore_missing: true) }}
+                    view: view|default(_context.view|default(null)),
+                    extension: extension|default(_context.extension|default(null)),
+                    loop: loop,
+                })) }}
             {% endif %}
         {% endif %}
     {% endfor %}
 {% endif %}
 
 {% if not has_content_slot and page_blocks|default([])|length > 0 %}
-    {{ include('includes/blocks_renderer.html.twig', {
-        blocks: page_blocks
-    }, with_context: false) }}
+    {{ sulu_blocks_render(page_blocks, _context|merge({
+        content: page|default(_context.content|default([])),
+        view: view|default(_context.view|default(null)),
+        extension: extension|default(_context.extension|default(null)),
+    })) }}
 {% endif %}

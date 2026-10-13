@@ -3,18 +3,15 @@
     {% set snippet = reusable_block_load(snippet) %}
 {% endif %}
 {% set inner_blocks = snippet.blocks|default(snippet.content.blocks|default([])) %}
-{% set props = block.props|default({}) %}
+{% set props = block._props|default(block.props is iterable ? block.props : {}) %}
 {% set wrapper_classes = sulu_block_suite_wrapper_classes(props, 'reusable-block-wrapper') %}
-{% set block_id = props.id|default(block.id|default(null)) %}
+{% set block_id = block._id|default(props.id|default(block.id|default(null))) %}
 
 {% if inner_blocks is not empty %}
     <div {% if block_id %}id="{{ block_id }}"{% endif %} class="{{ wrapper_classes }}">
         {% for inner_block in inner_blocks %}
             {% if inner_block.type is defined and inner_block.type != 'reusable' %}
-                {{ include('blocks/' ~ inner_block.type ~ '.html.twig', {
-                    block: inner_block,
-                    loop: loop,
-                }, with_context: false, ignore_missing: true) }}
+                {{ sulu_block_render(inner_block, _context) }}
             {% endif %}
         {% endfor %}
     </div>

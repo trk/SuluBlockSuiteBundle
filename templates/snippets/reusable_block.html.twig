@@ -3,7 +3,7 @@
         {% if block.type is defined and block.type != 'reusable' %}
             {{ include('blocks/' ~ block.type ~ '.html.twig', {
                 block: block,
-                loop: loop
+                loop: loop,
             }, with_context: false, ignore_missing: true) }}
         {% endif %}
     {% endfor %}

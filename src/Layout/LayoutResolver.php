@@ -6,52 +6,10 @@ namespace Totoglu\SuluBlockSuiteBundle\Layout;
 
 final class LayoutResolver implements LayoutResolverInterface
 {
-    public const DEFAULT_CONTAINER_CLASS = 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8';
-    public const DEFAULT_PADDING_CLASS = 'py-12 md:py-16';
+    public const DEFAULT_CONTAINER_CLASS = '';
+    public const DEFAULT_PADDING_CLASS = '';
 
-    public const DEFAULT_MAPPINGS = [
-        'container_width' => [
-            'full' => 'w-full',
-            'boxed' => self::DEFAULT_CONTAINER_CLASS,
-            'narrow' => 'max-w-4xl mx-auto px-4 sm:px-6',
-        ],
-        'content_padding' => [
-            'none' => 'py-0',
-            'compact' => 'py-6 md:py-8',
-            'normal' => self::DEFAULT_PADDING_CLASS,
-            'spacious' => 'py-16 md:py-24',
-        ],
-        'margin_top' => [
-            'none' => 'mt-0',
-            'xs' => 'mt-2',
-            'sm' => 'mt-4',
-            'md' => 'mt-6',
-            'lg' => 'mt-10',
-            'xl' => 'mt-16',
-            'auto' => 'mt-auto',
-        ],
-        'margin_bottom' => [
-            'none' => 'mb-0',
-            'xs' => 'mb-2',
-            'sm' => 'mb-4',
-            'md' => 'mb-6',
-            'lg' => 'mb-10',
-            'xl' => 'mb-16',
-            'auto' => 'mb-auto',
-        ],
-        'max_width' => [
-            'small' => 'max-w-xl mx-auto',
-            'medium' => 'max-w-3xl mx-auto',
-            'large' => 'max-w-5xl mx-auto',
-            'xlarge' => 'max-w-7xl mx-auto',
-            '2xlarge' => 'max-w-(--breakpoint-2xl) mx-auto',
-        ],
-        'block_align' => [
-            'left' => 'text-left',
-            'center' => 'text-center mx-auto',
-            'right' => 'text-right ml-auto',
-        ],
-    ];
+    public const DEFAULT_MAPPINGS = [];
 
     /**
      * @var array<string, array<string, string>>

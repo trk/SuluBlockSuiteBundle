@@ -91,6 +91,22 @@ final class LayoutResolverTest extends TestCase
         $this->assertSame('base-class', $resolver->resolveWrapperClasses(null, 'base-class'));
 
         $classes = $resolver->resolveWrapperClasses([
+            'custom_class' => 'my-custom-wrapper',
+        ], 'extra-block-class');
+
+        $this->assertSame('extra-block-class my-custom-wrapper', $classes);
+    }
+
+    public function testResolveWrapperClassesWithCustomMappings(): void
+    {
+        $resolver = new LayoutResolver([
+            'margin_top' => ['sm' => 'custom-mt-2', 'md' => 'mt-6'],
+            'margin_bottom' => ['lg' => 'mb-10'],
+            'max_width' => ['full' => 'w-full', 'large' => 'max-w-5xl mx-auto'],
+            'block_align' => ['center' => 'text-center mx-auto'],
+        ]);
+
+        $classes = $resolver->resolveWrapperClasses([
             'margin_top' => 'md',
             'margin_bottom' => 'lg',
             'max_width' => 'large',
@@ -104,20 +120,5 @@ final class LayoutResolverTest extends TestCase
         $this->assertStringContainsString('text-center mx-auto', $classes);
         $this->assertStringContainsString('my-custom-wrapper', $classes);
         $this->assertStringContainsString('extra-block-class', $classes);
-    }
-
-    public function testResolveWrapperClassesWithCustomMappings(): void
-    {
-        $resolver = new LayoutResolver([
-            'margin_top' => ['sm' => 'custom-mt-2'],
-            'max_width' => ['full' => 'w-full'],
-        ]);
-
-        $classes = $resolver->resolveWrapperClasses([
-            'margin_top' => 'sm',
-            'max_width' => 'full',
-        ]);
-
-        $this->assertSame('custom-mt-2 w-full', $classes);
     }
 }

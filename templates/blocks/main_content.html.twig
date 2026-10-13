@@ -1,11 +1,3 @@
 {% if page_blocks is defined and page_blocks|length > 0 %}
-    {% set width = block.container_width|default('default') %}
-    {% set py = block.padding_y|default('default') %}
-    {% set max_w = width == 'full' ? '100%' : (width == 'narrow' ? '48rem' : '85rem') %}
-
-    <twig:Section max_width="{{ max_w }}" padding_y="{{ py }}">
-        {{ include('includes/blocks_renderer.html.twig', {
-            blocks: page_blocks
-        }, with_context: false) }}
-    </twig:Section>
+    {{ sulu_blocks_render(page_blocks, _context) }}
 {% endif %}

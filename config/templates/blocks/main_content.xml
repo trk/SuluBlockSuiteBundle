@@ -43,32 +43,32 @@
                 <param name="values" type="collection">
                     <param name="default">
                         <meta>
-                            <title lang="en">Standard (85rem / 7xl)</title>
-                            <title lang="tr">Standart (85rem / 7xl)</title>
-                            <title lang="de">Standard (85rem / 7xl)</title>
-                            <title lang="ru">Стандартный (85rem / 7xl)</title>
-                            <title lang="es">Estándar (85rem / 7xl)</title>
-                            <title lang="fr">Standard (85rem / 7xl)</title>
+                            <title lang="en">Standard</title>
+                            <title lang="tr">Standart</title>
+                            <title lang="de">Standard</title>
+                            <title lang="ru">Стандартный</title>
+                            <title lang="es">Estándar</title>
+                            <title lang="fr">Standard</title>
                         </meta>
                     </param>
                     <param name="full">
                         <meta>
-                            <title lang="en">Full Width (100%)</title>
-                            <title lang="tr">Tam Genişlik (%100)</title>
-                            <title lang="de">Volle Breite (100%)</title>
-                            <title lang="ru">Полная ширина (100%)</title>
-                            <title lang="es">Ancho Completo (100%)</title>
-                            <title lang="fr">Pleine Largeur (100%)</title>
+                            <title lang="en">Full Width</title>
+                            <title lang="tr">Tam Genişlik</title>
+                            <title lang="de">Volle Breite</title>
+                            <title lang="ru">Полная ширина</title>
+                            <title lang="es">Ancho Completo</title>
+                            <title lang="fr">Pleine Largeur</title>
                         </meta>
                     </param>
                     <param name="narrow">
                         <meta>
-                            <title lang="en">Narrow / Prose (48rem / 3xl)</title>
-                            <title lang="tr">Dar / Makale (48rem / 3xl)</title>
-                            <title lang="de">Schmal / Fließtext (48rem / 3xl)</title>
-                            <title lang="ru">Узкий / Текст (48rem / 3xl)</title>
-                            <title lang="es">Estrecho / Artículo (48rem / 3xl)</title>
-                            <title lang="fr">Étroit / Article (48rem / 3xl)</title>
+                            <title lang="en">Narrow / Prose</title>
+                            <title lang="tr">Dar / Makale</title>
+                            <title lang="de">Schmal / Fließtext</title>
+                            <title lang="ru">Узкий / Текст</title>
+                            <title lang="es">Estrecho / Artículo</title>
+                            <title lang="fr">Étroit / Article</title>
                         </meta>
                     </param>
                 </param>
@@ -89,42 +89,42 @@
                 <param name="values" type="collection">
                     <param name="none">
                         <meta>
-                            <title lang="en">None (0)</title>
-                            <title lang="tr">Yok (0)</title>
-                            <title lang="de">Keiner (0)</title>
-                            <title lang="ru">Нет (0)</title>
-                            <title lang="es">Ninguno (0)</title>
-                            <title lang="fr">Aucun (0)</title>
+                            <title lang="en">None</title>
+                            <title lang="tr">Yok</title>
+                            <title lang="de">Keiner</title>
+                            <title lang="ru">Нет</title>
+                            <title lang="es">Ninguno</title>
+                            <title lang="fr">Aucun</title>
                         </meta>
                     </param>
                     <param name="sm">
                         <meta>
-                            <title lang="en">Small (py-4)</title>
-                            <title lang="tr">Küçük (py-4)</title>
-                            <title lang="de">Klein (py-4)</title>
-                            <title lang="ru">Маленький (py-4)</title>
-                            <title lang="es">Pequeño (py-4)</title>
-                            <title lang="fr">Petit (py-4)</title>
+                            <title lang="en">Small</title>
+                            <title lang="tr">Küçük</title>
+                            <title lang="de">Klein</title>
+                            <title lang="ru">Маленький</title>
+                            <title lang="es">Pequeño</title>
+                            <title lang="fr">Petit</title>
                         </meta>
                     </param>
                     <param name="default">
                         <meta>
-                            <title lang="en">Medium (py-8)</title>
-                            <title lang="tr">Orta (py-8)</title>
-                            <title lang="de">Mittel (py-8)</title>
-                            <title lang="ru">Средний (py-8)</title>
-                            <title lang="es">Medio (py-8)</title>
-                            <title lang="fr">Moyen (py-8)</title>
+                            <title lang="en">Medium</title>
+                            <title lang="tr">Orta</title>
+                            <title lang="de">Mittel</title>
+                            <title lang="ru">Средний</title>
+                            <title lang="es">Medio</title>
+                            <title lang="fr">Moyen</title>
                         </meta>
                     </param>
                     <param name="lg">
                         <meta>
-                            <title lang="en">Large (py-16)</title>
-                            <title lang="tr">Geniş (py-16)</title>
-                            <title lang="de">Groß (py-16)</title>
-                            <title lang="ru">Большой (py-16)</title>
-                            <title lang="es">Grande (py-16)</title>
-                            <title lang="fr">Grand (py-16)</title>
+                            <title lang="en">Large</title>
+                            <title lang="tr">Geniş</title>
+                            <title lang="de">Groß</title>
+                            <title lang="ru">Большой</title>
+                            <title lang="es">Grande</title>
+                            <title lang="fr">Grand</title>
                         </meta>
                     </param>
                 </param>
