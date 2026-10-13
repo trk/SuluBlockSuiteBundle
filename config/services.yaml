@@ -89,4 +89,70 @@ services:
             $projectDirectory: '%kernel.project_dir%'
             $translator: '@?translator'
             $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
-        tags: ['sulu_admin.form_metadata_visitor']
+        tags:
+            - { name: 'sulu_admin.form_metadata_visitor', priority: 50 }
+            - { name: 'sulu_admin.typed_form_metadata_visitor', priority: 50 }
+
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface:
+        alias: Totoglu\SuluBlockSuiteBundle\DynamicContent\SuluPageSourceResolver
+
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\SuluPageSourceResolver:
+        arguments:
+            $pageRepository: '@?sulu_page.page_repository'
+            $contentResolver: '@?sulu_content.content_resolver'
+            $requestStack: '@?request_stack'
+
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface:
+        alias: Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator
+
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator:
+        arguments:
+            $sourceResolver: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface'
+            $customProviders: !tagged_iterator sulu_block_suite.dynamic_source_provider
+
+    Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface:
+        alias: Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipeline
+
+    Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipeline:
+        arguments:
+            $transformers: !tagged_iterator sulu_block_suite.block_transformer
+
+    Totoglu\SuluBlockSuiteBundle\Transformer\DynamicContentTransformer:
+        arguments:
+            $hydrator: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface'
+        tags: ['sulu_block_suite.block_transformer']
+
+    Totoglu\SuluBlockSuiteBundle\Transformer\DefaultAttributesTransformer:
+        tags: ['sulu_block_suite.block_transformer']
+
+    Totoglu\SuluBlockSuiteBundle\Renderer\BlockRenderer:
+        arguments:
+            $twig: '@?twig'
+            $pipeline: '@Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface'
+            $templateNamespaces: '%sulu_block_suite.rendering.template_namespaces%'
+            $collectionRenderer: '@?Totoglu\SuluBlockSuiteBundle\Renderer\BlockCollectionRendererInterface'
+
+    Totoglu\SuluBlockSuiteBundle\Renderer\DefaultBlockCollectionRenderer:
+        arguments:
+            $blockRenderer: '@Totoglu\SuluBlockSuiteBundle\Renderer\BlockRenderer'
+
+    Totoglu\SuluBlockSuiteBundle\Renderer\BlockCollectionRendererInterface:
+        alias: Totoglu\SuluBlockSuiteBundle\Renderer\DefaultBlockCollectionRenderer
+
+    Totoglu\SuluBlockSuiteBundle\Twig\DynamicContentTwigExtension:
+        arguments:
+            $pipeline: '@Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface'
+            $blockRenderer: '@?Totoglu\SuluBlockSuiteBundle\Renderer\BlockRenderer'
+        tags: ['twig.extension']
+
+    Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver:
+        arguments:
+            $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
+            $schemaDirectory: '%sulu_block_suite.props.schema_dir%'
+
+    Totoglu\SuluBlockSuiteBundle\Controller\Admin\DynamicContentMetadataController:
+        arguments:
+            $sourceResolver: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface'
+            $targetFieldResolver: '@Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver'
+            $customProviders: !tagged_iterator sulu_block_suite.dynamic_source_provider
+        tags: ['controller.service_arguments']

@@ -1,93 +1,95 @@
-<?xml version="1.0" ?>
-<template xmlns="http://schemas.sulu.io/template/template"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/template-1.0.xsd">
-    <key>page_layout</key>
-    <meta>
-        <title lang="en">Page Layout</title>
-        <title lang="tr">Sayfa Düzeni</title>
-        <title lang="de">Seitenlayout</title>
-        <title lang="ru">Макет страницы</title>
-        <title lang="es">Diseño de Página</title>
-        <title lang="fr">Mise en Page</title>
-    </meta>
-    <properties>
-        <property name="title" type="text_line" mandatory="true">
-            <meta>
-                <title lang="en">Layout Name</title>
-                <title lang="tr">Düzen Adı</title>
-                <title lang="de">Layoutname</title>
-                <title lang="ru">Название макета</title>
-                <title lang="es">Nombre del Diseño</title>
-                <title lang="fr">Nom de la Mise en Page</title>
-                <info_text lang="en">Descriptive name for this page layout</info_text>
-                <info_text lang="tr">Bu sayfa düzeni için açıklayıcı isim</info_text>
-                <info_text lang="de">Beschreibender Name für dieses Seitenlayout</info_text>
-                <info_text lang="ru">Описательное название для этого макета страницы</info_text>
-                <info_text lang="es">Nombre descriptivo para este diseño de página</info_text>
-                <info_text lang="fr">Nom descriptif pour cette mise en page</info_text>
-            </meta>
-            <params>
-                <param name="headline" value="true"/>
-            </params>
-        </property>
-
-        <property name="key" type="text_line">
-            <meta>
-                <title lang="en">Layout Key</title>
-                <title lang="tr">Düzen Anahtarı</title>
-                <title lang="de">Layout-Schlüssel</title>
-                <title lang="ru">Ключ макета</title>
-                <title lang="es">Clave del Diseño</title>
-                <title lang="fr">Clé de la Mise en Page</title>
-                <info_text lang="en">Unique identifier used in Twig (e.g. 'default', 'article_footer'). If not specified, title is used.</info_text>
-                <info_text lang="tr">Twig içerisinde kullanılacak benzersiz anahtar (ör. 'default', 'article_footer'). Belirtilmezse başlık kullanılır.</info_text>
-                <info_text lang="de">Eindeutiger Bezeichner für Twig (z. B. 'default', 'article_footer'). Falls leer, wird der Titel verwendet.</info_text>
-                <info_text lang="ru">Уникальный идентификатор для Twig (например, 'default', 'article_footer'). Если пусто, используется название.</info_text>
-                <info_text lang="es">Identificador único utilizado en Twig (ej. 'default', 'article_footer'). Si no se especifica, se utiliza el título.</info_text>
-                <info_text lang="fr">Identifiant unique utilisé dans Twig (ex. 'default', 'article_footer'). Si non spécifié, le titre est utilisé.</info_text>
-            </meta>
-        </property>
-
-        <property name="description" type="text_area">
-            <meta>
-                <title lang="en">Description / Notes</title>
-                <title lang="tr">Açıklama / Notlar</title>
-                <title lang="de">Beschreibung / Notizen</title>
-                <title lang="ru">Описание / Примечания</title>
-                <title lang="es">Descripción / Notas</title>
-                <title lang="fr">Description / Notes</title>
-            </meta>
-        </property>
-
-        <!--
-            The blocks property below is intentionally empty in the bundle.
-            Developers should override this template in their project:
-            config/templates/snippets/page_layout.xml
-            to define project-specific block types and additional layout properties
-            (e.g., container_width, content_padding, sidebar, header_variant, animations).
-        -->
-        <property name="blocks" type="block" default-type="reusable">
-            <meta>
-                <title lang="en">Layout Blocks</title>
-                <title lang="tr">Düzen Blokları</title>
-                <title lang="de">Layout-Blöcke</title>
-                <title lang="ru">Блоки макета</title>
-                <title lang="es">Bloques del Diseño</title>
-                <title lang="fr">Blocs de la Mise en Page</title>
-            </meta>
-            <types>
-                <type ref="main_content"/>
-                <type ref="page_header"/>
-                <type ref="breadcrumbs"/>
-                <type ref="reusable"/>
-                <type ref="headline"/>
-                <type ref="button"/>
-                <type ref="text"/>
-                <type ref="image"/>
-                <type ref="card"/>
-                <type ref="video"/>
-            </types>
-        </property>
-    </properties>
+<?xml version="1.0"?>
+<template xmlns="http://schemas.sulu.io/template/template" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/template-1.0.xsd">
+  <key>page_layout</key>
+  <meta>
+    <title lang="en">Page Layout</title>
+    <title lang="tr">Sayfa D&#xFC;zeni</title>
+    <title lang="de">Seitenlayout</title>
+    <title lang="ru">&#x41C;&#x430;&#x43A;&#x435;&#x442; &#x441;&#x442;&#x440;&#x430;&#x43D;&#x438;&#x446;&#x44B;</title>
+    <title lang="es">Dise&#xF1;o de P&#xE1;gina</title>
+    <title lang="fr">Mise en Page</title>
+  </meta>
+  <areas>
+    <area key="page_layout">
+      <meta>
+        <title lang="en">Global Page Layout</title>
+        <title lang="tr">Genel Sayfa D&#xFC;zeni</title>
+        <title lang="de">Globales Seitenlayout</title>
+        <title lang="ru">&#x413;&#x43B;&#x43E;&#x431;&#x430;&#x43B;&#x44C;&#x43D;&#x44B;&#x439; &#x43C;&#x430;&#x43A;&#x435;&#x442; &#x441;&#x442;&#x440;&#x430;&#x43D;&#x438;&#x446;&#x44B;</title>
+        <title lang="es">Dise&#xF1;o Global de P&#xE1;gina</title>
+        <title lang="fr">Mise en Page Globale</title>
+      </meta>
+    </area>
+  </areas>
+  <properties>
+    <property name="title" type="text_line" mandatory="true">
+      <meta>
+        <title lang="en">Layout Name</title>
+        <title lang="tr">D&#xFC;zen Ad&#x131;</title>
+        <title lang="de">Layoutname</title>
+        <title lang="ru">&#x41D;&#x430;&#x437;&#x432;&#x430;&#x43D;&#x438;&#x435; &#x43C;&#x430;&#x43A;&#x435;&#x442;&#x430;</title>
+        <title lang="es">Nombre del Dise&#xF1;o</title>
+        <title lang="fr">Nom de la Mise en Page</title>
+        <info_text lang="en">Descriptive name for this page layout</info_text>
+        <info_text lang="tr">Bu sayfa d&#xFC;zeni i&#xE7;in a&#xE7;&#x131;klay&#x131;c&#x131; isim</info_text>
+        <info_text lang="de">Beschreibender Name f&#xFC;r dieses Seitenlayout</info_text>
+        <info_text lang="ru">&#x41E;&#x43F;&#x438;&#x441;&#x430;&#x442;&#x435;&#x43B;&#x44C;&#x43D;&#x43E;&#x435; &#x43D;&#x430;&#x437;&#x432;&#x430;&#x43D;&#x438;&#x435; &#x434;&#x43B;&#x44F; &#x44D;&#x442;&#x43E;&#x433;&#x43E; &#x43C;&#x430;&#x43A;&#x435;&#x442;&#x430; &#x441;&#x442;&#x440;&#x430;&#x43D;&#x438;&#x446;&#x44B;</info_text>
+        <info_text lang="es">Nombre descriptivo para este dise&#xF1;o de p&#xE1;gina</info_text>
+        <info_text lang="fr">Nom descriptif pour cette mise en page</info_text>
+      </meta>
+      <params>
+        <param name="headline" value="true"/>
+      </params>
+    </property>
+    <property name="key" type="text_line">
+      <meta>
+        <title lang="en">Layout Key</title>
+        <title lang="tr">D&#xFC;zen Anahtar&#x131;</title>
+        <title lang="de">Layout-Schl&#xFC;ssel</title>
+        <title lang="ru">&#x41A;&#x43B;&#x44E;&#x447; &#x43C;&#x430;&#x43A;&#x435;&#x442;&#x430;</title>
+        <title lang="es">Clave del Dise&#xF1;o</title>
+        <title lang="fr">Cl&#xE9; de la Mise en Page</title>
+        <info_text lang="en">Unique identifier used for auto-resolving matching page layouts (e.g. 'default', 'homepage', 'blog'). If not specified, title is used.</info_text>
+        <info_text lang="tr">Sayfa &#x15F;ablonuyla otomatik e&#x15F;le&#x15F;me i&#xE7;in benzersiz anahtar (&#xF6;rn. 'default', 'homepage', 'blog'). Belirtilmezse ba&#x15F;l&#x131;k kullan&#x131;l&#x131;r.</info_text>
+        <info_text lang="de">Eindeutiger Bezeichner f&#xFC;r die automatische Zuordnung (z. B. 'default', 'homepage'). Falls leer, wird der Titel verwendet.</info_text>
+        <info_text lang="ru">&#x423;&#x43D;&#x438;&#x43A;&#x430;&#x43B;&#x44C;&#x43D;&#x44B;&#x439; &#x438;&#x434;&#x435;&#x43D;&#x442;&#x438;&#x444;&#x438;&#x43A;&#x430;&#x442;&#x43E;&#x440; &#x434;&#x43B;&#x44F; &#x441;&#x43E;&#x43F;&#x43E;&#x441;&#x442;&#x430;&#x432;&#x43B;&#x435;&#x43D;&#x438;&#x44F; (&#x43D;&#x430;&#x43F;&#x440;&#x438;&#x43C;&#x435;&#x440;, 'default', 'homepage'). &#x415;&#x441;&#x43B;&#x438; &#x43F;&#x443;&#x441;&#x442;&#x43E;, &#x438;&#x441;&#x43F;&#x43E;&#x43B;&#x44C;&#x437;&#x443;&#x435;&#x442;&#x441;&#x44F; &#x43D;&#x430;&#x437;&#x432;&#x430;&#x43D;&#x438;&#x435;.</info_text>
+        <info_text lang="es">Identificador &#xFA;nico utilizado en Twig (ej. 'default', 'homepage'). Si no se especifica, se utiliza el t&#xED;tulo.</info_text>
+        <info_text lang="fr">Identifiant unique utilis&#xE9; dans Twig (ex. 'default', 'homepage'). Si non sp&#xE9;cifi&#xE9;, le titre est utilis&#xE9;.</info_text>
+      </meta>
+    </property>
+    <property name="description" type="text_area">
+      <meta>
+        <title lang="en">Description / Notes</title>
+        <title lang="tr">A&#xE7;&#x131;klama / Notlar</title>
+        <title lang="de">Beschreibung / Notizen</title>
+        <title lang="ru">&#x41E;&#x43F;&#x438;&#x441;&#x430;&#x43D;&#x438;&#x435; / &#x41F;&#x440;&#x438;&#x43C;&#x435;&#x447;&#x430;&#x43D;&#x438;&#x44F;</title>
+        <title lang="es">Descripci&#xF3;n / Notas</title>
+        <title lang="fr">Description / Notes</title>
+      </meta>
+    </property>
+    <property name="blocks" type="block" default-type="default">
+      <meta>
+        <title lang="en">Layout Blocks</title>
+        <title lang="tr">D&#xFC;zen Bloklar&#x131;</title>
+        <title lang="de">Layout-Bl&#xF6;cke</title>
+        <title lang="ru">&#x411;&#x43B;&#x43E;&#x43A;&#x438; &#x43C;&#x430;&#x43A;&#x435;&#x442;&#x430;</title>
+        <title lang="es">Bloques del Dise&#xF1;o</title>
+        <title lang="fr">Blocs de la Mise en Page</title>
+      </meta>
+      <tag name="sulu_block_suite.auto_blocks" default="main_content" exclude="row,column"/>
+      <types>
+        <type name="default">
+          <meta>
+            <title lang="en">Default</title>
+            <title lang="tr">Varsay&#x131;lan</title>
+            <title lang="de">Standard</title>
+            <title lang="ru">&#x41F;&#x43E; &#x443;&#x43C;&#x43E;&#x43B;&#x447;&#x430;&#x43D;&#x438;&#x44E;</title>
+            <title lang="es">Predeterminado</title>
+            <title lang="fr">Par D&#xE9;faut</title>
+          </meta>
+          <properties/>
+        </type>
+      </types>
+    </property>
+  </properties>
 </template>

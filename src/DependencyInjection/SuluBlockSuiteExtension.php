@@ -9,6 +9,8 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformerInterface;
 
 final class SuluBlockSuiteExtension extends Extension implements PrependExtensionInterface
 {
@@ -45,6 +47,12 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
      */
     public function load(array $configs, ContainerBuilder $container): void
     {
+        $container->registerForAutoconfiguration(BlockTransformerInterface::class)
+            ->addTag('sulu_block_suite.block_transformer');
+
+        $container->registerForAutoconfiguration(DynamicContentSourceProviderInterface::class)
+            ->addTag('sulu_block_suite.dynamic_source_provider');
+
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
 
@@ -67,8 +75,44 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
         $container->setParameter('sulu_block_suite.layout.yaml_dir', $layoutConfig['yaml_dir']);
         $container->setParameter('sulu_block_suite.layout.mappings', $layoutConfig['mappings']);
 
-        /** @var array{schema_dir: string|list<string>} $propsConfig */
-        $propsConfig = $config['props'];
-        $container->setParameter('sulu_block_suite.props.schema_dir', $propsConfig['schema_dir']);
+        // Collect all schema_dir entries across all prepended bundle configs and app configs
+        // Order: 1) BlockSuite engine, 2) Framework bundles (e.g. Preline), 3) Host project overrides
+        $engineSchemaDir = \dirname(__DIR__, 2) . '/config/blocks/props';
+        $projectSchemaDir = '%kernel.project_dir%/config/blocks/props';
+        $collectedSchemaDirs = [$engineSchemaDir];
+
+        foreach ($configs as $rawConfig) {
+            if (!\is_array($rawConfig) || !isset($rawConfig['props']) || !\is_array($rawConfig['props'])) {
+                continue;
+            }
+            $rawDirs = $rawConfig['props']['schema_dir'] ?? null;
+            if (\is_string($rawDirs) && '' !== \trim($rawDirs)) {
+                $collectedSchemaDirs[] = \trim($rawDirs);
+            } elseif (\is_array($rawDirs)) {
+                foreach ($rawDirs as $dir) {
+                    if (\is_string($dir) && '' !== \trim($dir)) {
+                        $collectedSchemaDirs[] = \trim($dir);
+                    }
+                }
+            }
+        }
+
+        // Ensure projectSchemaDir is always last so project overrides take highest precedence
+        $finalSchemaDirs = [];
+        foreach ($collectedSchemaDirs as $dir) {
+            if ($dir !== $projectSchemaDir && !\in_array($dir, $finalSchemaDirs, true)) {
+                $finalSchemaDirs[] = $dir;
+            }
+        }
+        $finalSchemaDirs[] = $projectSchemaDir;
+
+        $container->setParameter('sulu_block_suite.props.schema_dir', $finalSchemaDirs);
+
+        /** @var array{template_namespaces: string|array<array-key, string>} $renderingConfig */
+        $renderingConfig = $config['rendering'];
+        $namespaces = \is_array($renderingConfig['template_namespaces'])
+            ? \array_values($renderingConfig['template_namespaces'])
+            : [$renderingConfig['template_namespaces']];
+        $container->setParameter('sulu_block_suite.rendering.template_namespaces', $namespaces);
     }
 }

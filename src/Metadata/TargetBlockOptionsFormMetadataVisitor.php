@@ -7,17 +7,25 @@ namespace Totoglu\SuluBlockSuiteBundle\Metadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadataVisitorInterface;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\ItemMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\OptionMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TagMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadataVisitorInterface;
 use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitorInterface
+final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitorInterface, TypedFormMetadataVisitorInterface
 {
+    public const AUTO_BLOCKS_TAG = 'sulu_block_suite.auto_blocks';
+
     /**
      * @var array<string, array<string, FormMetadata>>
      */
     private array $registeredBlocksCache = [];
+
+    private bool $isLoadingRegisteredBlocks = false;
 
     /**
      * @var list<string>
@@ -44,12 +52,48 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
         $this->presetDirectories = \is_array($presetDirectory) ? \array_values($presetDirectory) : [$presetDirectory];
     }
 
+    /**
+     * @param array<mixed> $metadataOptions
+     */
+    public function visitTypedFormMetadata(TypedFormMetadata $formMetadata, string $key, string $locale, array $metadataOptions = []): void
+    {
+        if ('block' === $key) {
+            $blockForms = [];
+            foreach ($formMetadata->getForms() as $formKey => $form) {
+                if (\is_string($formKey)) {
+                    $blockForms[$formKey] = $form;
+                }
+            }
+            $this->registeredBlocksCache[$locale] = $blockForms;
+        }
+
+        foreach ($formMetadata->getForms() as $form) {
+            $this->visitFormMetadata($form, $locale, $metadataOptions);
+        }
+    }
+
+    /**
+     * @param array<mixed> $metadataOptions
+     */
     public function visitFormMetadata(FormMetadata $formMetadata, string $locale, array $metadataOptions = []): void
     {
         $key = $formMetadata->getKey();
 
-        if ('reusable_block' === $key || 'page_layout' === $key) {
-            $this->enhanceBlockTypes($formMetadata, $locale, 'blocks');
+        // 1. Recursively enhance any <block> field tagged with sulu_block_suite.auto_blocks
+        $this->enhanceAutoBlocksInItems($formMetadata->getItems(), $formMetadata, $locale, [$key]);
+
+        // 2. Enhance block preview tags for any block form (or container containing blocks)
+        $this->enhanceBlockPreviewTags($formMetadata);
+
+        // 3. Legacy/programmatic fallback for snippet forms constructed without tags (e.g. in unit tests)
+        if ('reusable_block' === $key) {
+            $this->enhanceBlockTypes($formMetadata, $locale, 'blocks', ['reusable', 'main_content']);
+
+            return;
+        }
+
+        if ('page_layout' === $key) {
+            $this->enhanceBlockTypes($formMetadata, $locale, 'blocks', []);
 
             return;
         }
@@ -58,7 +102,7 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
             return;
         }
 
-        $this->enhanceBlockTypes($formMetadata, $locale, 'block');
+        $this->enhanceBlockTypes($formMetadata, $locale, 'block', ['reusable', 'main_content']);
 
         $items = $formMetadata->getItems();
         if (!isset($items['target_block']) || !$items['target_block'] instanceof FieldMetadata) {
@@ -102,9 +146,217 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
     }
 
     /**
-     * Dynamically enhances block/snippet forms to allow any project-registered block.
+     * Recursively traverses form items (sections, inline block types, and block fields)
+     * to populate any <block> field carrying <tag name="sulu_block_suite.auto_blocks" .../>.
+     *
+     * @param array<array-key, ItemMetadata> $items
+     * @param list<string> $ancestorKeys
      */
-    private function enhanceBlockTypes(FormMetadata $formMetadata, string $locale, string $propertyName = 'blocks'): void
+    private function enhanceAutoBlocksInItems(array $items, FormMetadata $rootForm, string $locale, array $ancestorKeys): void
+    {
+        foreach ($items as $item) {
+            if ($item instanceof SectionMetadata) {
+                $this->enhanceAutoBlocksInItems($item->getItems(), $rootForm, $locale, $ancestorKeys);
+
+                continue;
+            }
+
+            if (!$item instanceof FieldMetadata) {
+                continue;
+            }
+
+            // First traverse inline sub-types (e.g. rows -> row_item -> columns -> column_item)
+            $existingTypes = $item->getTypes();
+            foreach ($existingTypes as $typeKey => $typeForm) {
+                if (\is_string($typeKey) && !$typeForm->hasTag('sulu.global_block') && !\in_array($typeKey, $ancestorKeys, true)) {
+                    $this->enhanceAutoBlocksInItems(
+                        $typeForm->getItems(),
+                        $rootForm,
+                        $locale,
+                        [...$ancestorKeys, $typeKey],
+                    );
+                }
+            }
+
+            $autoBlocksTag = $this->findFieldTag($item, self::AUTO_BLOCKS_TAG);
+            if (null === $autoBlocksTag) {
+                continue;
+            }
+
+            $attributes = $autoBlocksTag->getAttributes();
+            $excludeAttr = isset($attributes['exclude']) && \is_string($attributes['exclude']) ? $attributes['exclude'] : '';
+            $excludedTypes = \array_values(\array_filter(
+                \array_map('trim', \explode(',', $excludeAttr)),
+                static fn (string $val): bool => '' !== $val,
+            ));
+
+            $preferredDefault = isset($attributes['default']) && \is_string($attributes['default']) && '' !== \trim($attributes['default'])
+                ? \trim($attributes['default'])
+                : null;
+
+            $this->enhanceBlockField(
+                $item,
+                $rootForm,
+                $locale,
+                \array_values(\array_unique([...$excludedTypes, ...$ancestorKeys])),
+                $preferredDefault,
+            );
+        }
+    }
+
+    private function findFieldTag(FieldMetadata $field, string $tagName): ?TagMetadata
+    {
+        foreach ($field->getTags() as $tag) {
+            if ($tag->getName() === $tagName) {
+                return $tag;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Ensures block forms (and nested inline block types) expose structured preview tags
+     * in the priority order: Media (2048) -> Data/Text (1024..512) -> Child Blocks (256) -> Block Props (128).
+     */
+    private function enhanceBlockPreviewTags(FormMetadata $formMetadata): void
+    {
+        $fields = $this->collectFlatFieldMetadata($formMetadata->getItems());
+        if ([] === $fields) {
+            return;
+        }
+
+        $hasBlockProps = false;
+        foreach ($fields as $field) {
+            if ('block_props' === $this->getFieldType($field)) {
+                $hasBlockProps = true;
+            }
+            foreach ($field->getTypes() as $subTypeForm) {
+                $this->enhanceBlockPreviewTags($subTypeForm);
+            }
+        }
+
+        if (!$hasBlockProps && !$formMetadata->hasTag('sulu.global_block')) {
+            return;
+        }
+
+        $hasExplicitPreviewTag = false;
+        foreach ($fields as $field) {
+            if (null !== $this->findFieldTag($field, 'sulu.block_preview')) {
+                $hasExplicitPreviewTag = true;
+                break;
+            }
+        }
+
+        if ($hasExplicitPreviewTag) {
+            foreach ($fields as $field) {
+                if (null !== $this->findFieldTag($field, 'sulu.block_preview')) {
+                    continue;
+                }
+                $fieldType = $this->getFieldType($field);
+                if ('block' === $fieldType) {
+                    $this->addBlockPreviewTag($field, 50);
+                } elseif ('block_props' === $fieldType) {
+                    $this->addBlockPreviewTag($field, 25);
+                }
+            }
+
+            return;
+        }
+
+        $excludedFieldNames = [
+            'hover_image' => true,
+            'hover_video' => true,
+            'image_url' => true,
+            'hover_image_url' => true,
+            'video_url' => true,
+            'hover_video_url' => true,
+            'link_title' => true,
+            'aspect_ratio_width' => true,
+            'aspect_ratio_height' => true,
+            'zoom' => true,
+        ];
+
+        $primaryTextNames = [
+            'title' => true,
+            'headline' => true,
+            'override_title' => true,
+            'header_title' => true,
+            'author' => true,
+            'location_query' => true,
+            'target_id' => true,
+            'label' => true,
+            'term' => true,
+        ];
+
+        foreach ($fields as $field) {
+            $name = $field->getName();
+            if (isset($excludedFieldNames[$name])) {
+                continue;
+            }
+
+            $type = $this->getFieldType($field);
+            $priority = match ($type) {
+                'single_reusable_block_selection' => 2048,
+                'single_media_selection', 'media_selection' => 'image' === $name ? 2048 : 1900,
+                'text_line' => isset($primaryTextNames[$name]) ? 1024 : 768,
+                'date', 'datetime', 'time', 'email', 'phone', 'url', 'color', 'smart_content' => 900,
+                'text_editor', 'text_area' => 512,
+                'block' => 256,
+                'block_props' => 128,
+                default => null,
+            };
+
+            if (null !== $priority) {
+                $this->addBlockPreviewTag($field, $priority);
+            }
+        }
+    }
+
+    private function getFieldType(FieldMetadata $field): ?string
+    {
+        try {
+            return $field->getType();
+        } catch (\TypeError) {
+            return null;
+        }
+    }
+
+    /**
+     * @param array<array-key, ItemMetadata> $items
+     *
+     * @return list<FieldMetadata>
+     */
+    private function collectFlatFieldMetadata(array $items): array
+    {
+        $fields = [];
+        foreach ($items as $item) {
+            if ($item instanceof SectionMetadata) {
+                foreach ($this->collectFlatFieldMetadata($item->getItems()) as $subField) {
+                    $fields[] = $subField;
+                }
+            } elseif ($item instanceof FieldMetadata) {
+                $fields[] = $item;
+            }
+        }
+
+        return $fields;
+    }
+
+    private function addBlockPreviewTag(FieldMetadata $field, int $priority): void
+    {
+        $tag = new TagMetadata();
+        $tag->setName('sulu.block_preview');
+        $tag->setPriority($priority);
+        $field->addTag($tag);
+    }
+
+    /**
+     * Dynamically enhances block/snippet forms to allow any project-registered block.
+     *
+     * @param list<string> $excludedTypes
+     */
+    private function enhanceBlockTypes(FormMetadata $formMetadata, string $locale, string $propertyName = 'blocks', array $excludedTypes = ['reusable', 'main_content']): void
     {
         $items = $formMetadata->getItems();
         if (!isset($items[$propertyName]) || !$items[$propertyName] instanceof FieldMetadata) {
@@ -113,23 +365,45 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
 
         /** @var FieldMetadata $blocksProperty */
         $blocksProperty = $items[$propertyName];
+        if ($blocksProperty->hasTag(self::AUTO_BLOCKS_TAG)) {
+            return;
+        }
+
+        $this->enhanceBlockField($blocksProperty, $formMetadata, $locale, $excludedTypes, null);
+    }
+
+    /**
+     * @param list<string> $excludedTypes
+     */
+    private function enhanceBlockField(
+        FieldMetadata $blocksProperty,
+        FormMetadata $rootForm,
+        string $locale,
+        array $excludedTypes = [],
+        ?string $preferredDefault = null,
+    ): void {
         $blockForms = $this->getRegisteredBlockForms($locale);
         if ([] === $blockForms) {
             return;
         }
 
-        $rootSchema = $formMetadata->getSchema();
+        $excludedMap = \array_fill_keys(['default', '', $rootForm->getKey(), ...$excludedTypes], true);
+        $rootSchema = $rootForm->getSchema();
         $existingTypes = $blocksProperty->getTypes();
 
         $addedCount = 0;
         foreach ($blockForms as $typeKey => $blockForm) {
-            if ('reusable' === $typeKey || 'default' === $typeKey || '' === $typeKey) {
+            if (isset($excludedMap[$typeKey])) {
                 continue;
             }
+
+            $this->enhanceBlockPreviewTags($blockForm);
 
             if (!isset($existingTypes[$typeKey])) {
                 $blocksProperty->addType($blockForm);
                 $rootSchema->addDefinition($typeKey, $blockForm->getSchema());
+                ++$addedCount;
+            } else {
                 ++$addedCount;
             }
         }
@@ -141,6 +415,12 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
 
         // Ensure default type is valid
         $updatedTypes = $blocksProperty->getTypes();
+        if (null !== $preferredDefault && isset($updatedTypes[$preferredDefault])) {
+            $blocksProperty->setDefaultType($preferredDefault);
+
+            return;
+        }
+
         $currentDefault = $blocksProperty->getDefaultType();
         if ((null === $currentDefault || !isset($updatedTypes[$currentDefault]) || 'default' === $currentDefault) && [] !== $updatedTypes) {
             $firstTypeKey = (string) \array_key_first($updatedTypes);
@@ -155,11 +435,12 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
     {
         $resolvedLocale = $locale ?? 'en';
         $types = [];
+        $excluded = ['reusable', 'main_content', 'default', 'common', ''];
 
         // 1. Query formal Sulu MetadataProviderRegistry if available (dynamic discovery)
         $blockForms = $this->getRegisteredBlockForms($resolvedLocale);
         foreach (\array_keys($blockForms) as $blockKey) {
-            if ('reusable' !== $blockKey && 'default' !== $blockKey && '' !== $blockKey) {
+            if (!\in_array($blockKey, $excluded, true)) {
                 $types[$blockKey] = true;
             }
         }
@@ -171,7 +452,7 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
                 if (false !== $files) {
                     foreach ($files as $file) {
                         $basename = \basename($file, '.yaml');
-                        if ('common' !== $basename && 'default' !== $basename && '' !== $basename) {
+                        if (!\in_array($basename, $excluded, true)) {
                             $types[$basename] = true;
                         }
                     }
@@ -186,7 +467,7 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
                 if (false !== $files) {
                     foreach ($files as $file) {
                         $basename = \basename($file, '.yaml');
-                        if ('default' !== $basename && '' !== $basename) {
+                        if (!\in_array($basename, $excluded, true)) {
                             $types[$basename] = true;
                         }
                     }
@@ -202,7 +483,7 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
                 if (false !== $files) {
                     foreach ($files as $file) {
                         $basename = \basename($file, '.xml');
-                        if ('' !== $basename) {
+                        if (!\in_array($basename, $excluded, true)) {
                             $types[$basename] = true;
                         }
                     }
@@ -289,6 +570,12 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
             return $this->registeredBlocksCache[$locale] = [];
         }
 
+        if ($this->isLoadingRegisteredBlocks) {
+            return [];
+        }
+
+        $this->isLoadingRegisteredBlocks = true;
+
         try {
             $provider = $this->metadataProviderRegistry->getMetadataProvider('form');
             $metadata = $provider->getMetadata('block', $locale, ['ignore_global_blocks' => true]);
@@ -304,6 +591,8 @@ final class TargetBlockOptionsFormMetadataVisitor implements FormMetadataVisitor
             }
         } catch (\Throwable) {
             // Gracefully ignore early initialization or cache warmup
+        } finally {
+            $this->isLoadingRegisteredBlocks = false;
         }
 
         return $this->registeredBlocksCache[$locale] = [];

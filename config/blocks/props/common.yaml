@@ -1,0 +1,232 @@
+tabs:
+  general:
+    title:
+      en: General
+      tr: Genel
+      de: Allgemein
+      ru: Общие
+      es: General
+      fr: Général
+    fields:
+      margin_top:
+        type: select
+        label:
+          en: 'Margin Top'
+          tr: 'Üst Boşluk (Margin Top)'
+          de: 'Abstand Oben'
+          ru: 'Отступ сверху'
+          es: 'Margen Superior'
+          fr: 'Marge Supérieure'
+        col_span: 6
+        options:
+          - { value: none, label: { en: 'None (0)', tr: 'Yok (0)', de: 'Keine (0)', ru: 'Нет (0)', es: 'Ninguno (0)', fr: 'Aucun (0)' } }
+          - { value: xs, label: { en: 'Extra Small (XS)', tr: 'Çok Küçük (XS)', de: 'Extra Klein (XS)', ru: 'Очень малый (XS)', es: 'Extra Pequeño (XS)', fr: 'Très Petit (XS)' } }
+          - { value: sm, label: { en: 'Small (SM)', tr: 'Küçük (SM)', de: 'Klein (SM)', ru: 'Малый (SM)', es: 'Pequeño (SM)', fr: 'Petit (SM)' } }
+          - { value: md, label: { en: 'Medium (MD)', tr: 'Orta (MD)', de: 'Mittel (MD)', ru: 'Средний (MD)', es: 'Mediano (MD)', fr: 'Moyen (MD)' } }
+          - { value: lg, label: { en: 'Large (LG)', tr: 'Büyük (LG)', de: 'Groß (LG)', ru: 'Большой (LG)', es: 'Grande (LG)', fr: 'Grand (LG)' } }
+          - { value: xl, label: { en: 'Extra Large (XL)', tr: 'Çok Büyük (XL)', de: 'Extra Groß (XL)', ru: 'Очень большой (XL)', es: 'Extra Grande (XL)', fr: 'Très Grand (XL)' } }
+          - { value: auto, label: { en: Auto, tr: Otomatik, de: Auto, ru: Авто, es: Auto, fr: Auto } }
+      margin_bottom:
+        type: select
+        label:
+          en: 'Margin Bottom'
+          tr: 'Alt Boşluk (Margin Bottom)'
+          de: 'Abstand Unten'
+          ru: 'Отступ снизу'
+          es: 'Margen Inferior'
+          fr: 'Marge Inférieure'
+        col_span: 6
+        options:
+          - { value: none, label: { en: 'None (0)', tr: 'Yok (0)', de: 'Keine (0)', ru: 'Нет (0)', es: 'Ninguno (0)', fr: 'Aucun (0)' } }
+          - { value: xs, label: { en: 'Extra Small (XS)', tr: 'Çok Küçük (XS)', de: 'Extra Klein (XS)', ru: 'Очень малый (XS)', es: 'Extra Pequeño (XS)', fr: 'Très Petit (XS)' } }
+          - { value: sm, label: { en: 'Small (SM)', tr: 'Küçük (SM)', de: 'Klein (SM)', ru: 'Малый (SM)', es: 'Pequeño (SM)', fr: 'Petit (SM)' } }
+          - { value: md, label: { en: 'Medium (MD)', tr: 'Orta (MD)', de: 'Mittel (MD)', ru: 'Средний (MD)', es: 'Mediano (MD)', fr: 'Moyen (MD)' } }
+          - { value: lg, label: { en: 'Large (LG)', tr: 'Büyük (LG)', de: 'Groß (LG)', ru: 'Большой (LG)', es: 'Grande (LG)', fr: 'Grand (LG)' } }
+          - { value: xl, label: { en: 'Extra Large (XL)', tr: 'Çok Büyük (XL)', de: 'Extra Groß (XL)', ru: 'Очень большой (XL)', es: 'Extra Grande (XL)', fr: 'Très Grand (XL)' } }
+          - { value: auto, label: { en: Auto, tr: Otomatik, de: Auto, ru: Авто, es: Auto, fr: Auto } }
+      text_align:
+        type: select
+        label:
+          en: 'Text Alignment'
+          tr: 'Metin Hizalama'
+          de: Textausrichtung
+          ru: 'Выравнивание текста'
+          es: 'Alineación de Texto'
+          fr: 'Alignement du Texte'
+        col_span: 6
+        options:
+          - { value: left, label: { en: Left, tr: 'Sola Hizalı', de: Links, ru: 'По левому краю', es: Izquierda, fr: Gauche } }
+          - { value: center, label: { en: Center, tr: Ortalı, de: Zentriert, ru: 'По центру', es: Centro, fr: Centre } }
+          - { value: right, label: { en: Right, tr: 'Sağa Hizalı', de: Rechts, ru: 'По правому краю', es: Derecha, fr: Droite } }
+          - { value: justify, label: { en: Justify, tr: 'İki Yana Yasla', de: Blocksatz, ru: 'По ширине', es: Justificar, fr: Justifier } }
+      position:
+        type: select
+        label:
+          en: Position
+          tr: 'Konum (Position)'
+          de: Position
+          ru: Позиция
+          es: Posición
+          fr: Position
+        col_span: 6
+        options:
+          - { value: static, label: { en: 'Static (Default)', tr: 'Statik (Varsayılan)', de: Statisch, ru: Статическая, es: Estático, fr: Statique } }
+          - { value: relative, label: { en: Relative, tr: 'Göreceli (Relative)', de: Relativ, ru: Относительная, es: Relativo, fr: Relative } }
+          - { value: sticky, label: { en: 'Sticky (Top)', tr: 'Yapışkan (Sticky)', de: 'Sticky (Oben)', ru: 'Липкая (Sticky)', es: 'Fijo al desplazarse (Sticky)', fr: 'Collant (Sticky)' } }
+      max_width:
+        type: select
+        label:
+          en: 'Max Width'
+          tr: 'Maksimum Genişlik'
+          de: 'Maximale Breite'
+          ru: 'Максимальная ширина'
+          es: 'Ancho Máximo'
+          fr: 'Largeur Maximale'
+        col_span: 6
+        options:
+          - { value: none, label: { en: None, tr: Sınırsız, de: Keine, ru: 'Без ограничений', es: Ninguno, fr: Aucun } }
+          - { value: small, label: { en: 'Small (sm)', tr: 'Küçük (sm)', de: 'Klein (sm)', ru: 'Малая (sm)', es: 'Pequeño (sm)', fr: 'Petit (sm)' } }
+          - { value: medium, label: { en: 'Medium (md)', tr: 'Orta (md)', de: 'Mittel (md)', ru: 'Средняя (md)', es: 'Mediano (md)', fr: 'Moyen (md)' } }
+          - { value: large, label: { en: 'Large (lg)', tr: 'Büyük (lg)', de: 'Groß (lg)', ru: 'Большая (lg)', es: 'Grande (lg)', fr: 'Grand (lg)' } }
+          - { value: xlarge, label: { en: 'Extra Large (xl)', tr: 'Çok Büyük (xl)', de: 'Extra Groß (xl)', ru: 'Очень большая (xl)', es: 'Extra Grande (xl)', fr: 'Très Grand (xl)' } }
+          - { value: 2xlarge, label: { en: '2X Large (2xl)', tr: 'Ekstra Büyük (2xl)', de: '2X Groß (2xl)', ru: '2X Большая (2xl)', es: '2X Grande (2xl)', fr: '2X Grand (2xl)' } }
+      block_align:
+        type: select
+        label:
+          en: 'Block Alignment'
+          tr: 'Blok Hizalama'
+          de: Blockausrichtung
+          ru: 'Выравнивание блока'
+          es: 'Alineación del Bloque'
+          fr: 'Alignement du Bloc'
+        col_span: 6
+        options:
+          - { value: left, label: { en: Left, tr: Sola, de: Links, ru: Слева, es: Izquierda, fr: Gauche } }
+          - { value: center, label: { en: Center, tr: Ortalı, de: Zentriert, ru: 'По центру', es: Centro, fr: Centre } }
+          - { value: right, label: { en: Right, tr: Sağa, de: Rechts, ru: Справа, es: Derecha, fr: Droite } }
+      animation:
+        type: select
+        label:
+          en: Animation
+          tr: Animasyon
+          de: Animation
+          ru: Анимация
+          es: Animación
+          fr: Animation
+        col_span: 6
+        options:
+          - { value: none, label: { en: None, tr: Yok, de: Keine, ru: Нет, es: Ninguna, fr: Aucune } }
+          - { value: fade, label: { en: 'Fade In', tr: 'Belirme (Fade In)', de: Einblenden, ru: 'Плавное появление', es: 'Aparecer (Fade)', fr: 'Fondu (Fade)' } }
+          - { value: slide-up, label: { en: 'Slide Up', tr: 'Aşağıdan Yukarı', de: 'Nach oben gleiten', ru: 'Снизу вверх', es: 'Deslizar hacia arriba', fr: 'Glisser vers le haut' } }
+          - { value: slide-down, label: { en: 'Slide Down', tr: 'Yukarıdan Aşağı', de: 'Nach unten gleiten', ru: 'Сверху вниз', es: 'Deslizar hacia abajo', fr: 'Glisser vers le bas' } }
+          - { value: zoom-in, label: { en: 'Zoom In', tr: 'Yakınlaşarak (Zoom In)', de: Heranzoomen, ru: 'Увеличение (Zoom)', es: 'Acercar (Zoom)', fr: 'Zoom avant' } }
+      visibility:
+        type: select
+        label:
+          en: Visibility
+          tr: Görünürlük
+          de: Sichtbarkeit
+          ru: Видимость
+          es: Visibilidad
+          fr: Visibilité
+        col_span: 6
+        options:
+          - { value: all, label: { en: 'Always Visible', tr: 'Her Zaman Görünür', de: 'Immer sichtbar', ru: 'Всегда видимо', es: 'Siempre visible', fr: 'Toujours visible' } }
+          - { value: hidden_sm, label: { en: 'Hidden on Mobile (< sm)', tr: 'Mobilde Gizle (< sm)', de: 'Auf Mobilgeräten ausblenden', ru: 'Скрыть на мобильных', es: 'Oculto en móvil', fr: 'Masqué sur mobile' } }
+          - { value: hidden_md, label: { en: 'Hidden on Tablet & Below (< md)', tr: 'Tablet ve Altında Gizle (< md)', de: 'Bis Tablet ausblenden', ru: 'Скрыть на планшетах', es: 'Oculto en tablet', fr: 'Masqué sur tablette' } }
+          - { value: visible_sm, label: { en: 'Mobile Only', tr: 'Sadece Mobil', de: 'Nur Mobil', ru: 'Только мобильные', es: 'Solo móvil', fr: 'Mobile uniquement' } }
+  advanced:
+    title:
+      en: Advanced
+      tr: Gelişmiş
+      de: Erweitert
+      ru: Расширенные
+      es: Avanzado
+      fr: Avancé
+    fields:
+      name:
+        type: text
+        label:
+          en: Name
+          tr: 'Öğe Adı (Name)'
+          de: Name
+          ru: Название
+          es: Nombre
+          fr: Nom
+        placeholder:
+          en: 'e.g. Hero Section, Featured Story'
+          tr: 'örn. Hero Bölümü, Öne Çıkanlar'
+          de: 'z.B. Hero-Bereich, Hauptbeitrag'
+          ru: 'напр. Главный баннер, Избранное'
+          es: 'ej. Sección Hero, Historia Destacada'
+          fr: 'ex. Section Héro, Article à la une'
+        col_span: 12
+      id:
+        type: text
+        label:
+          en: 'HTML Element ID'
+          tr: 'HTML Eleman Kimliği (ID)'
+          de: 'HTML-Element-ID'
+          ru: 'ID HTML-элемента'
+          es: 'ID del Elemento HTML'
+          fr: 'ID de l''élément HTML'
+        placeholder:
+          en: 'e.g. hero-cta, features-block'
+          tr: 'örn. hero-cta, features-block'
+          de: 'z.B. hero-cta, features-block'
+          ru: 'напр. hero-cta, features-block'
+          es: 'ej. hero-cta, features-block'
+          fr: 'ex. hero-cta, features-block'
+        col_span: 6
+      class:
+        type: text
+        label:
+          en: 'Custom CSS Classes'
+          tr: 'Özel CSS Sınıfları (Class)'
+          de: 'Benutzerdefinierte CSS-Klassen'
+          ru: 'Пользовательские CSS-классы'
+          es: 'Clases CSS Personalizadas'
+          fr: 'Classes CSS Personnalisées'
+        placeholder:
+          en: 'e.g. hero-banner custom-section'
+          tr: 'örn. hero-banner custom-section'
+          de: 'z.B. hero-banner custom-section'
+          ru: 'напр. hero-banner custom-section'
+          es: 'ej. hero-banner custom-section'
+          fr: 'ex. hero-banner custom-section'
+        col_span: 6
+      attributes:
+        type: textarea
+        label:
+          en: Attributes
+          tr: 'Öznitelikler (Attributes)'
+          de: Attribute
+          ru: Атрибуты
+          es: Atributos
+          fr: Attributs
+        placeholder:
+          en: "e.g. data-aos=fade-up\naria-label=\"Banner\" (one per line)"
+          tr: "örn. data-aos=fade-up\naria-label=\"Açıklama\" (her satıra bir adet)"
+          de: "z.B. data-aos=fade-up\naria-label=\"Banner\" (eins pro Zeile)"
+          ru: "напр. data-aos=fade-up\naria-label=\"Баннер\" (по одному на строку)"
+          es: "ej. data-aos=fade-up\naria-label=\"Banner\" (uno por línea)"
+          fr: "ex. data-aos=fade-up\naria-label=\"Bannière\" (un par ligne)"
+        col_span: 12
+      css:
+        type: textarea
+        label:
+          en: 'Custom CSS'
+          tr: 'Özel CSS'
+          de: 'Benutzerdefiniertes CSS'
+          ru: 'Пользовательский CSS'
+          es: 'CSS Personalizado'
+          fr: 'CSS Personnalisé'
+        placeholder:
+          en: 'e.g. .el-element ''{'' border-radius: 1rem; ''}'''
+          tr: 'örn. .el-element ''{'' border-radius: 1rem; ''}'''
+          de: 'z.B. .el-element ''{'' border-radius: 1rem; ''}'''
+          ru: 'напр. .el-element ''{'' border-radius: 1rem; ''}'''
+          es: 'ej. .el-element ''{'' border-radius: 1rem; ''}'''
+          fr: 'ex. .el-element ''{'' border-radius: 1rem; ''}'''
+        col_span: 12
+

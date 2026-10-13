@@ -39,9 +39,9 @@ final class YamlBlockPropSchemaProvider implements BlockPropSchemaProviderInterf
             return $this->cache[$cacheKey];
         }
 
-        // Directories are provided in priority order from base to override: [base, override]
-        /** @var array<string, array<string, mixed>> $mergedTabs */
-        $mergedTabs = [];
+        // Directories are provided in priority order from base to override: [engine, framework, project]
+        /** @var array<string, array<string, mixed>> $blockTabs */
+        $blockTabs = [];
 
         foreach ($this->schemaDirectories as $dir) {
             $basePath = \rtrim($dir, '/');
@@ -55,43 +55,14 @@ final class YamlBlockPropSchemaProvider implements BlockPropSchemaProviderInterf
             foreach ($candidateFiles as $file) {
                 if (\is_file($file)) {
                     $data = $this->loadYamlFile($file);
-                    if (isset($data['tabs']) && \is_array($data['tabs'])) {
-                        foreach ($data['tabs'] as $tabId => $tabConfig) {
-                            if (!\is_array($tabConfig)) {
-                                continue;
-                            }
-                            $tabIdStr = (string) $tabId;
-                            if (!isset($mergedTabs[$tabIdStr])) {
-                                $mergedTabs[$tabIdStr] = $tabConfig;
-                            } else {
-                                if (isset($tabConfig['title'])) {
-                                    $mergedTabs[$tabIdStr]['title'] = $tabConfig['title'];
-                                }
-                                if (isset($tabConfig['fields']) && \is_array($tabConfig['fields'])) {
-                                    if (!isset($mergedTabs[$tabIdStr]['fields']) || !\is_array($mergedTabs[$tabIdStr]['fields'])) {
-                                        $mergedTabs[$tabIdStr]['fields'] = [];
-                                    }
-                                    foreach ($tabConfig['fields'] as $fieldKey => $fieldConfig) {
-                                        if (\is_array($fieldConfig)) {
-                                            $fieldKeyStr = (string) $fieldKey;
-                                            if (isset($mergedTabs[$tabIdStr]['fields'][$fieldKeyStr]) && \is_array($mergedTabs[$tabIdStr]['fields'][$fieldKeyStr])) {
-                                                $mergedTabs[$tabIdStr]['fields'][$fieldKeyStr] = \array_replace_recursive(
-                                                    $mergedTabs[$tabIdStr]['fields'][$fieldKeyStr],
-                                                    $fieldConfig,
-                                                );
-                                            } else {
-                                                $mergedTabs[$tabIdStr]['fields'][$fieldKeyStr] = $fieldConfig;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    $this->mergeTabsInto($blockTabs, $data);
                     break;
                 }
             }
         }
+
+        /** @var array<string, array<string, mixed>> $commonTabs */
+        $commonTabs = [];
 
         foreach ($this->schemaDirectories as $dir) {
             $basePath = \rtrim($dir, '/');
@@ -105,24 +76,53 @@ final class YamlBlockPropSchemaProvider implements BlockPropSchemaProviderInterf
             foreach ($commonCandidates as $commonFile) {
                 if (\is_file($commonFile)) {
                     $commonData = $this->loadYamlFile($commonFile);
-                    if (isset($commonData['tabs']) && \is_array($commonData['tabs'])) {
-                        foreach ($commonData['tabs'] as $tabKey => $tabConfig) {
-                            $tabKeyStr = (string) $tabKey;
-                            if (!isset($mergedTabs[$tabKeyStr]) && \is_array($tabConfig)) {
-                                $mergedTabs[$tabKeyStr] = $tabConfig;
-                            }
-                        }
-                    }
+                    $this->mergeTabsInto($commonTabs, $commonData);
                     break;
                 }
             }
         }
 
-        if ([] === $mergedTabs) {
+        // Merge commonTabs and blockTabs with canonical ordering:
+        // 1) settings (block-specific settings)
+        // 2) any custom developer/block tabs (excluding settings, general, advanced)
+        // 3) general (universal layout/spacing/alignment/animation)
+        // 4) advanced (universal name, status, id, class, attributes, css)
+        /** @var array<string, array<string, mixed>> $combinedTabs */
+        $combinedTabs = $commonTabs;
+        $this->mergeTabsMapInto($combinedTabs, $blockTabs);
+
+        if ([] === $combinedTabs) {
             $emptyResult = ['tabs' => []];
             $this->cache[$cacheKey] = $emptyResult;
 
             return $emptyResult;
+        }
+
+        /** @var array<string, array<string, mixed>> $mergedTabs */
+        $mergedTabs = [];
+
+        if (isset($combinedTabs['settings'])) {
+            $mergedTabs['settings'] = $combinedTabs['settings'];
+        }
+
+        foreach (\array_keys($blockTabs) as $tabKey) {
+            if (!\in_array($tabKey, ['settings', 'general', 'advanced'], true) && isset($combinedTabs[$tabKey])) {
+                $mergedTabs[$tabKey] = $combinedTabs[$tabKey];
+            }
+        }
+
+        foreach (\array_keys($commonTabs) as $tabKey) {
+            if (!\in_array($tabKey, ['settings', 'general', 'advanced'], true) && !isset($mergedTabs[$tabKey]) && isset($combinedTabs[$tabKey])) {
+                $mergedTabs[$tabKey] = $combinedTabs[$tabKey];
+            }
+        }
+
+        if (isset($combinedTabs['general'])) {
+            $mergedTabs['general'] = $combinedTabs['general'];
+        }
+
+        if (isset($combinedTabs['advanced'])) {
+            $mergedTabs['advanced'] = $combinedTabs['advanced'];
         }
 
         /** @var list<array{id: string, title: string, fields: list<array{name: string, type: string, label: string, placeholder?: string, col_span?: int, options?: list<array{value: string, label: string}>, default?: mixed}>}> $tabs */
@@ -196,6 +196,61 @@ final class YamlBlockPropSchemaProvider implements BlockPropSchemaProviderInterf
         $this->cache[$cacheKey] = $result;
 
         return $result;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $targetTabs
+     * @param array<string, mixed> $yamlData
+     */
+    private function mergeTabsInto(array &$targetTabs, array $yamlData): void
+    {
+        if (!isset($yamlData['tabs']) || !\is_array($yamlData['tabs'])) {
+            return;
+        }
+
+        /** @var array<string, mixed> $rawTabs */
+        $rawTabs = $yamlData['tabs'];
+        $this->mergeTabsMapInto($targetTabs, $rawTabs);
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $targetTabs
+     * @param array<string, mixed> $sourceTabs
+     */
+    private function mergeTabsMapInto(array &$targetTabs, array $sourceTabs): void
+    {
+        foreach ($sourceTabs as $tabId => $tabConfig) {
+            if (!\is_array($tabConfig)) {
+                continue;
+            }
+            $tabIdStr = (string) $tabId;
+            if (!isset($targetTabs[$tabIdStr])) {
+                /** @var array<string, mixed> $tabConfig */
+                $targetTabs[$tabIdStr] = $tabConfig;
+            } else {
+                if (isset($tabConfig['title'])) {
+                    $targetTabs[$tabIdStr]['title'] = $tabConfig['title'];
+                }
+                if (isset($tabConfig['fields']) && \is_array($tabConfig['fields'])) {
+                    if (!isset($targetTabs[$tabIdStr]['fields']) || !\is_array($targetTabs[$tabIdStr]['fields'])) {
+                        $targetTabs[$tabIdStr]['fields'] = [];
+                    }
+                    foreach ($tabConfig['fields'] as $fieldKey => $fieldConfig) {
+                        if (\is_array($fieldConfig)) {
+                            $fieldKeyStr = (string) $fieldKey;
+                            if (isset($targetTabs[$tabIdStr]['fields'][$fieldKeyStr]) && \is_array($targetTabs[$tabIdStr]['fields'][$fieldKeyStr])) {
+                                $targetTabs[$tabIdStr]['fields'][$fieldKeyStr] = \array_replace_recursive(
+                                    $targetTabs[$tabIdStr]['fields'][$fieldKeyStr],
+                                    $fieldConfig,
+                                );
+                            } else {
+                                $targetTabs[$tabIdStr]['fields'][$fieldKeyStr] = $fieldConfig;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**

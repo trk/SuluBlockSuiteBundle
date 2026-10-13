@@ -63,7 +63,7 @@
             </params>
         </property>
 
-        <property name="blocks" type="block">
+        <property name="blocks" type="block" default-type="default">
             <meta>
                 <title lang="en">Section Content Blocks</title>
                 <title lang="tr">Bölüm İçerik Blokları</title>
@@ -72,13 +72,8 @@
                 <title lang="es">Bloques de Contenido de la Sección</title>
                 <title lang="fr">Blocs de Contenu de la Section</title>
             </meta>
+            <tag name="sulu_block_suite.auto_blocks" default="headline" exclude="reusable,main_content,row,column"/>
             <types>
-                <type ref="headline"/>
-                <type ref="button"/>
-                <type ref="text"/>
-                <type ref="image"/>
-                <type ref="card"/>
-                <type ref="video"/>
                 <type name="default">
                     <meta>
                         <title lang="en">Block Content</title>

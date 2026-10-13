@@ -198,6 +198,49 @@ YAML;
         }
     }
 
+    public function testCanonicalTabOrderingPlacesSettingsFirstAndGeneralAdvancedLast(): void
+    {
+        $commonYaml = <<<YAML
+tabs:
+  general:
+    title: "General"
+    fields:
+      margin_top:
+        type: select
+        label: "Margin Top"
+  advanced:
+    title: "Advanced"
+    fields:
+      id:
+        type: text
+        label: "ID"
+YAML;
+        \file_put_contents($this->tempDir . '/common.yaml', $commonYaml);
+
+        $cardYaml = <<<YAML
+tabs:
+  settings:
+    title: "Settings"
+    fields:
+      variant:
+        type: select
+        label: "Card Style"
+  custom_developer_tab:
+    title: "Custom Tab"
+    fields:
+      extra:
+        type: text
+        label: "Extra"
+YAML;
+        \file_put_contents($this->tempDir . '/card.yaml', $cardYaml);
+
+        $provider = new YamlBlockPropSchemaProvider($this->tempDir);
+        $schema = $provider->getSchema('card', 'en');
+
+        $tabIds = \array_column($schema['tabs'], 'id');
+        $this->assertSame(['settings', 'custom_developer_tab', 'general', 'advanced'], $tabIds);
+    }
+
     private function removeDirectory(string $dir): void
     {
         if (!\is_dir($dir)) {

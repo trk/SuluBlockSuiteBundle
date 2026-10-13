@@ -69,7 +69,7 @@
             </params>
         </property>
 
-        <property name="block" type="block" minOccurs="1" maxOccurs="1" mandatory="true">
+        <property name="block" type="block" default-type="default" minOccurs="1" maxOccurs="1" mandatory="true">
             <meta>
                 <title lang="en">Preset Block Configuration</title>
                 <title lang="tr">Hazır Blok Yapılandırması</title>
@@ -84,6 +84,7 @@
                 <info_text lang="es">Elija el tipo de bloque de destino y configure su contenido listo para usar y valores de estilo.</info_text>
                 <info_text lang="fr">Choisissez le type de bloc cible et configurez ses valeurs de contenu et de style prêtes à l'emploi.</info_text>
             </meta>
+            <tag name="sulu_block_suite.auto_blocks" default="headline" exclude="reusable,main_content"/>
             <types>
                 <type name="default">
                     <meta>
