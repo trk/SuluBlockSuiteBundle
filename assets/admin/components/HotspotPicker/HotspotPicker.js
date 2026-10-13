@@ -338,7 +338,7 @@ export default class HotspotPicker extends React.Component<Props> {
                         <button
                             className={styles.canvasActionBtn}
                             onClick={this.loadImage}
-                            title={translate('sulu_block_suite.hotspot_picker.refresh_image') || 'Yenile'}
+                            title={translate('sulu_block_suite.hotspot_picker.refresh_image') || 'Refresh'}
                             type="button"
                         >
                             <Icon name="su-sync" />
@@ -346,7 +346,7 @@ export default class HotspotPicker extends React.Component<Props> {
                         <button
                             className={styles.canvasActionBtn}
                             onClick={this.handleResetCenter}
-                            title={translate('sulu_block_suite.hotspot_picker.center') || 'Ortala (50%, 50%)'}
+                            title={translate('sulu_block_suite.hotspot_picker.center') || 'Center (50%, 50%)'}
                             type="button"
                         >
                             <Icon name="su-location" />
@@ -422,7 +422,7 @@ export default class HotspotPicker extends React.Component<Props> {
                     <div className={styles.coordsGrid}>
                         <div className={styles.fieldGroup}>
                             <label className={styles.fieldLabel}>
-                                {translate('sulu_block_suite.hotspot_picker.x') || 'Yatay (X)'} (%)
+                                {translate('sulu_block_suite.hotspot_picker.x') || 'Horizontal (X)'} (%)
                             </label>
                             <NumberField
                                 max={100}
@@ -435,7 +435,7 @@ export default class HotspotPicker extends React.Component<Props> {
 
                         <div className={styles.fieldGroup}>
                             <label className={styles.fieldLabel}>
-                                {translate('sulu_block_suite.hotspot_picker.y') || 'Dikey (Y)'} (%)
+                                {translate('sulu_block_suite.hotspot_picker.y') || 'Vertical (Y)'} (%)
                             </label>
                             <NumberField
                                 max={100}

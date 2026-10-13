@@ -12,6 +12,7 @@ import {
 import {translate} from 'sulu-admin-bundle/utils';
 import {Requester} from 'sulu-admin-bundle/services';
 import FieldRenderer from './FieldRenderer';
+import DynamicContent from './DynamicContent';
 import blockPropsStyles from './blockProps.scss';
 
 type Props = {
@@ -77,10 +78,17 @@ class Properties extends React.Component<Props> {
 
     get tabs(): Array<Object> {
         const {schema} = this;
-        if (!schema || !schema.tabs) {
-            return [];
-        }
-        return Array.isArray(schema.tabs) ? schema.tabs : Array.from(schema.tabs);
+        const list = (!schema || !schema.tabs)
+            ? []
+            : (Array.isArray(schema.tabs) ? [...schema.tabs] : Array.from(schema.tabs));
+
+        list.push({
+            id: 'dynamic_content',
+            title: 'sulu_block_suite.dynamic_content',
+            isDynamicTab: true,
+        });
+
+        return list;
     }
 
     @action loadSchema = (force: boolean = false) => {
@@ -179,12 +187,24 @@ class Properties extends React.Component<Props> {
         this.activeTabIndex = tabIndex;
     };
 
-    @action handleFieldChange = (name: string, value: any) => {
-        if (value === undefined || value === null || value === '') {
-            delete this.draftValues[name];
+    @action handleDynamicChange = (dynamicConfig: ?Object) => {
+        const next = {...toJS(this.draftValues)};
+        if (!dynamicConfig) {
+            delete next._dynamic;
         } else {
-            this.draftValues[name] = value;
+            next._dynamic = dynamicConfig;
         }
+        this.draftValues = next;
+    };
+
+    @action handleFieldChange = (name: string, value: any) => {
+        const next = {...toJS(this.draftValues)};
+        if (value === undefined || value === null || value === '') {
+            delete next[name];
+        } else {
+            next[name] = value;
+        }
+        this.draftValues = next;
     };
 
     @action handleReset = () => {
@@ -240,6 +260,16 @@ class Properties extends React.Component<Props> {
         }
 
         const activeTab = tabs[this.activeTabIndex] || tabs[0];
+        if (activeTab && activeTab.isDynamicTab) {
+            return (
+                <DynamicContent
+                    componentType={this.props.componentType}
+                    locale={this.props.locale}
+                    onChange={this.handleDynamicChange}
+                    value={this.draftValues._dynamic}
+                />
+            );
+        }
         const fields = activeTab && activeTab.fields
             ? (Array.isArray(activeTab.fields) ? activeTab.fields : Array.from(activeTab.fields))
             : [];

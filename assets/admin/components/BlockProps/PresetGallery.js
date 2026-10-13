@@ -163,14 +163,22 @@ export default class PresetGallery extends React.Component<Props> {
         }
         if (props.text_align) {
             const alignKey = String(props.text_align).toLowerCase();
-            const alignLabel = alignKey === 'center' ? 'Ortalı' : (alignKey === 'right' ? 'Sağa' : 'Sola');
+            const alignLabel = alignKey === 'center'
+                ? (translate('sulu_block_suite.opt_center') || 'Center')
+                : (alignKey === 'right'
+                    ? (translate('sulu_block_suite.opt_right') || 'Right')
+                    : (translate('sulu_block_suite.opt_left') || 'Left'));
             badges.push({id: 'align', label: alignLabel});
         }
         if (props.variant && badges.length < 3) {
             badges.push({id: 'variant', label: String(props.variant)});
         }
         if (preset.values && Object.keys(preset.values).length > 0) {
-            badges.push({id: 'content', isContent: true, label: 'İçerik Dahil'});
+            badges.push({
+                id: 'content',
+                isContent: true,
+                label: translate('sulu_block_suite.includes_content') || 'Includes Content',
+            });
         }
 
         return badges;
@@ -182,12 +190,13 @@ export default class PresetGallery extends React.Component<Props> {
             return null;
         }
 
-        const modalTitle = translate('sulu_block_suite.preset_gallery_title') || 'Hazır Şablon Kataloğu';
-        const searchPlaceholder = translate('sulu_block_suite.search_presets') || 'Şablonlarda ara...';
-        const applyText = translate('sulu_block_suite.apply_preset') || 'Bu Şablonu Uygula';
-        const reapplyText = translate('sulu_block_suite.reapply_button') || 'Tekrar Uygula';
-        const activeText = translate('sulu_block_suite.current_preset') || 'Aktif Şablon';
-        const noResultsText = translate('sulu_block_suite.no_presets_found') || 'Eşleşen hazır şablon bulunamadı.';
+        const modalTitle = translate('sulu_block_suite.preset_gallery_title') || 'Preset Style Gallery';
+        const searchPlaceholder = translate('sulu_block_suite.search_presets') || 'Search presets...';
+        const applyText = translate('sulu_block_suite.apply_preset') || 'Apply Preset';
+        const reapplyText = translate('sulu_block_suite.reapply_button') || 'Re-apply';
+        const activeText = translate('sulu_block_suite.current_preset') || 'Active Preset';
+        const noResultsText = translate('sulu_block_suite.no_presets_found') || 'No presets found matching your query.';
+        const listedText = translate('sulu_block_suite.presets_listed') || 'presets listed';
 
         return (
             <Overlay
@@ -208,7 +217,7 @@ export default class PresetGallery extends React.Component<Props> {
                             />
                         </div>
                         <div className={styles.statsText}>
-                            {this.filteredPresets.length} şablon listeleniyor
+                            {this.filteredPresets.length} {listedText}
                         </div>
                     </div>
 

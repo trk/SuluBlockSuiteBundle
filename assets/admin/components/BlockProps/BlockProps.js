@@ -10,7 +10,10 @@ import type {FieldTypeProps} from 'sulu-admin-bundle/types';
 import Properties from './Properties';
 import Preset from './Preset';
 import Reusable from './Reusable';
+import BlockPropsBlockPreviewTransformer from './BlockPropsBlockPreviewTransformer';
 import blockPropsStyles from './blockProps.scss';
+
+const blockPropsPreviewTransformer = new BlockPropsBlockPreviewTransformer();
 
 type Props = FieldTypeProps<?Object>;
 
@@ -86,16 +89,34 @@ class BlockProps extends React.Component<Props> {
         return String(rawLoc).toLowerCase().split('_')[0];
     }
 
+    get uiLocale(): string {
+        const userLoc = userStore.user && userStore.user.locale ? userStore.user.locale : null;
+        if (userLoc) {
+            return String(userLoc).toLowerCase().split('_')[0];
+        }
+
+        return this.currentLocale;
+    }
+
     get componentType(): string {
         const {data, dataPath, formInspector, schemaOptions, schemaPath} = this.props;
         const normalizePointer = (p: string): string => (p.startsWith('/') ? p : '/' + p);
+        const normalizeType = (t: string): string => {
+            if (t === 'row_item') {
+                return 'row';
+            }
+            if (t === 'column_item') {
+                return 'column';
+            }
+            return t;
+        };
 
         // 1. From formInspector if target_block is selected on current form
         if (formInspector) {
             try {
                 const targetBlock = formInspector.getValueByPath('/target_block');
                 if (targetBlock && typeof targetBlock === 'string') {
-                    return targetBlock;
+                    return normalizeType(targetBlock);
                 }
             } catch (e) {
                 // ignore
@@ -105,18 +126,21 @@ class BlockProps extends React.Component<Props> {
         // 2. From schemaOptions
         if (schemaOptions && schemaOptions.component_type) {
             if (typeof schemaOptions.component_type === 'string') {
-                return schemaOptions.component_type;
+                return normalizeType(schemaOptions.component_type);
             }
             if (schemaOptions.component_type.value) {
-                return String(schemaOptions.component_type.value);
+                return normalizeType(String(schemaOptions.component_type.value));
             }
         }
 
-        // 3. From schemaPath (e.g. "/blocks/types/headline/form/props")
+        // 3. From schemaPath (use the LAST "types/<block>" segment for nested blocks inside section/row/column)
         if (schemaPath) {
-            const match = schemaPath.match(/types\/([a-zA-Z0-9_-]+)/);
-            if (match && match[1]) {
-                return match[1];
+            const matches = [...schemaPath.matchAll(/types\/([a-zA-Z0-9_-]+)/g)];
+            if (matches.length > 0) {
+                const lastMatch = matches[matches.length - 1];
+                if (lastMatch && lastMatch[1]) {
+                    return normalizeType(lastMatch[1]);
+                }
             }
         }
 
@@ -129,11 +153,11 @@ class BlockProps extends React.Component<Props> {
                 try {
                     const type = formInspector.getValueByPath(normalizePointer(parentPath + '/type'));
                     if (type && typeof type === 'string') {
-                        return type;
+                        return normalizeType(type);
                     }
                     const blockData = formInspector.getValueByPath(normalizePointer(parentPath));
                     if (blockData && typeof blockData === 'object' && blockData.type && typeof blockData.type === 'string') {
-                        return blockData.type;
+                        return normalizeType(blockData.type);
                     }
                 } catch (e) {
                     // ignore
@@ -143,7 +167,7 @@ class BlockProps extends React.Component<Props> {
 
         // 5. From data prop directly
         if (data && typeof data === 'object' && typeof data.type === 'string') {
-            return data.type;
+            return normalizeType(data.type);
         }
 
         return 'general';
@@ -473,16 +497,6 @@ class BlockProps extends React.Component<Props> {
                 <div className={blockPropsStyles.blockSuiteContainer}>
                     <div className={blockPropsStyles.blockSuiteToolbar}>
                         <div className={blockPropsStyles.actionGroup}>
-                            {this.presets.length > 0 && (
-                                <Button
-                                    icon="su-eye"
-                                    onClick={this.handleOpenPresetGallery}
-                                    skin="secondary"
-                                    title={translate('sulu_block_suite.browse_presets') || 'Şablonları İncele'}
-                                >
-                                    {translate('sulu_block_suite.browse_presets') || 'Şablonları İncele'}
-                                </Button>
-                            )}
                             <Button
                                 icon="su-cog"
                                 onClick={this.handleOpenProperties}
@@ -490,6 +504,16 @@ class BlockProps extends React.Component<Props> {
                             >
                                 {editButton}
                             </Button>
+                            {this.presets.length > 0 && (
+                                <Button
+                                    icon="su-eye"
+                                    onClick={this.handleOpenPresetGallery}
+                                    skin="secondary"
+                                    title={translate('sulu_block_suite.browse_presets') || 'Browse Presets'}
+                                >
+                                    {translate('sulu_block_suite.browse_presets') || 'Browse Presets'}
+                                </Button>
+                            )}
                             {activePreset && activePreset.values && Object.keys(activePreset.values).some((k) => k !== 'type' && k !== 'props') && (
                                 <Button
                                     icon="su-brush"
@@ -509,6 +533,7 @@ class BlockProps extends React.Component<Props> {
                                     </DropdownButton.Item>
                                 )}
                             </DropdownButton>
+                            {blockPropsPreviewTransformer.transform(value)}
                         </div>
                     </div>
 
@@ -531,10 +556,10 @@ class BlockProps extends React.Component<Props> {
                                 </div>
                             )}
                             <button
-                                aria-label="Şablonu kaldır"
+                                aria-label={translate('sulu_block_suite.clear_preset') || 'Clear Preset'}
                                 className={blockPropsStyles.clearPresetButton}
                                 onClick={this.handleClearPreset}
-                                title={translate('sulu_block_suite.clear_preset') || 'Şablonu Kaldır'}
+                                title={translate('sulu_block_suite.clear_preset') || 'Clear Preset'}
                                 type="button"
                             >
                                 <Icon name="su-trash-alt" />
@@ -545,7 +570,7 @@ class BlockProps extends React.Component<Props> {
 
                 <Properties
                     componentType={this.componentType}
-                    locale={this.currentLocale}
+                    locale={this.uiLocale}
                     onCancel={this.handleCloseProperties}
                     onConfirm={this.handleConfirmProperties}
                     open={this.propertiesOpen}

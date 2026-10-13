@@ -2,6 +2,7 @@
 import React from 'react';
 import {observer} from 'mobx-react';
 import Icon from 'sulu-admin-bundle/components/Icon';
+import {translate} from 'sulu-admin-bundle/utils';
 import type {Node} from 'react';
 import type {BlockPreviewTransformer} from 'sulu-admin-bundle/types';
 import reusableBlockStore from '../../stores/reusableBlockStore';
@@ -13,6 +14,9 @@ type PreviewItemProps = {
 
 const PreviewItem = observer(({id}: PreviewItemProps) => {
     const snippet = reusableBlockStore.get(id);
+    const badgeLabel = translate('sulu_block_suite.save_as_reusable_option') || 'Reusable Block';
+    const loadingLabel = translate('sulu_block_suite.reusable_block_loading') || 'Loading...';
+    const innerBlocksLabel = translate('sulu_block_suite.reusable_block_inner_blocks') || 'blocks';
 
     if (!snippet) {
         reusableBlockStore.load(id);
@@ -20,9 +24,9 @@ const PreviewItem = observer(({id}: PreviewItemProps) => {
             <span className={styles.previewContainer}>
                 <span className={styles.badge}>
                     <Icon name="su-clone" />
-                    <span>Ortak Blok</span>
+                    <span>{badgeLabel}</span>
                 </span>
-                <span className={styles.loading}>Yükleniyor...</span>
+                <span className={styles.loading}>{loadingLabel}</span>
             </span>
         );
     }
@@ -36,11 +40,11 @@ const PreviewItem = observer(({id}: PreviewItemProps) => {
         <span className={styles.previewContainer} title={tooltip}>
             <span className={styles.badge}>
                 <Icon name="su-clone" />
-                <span>Ortak Blok</span>
+                <span>{badgeLabel}</span>
             </span>
             <strong className={styles.title}>{snippet.title}</strong>
             {blockCount !== null && (
-                <span className={styles.description}>({blockCount} blok)</span>
+                <span className={styles.description}>({blockCount} {innerBlocksLabel})</span>
             )}
             {snippet.description && (
                 <span className={styles.description}>— {snippet.description}</span>

@@ -2,15 +2,14 @@
 @import 'sulu-admin-bundle/containers/Application/colors.scss';
 
 .previewContainer {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 8px;
-    vertical-align: middle;
-    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     line-height: 18px;
+    margin: 2px 8px 2px 0;
 }
 
 .badge {
