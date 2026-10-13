@@ -1,0 +1,744 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Totoglu\SuluBlockSuiteBundle\Tests\DynamicContent;
+
+use PHPUnit\Framework\TestCase;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface;
+
+final class DynamicContentHydratorTest extends TestCase
+{
+    public function testStaticBlockPassesThroughUnchanged(): void
+    {
+        $hydrator = new DynamicContentHydrator();
+
+        $block = [
+            'type' => 'card',
+            'title' => 'Static Title',
+            'summary' => 'Static Summary',
+            'props' => [
+                'bg_style' => 'white',
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(1, $result);
+        self::assertSame($block, $result[0]);
+    }
+
+    public function testDisabledDynamicContentPassesThrough(): void
+    {
+        $hydrator = new DynamicContentHydrator();
+
+        $block = [
+            'type' => 'headline',
+            'headline' => 'Static Headline',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => false,
+                    'source_type' => 'specific_page',
+                    'page_id' => '123-abc',
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(1, $result);
+        self::assertSame('Static Headline', $result[0]['headline']);
+    }
+
+    public function testSpecificPageFieldMapping(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $pageId = 'page-uuid-001';
+        $pageData = [
+            'title' => 'About Our Company',
+            'content' => [
+                'headline' => 'Pioneering Industry Solutions',
+                'summary' => 'Established in 1985.',
+                'image' => ['id' => 42, 'url' => '/uploads/hero.jpg'],
+            ],
+            'url' => '/about-us',
+        ];
+
+        $sourceResolver->expects(self::once())
+            ->method('resolvePage')
+            ->with($pageId)
+            ->willReturn($pageData);
+
+        $block = [
+            'type' => 'card',
+            'title' => 'Old Title',
+            'summary' => 'Old Summary',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'specific_page',
+                    'page_id' => $pageId,
+                    'mapping' => [
+                        'title' => 'title',
+                        'headline' => 'content.headline',
+                        'summary' => 'content.summary',
+                        'image' => 'content.image',
+                        'link' => 'url',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(1, $result);
+        $hydrated = $result[0];
+
+        self::assertSame('About Our Company', $hydrated['title']);
+        self::assertSame('Pioneering Industry Solutions', $hydrated['headline']);
+        self::assertSame('Established in 1985.', $hydrated['summary']);
+        self::assertSame(['id' => 42, 'url' => '/uploads/hero.jpg'], $hydrated['image']);
+        self::assertSame('/about-us', $hydrated['link']);
+    }
+
+    public function testSmartFallbackPreservesStaticContentWhenDynamicFieldEmpty(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $pageId = 'page-uuid-002';
+        $pageData = [
+            'title' => 'Services',
+            'content' => [
+                'summary' => null, // empty dynamic field
+            ],
+        ];
+
+        $sourceResolver->expects(self::once())
+            ->method('resolvePage')
+            ->with($pageId)
+            ->willReturn($pageData);
+
+        $block = [
+            'type' => 'card',
+            'title' => 'Static Title',
+            'summary' => 'Static Manual Summary Fallback',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'specific_page',
+                    'page_id' => $pageId,
+                    'mapping' => [
+                        'title' => 'title',
+                        'summary' => 'content.summary',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(1, $result);
+        self::assertSame('Services', $result[0]['title']);
+        // Summary fell back to static manual content
+        self::assertSame('Static Manual Summary Fallback', $result[0]['summary']);
+    }
+
+    public function testDisplayConditionNotEmptyHidesBlockWhenFieldEmpty(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $pageId = 'page-uuid-003';
+        $pageData = [
+            'title' => 'No Image Page',
+            'content' => [
+                'image' => null,
+            ],
+        ];
+
+        $sourceResolver->expects(self::once())
+            ->method('resolvePage')
+            ->with($pageId)
+            ->willReturn($pageData);
+
+        $block = [
+            'type' => 'image',
+            'image' => null,
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'specific_page',
+                    'page_id' => $pageId,
+                    'mapping' => [
+                        'image' => 'content.image',
+                    ],
+                    'condition' => [
+                        'field' => 'content.image',
+                        'operator' => 'not_empty',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(0, $result); // Block hidden!
+    }
+
+    public function testDisplayConditionNotEmptyAllowsBlockWhenFieldPresent(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $pageId = 'page-uuid-004';
+        $pageData = [
+            'title' => 'Image Page',
+            'content' => [
+                'image' => '/uploads/photo.jpg',
+            ],
+        ];
+
+        $sourceResolver->expects(self::once())
+            ->method('resolvePage')
+            ->with($pageId)
+            ->willReturn($pageData);
+
+        $block = [
+            'type' => 'image',
+            'image' => null,
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'specific_page',
+                    'page_id' => $pageId,
+                    'mapping' => [
+                        'image' => 'content.image',
+                    ],
+                    'condition' => [
+                        'field' => 'content.image',
+                        'operator' => 'not_empty',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(1, $result);
+        self::assertSame('/uploads/photo.jpg', $result[0]['image']);
+    }
+
+    public function testGracefulFallbackWhenPageNotFound(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $sourceResolver->expects(self::once())
+            ->method('resolvePage')
+            ->with('missing-uuid')
+            ->willReturn(null);
+
+        $block = [
+            'type' => 'headline',
+            'headline' => 'Fallback Headline',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'specific_page',
+                    'page_id' => 'missing-uuid',
+                    'mapping' => [
+                        'headline' => 'title',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(1, $result);
+        self::assertSame('Fallback Headline', $result[0]['headline']);
+    }
+
+    public function testPageChildrenExpandsToMultipleBlocks(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $parentId = 'parent-uuid-001';
+        $children = [
+            [
+                'title' => 'Service 1',
+                'url' => '/services/1',
+                'content' => ['summary' => 'Summary 1'],
+            ],
+            [
+                'title' => 'Service 2',
+                'url' => '/services/2',
+                'content' => ['summary' => 'Summary 2'],
+            ],
+            [
+                'title' => 'Service 3',
+                'url' => '/services/3',
+                'content' => ['summary' => 'Summary 3'],
+            ],
+        ];
+
+        $sourceResolver->expects(self::once())
+            ->method('resolveChildren')
+            ->with($parentId, null, 10)
+            ->willReturn($children);
+
+        $block = [
+            'type' => 'card',
+            'title' => 'Template Card',
+            'props' => [
+                'variant' => 'elevated',
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_children',
+                    'parent_id' => $parentId,
+                    'limit' => 10,
+                    'mapping' => [
+                        'title' => 'title',
+                        'link' => 'url',
+                        'summary' => 'content.summary',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(3, $result);
+        self::assertSame('Service 1', $result[0]['title']);
+        self::assertSame('/services/1', $result[0]['link']);
+        self::assertSame('Summary 1', $result[0]['summary']);
+        self::assertIsArray($result[0]['props']);
+        self::assertSame('elevated', $result[0]['props']['variant']);
+
+        self::assertSame('Service 2', $result[1]['title']);
+        self::assertSame('Service 3', $result[2]['title']);
+    }
+
+    public function testCustomQueryExpandsToMultipleBlocks(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $query = [
+            'categories' => ['news'],
+            'limit' => 2,
+        ];
+
+        $items = [
+            ['title' => 'Article 1', 'url' => '/news/1'],
+            ['title' => 'Article 2', 'url' => '/news/2'],
+        ];
+
+        $sourceResolver->expects(self::once())
+            ->method('resolveQuery')
+            ->with($query)
+            ->willReturn($items);
+
+        $block = [
+            'type' => 'headline',
+            'headline' => 'Default',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'custom_query',
+                    'query' => $query,
+                    'mapping' => [
+                        'headline' => 'title',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(2, $result);
+        self::assertSame('Article 1', $result[0]['headline']);
+        self::assertSame('Article 2', $result[1]['headline']);
+    }
+
+    public function testDisplayConditionFiltersOutNonMatchingItemsInRepeater(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $parentId = 'parent-uuid-002';
+        $children = [
+            ['title' => 'Item With Image', 'content' => ['image' => '/pic.jpg']],
+            ['title' => 'Item Without Image', 'content' => ['image' => null]],
+            ['title' => 'Another Item With Image', 'content' => ['image' => '/pic2.jpg']],
+        ];
+
+        $sourceResolver->expects(self::once())
+            ->method('resolveChildren')
+            ->with($parentId, null, 50)
+            ->willReturn($children);
+
+        $block = [
+            'type' => 'card',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_children',
+                    'parent_id' => $parentId,
+                    'mapping' => [
+                        'title' => 'title',
+                        'image' => 'content.image',
+                    ],
+                    'condition' => [
+                        'field' => 'content.image',
+                        'operator' => 'not_empty',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(2, $result);
+        self::assertSame('Item With Image', $result[0]['title']);
+        self::assertSame('Another Item With Image', $result[1]['title']);
+    }
+
+    public function testHydrateBlocksCollectionFlattensRepeatersAndStaticBlocks(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $parentId = 'parent-uuid-003';
+        $sourceResolver->expects(self::once())
+            ->method('resolveChildren')
+            ->with($parentId, null, 50)
+            ->willReturn([
+                ['title' => 'Child 1'],
+                ['title' => 'Child 2'],
+            ]);
+
+        $blocks = [
+            ['type' => 'headline', 'title' => 'Top Static'],
+            [
+                'type' => 'card',
+                'props' => [
+                    '_dynamic' => [
+                        'enabled' => true,
+                        'source_type' => 'page_children',
+                        'parent_id' => $parentId,
+                        'mapping' => ['title' => 'title'],
+                    ],
+                ],
+            ],
+            ['type' => 'divider'],
+        ];
+
+        $flattened = $hydrator->hydrateBlocks($blocks);
+
+        self::assertCount(4, $flattened);
+        self::assertSame('headline', $flattened[0]['type']);
+        self::assertSame('Top Static', $flattened[0]['title']);
+        self::assertSame('card', $flattened[1]['type']);
+        self::assertSame('Child 1', $flattened[1]['title']);
+        self::assertSame('card', $flattened[2]['type']);
+        self::assertSame('Child 2', $flattened[2]['title']);
+        self::assertSame('divider', $flattened[3]['type']);
+    }
+
+    public function testExtractsDynamicConfigFromContentViewObject(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $sourceResolver->expects(self::once())
+            ->method('resolvePage')
+            ->willReturn(['title' => 'Hydrated From Object']);
+
+        $propsObject = new class {
+            /**
+             * @return array<string, mixed>
+             */
+            public function getContent(): array
+            {
+                return [
+                    '_dynamic' => [
+                        'enabled' => true,
+                        'source_type' => 'specific_page',
+                        'page_id' => 'obj-123',
+                        'mapping' => ['title' => 'title'],
+                    ],
+                ];
+            }
+        };
+
+        $block = [
+            'type' => 'card',
+            'title' => 'Original',
+            'props' => $propsObject,
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+        self::assertCount(1, $result);
+        self::assertSame('Hydrated From Object', $result[0]['title']);
+    }
+
+    public function testCurrentPageSourceResolvesWhenContextPageIsEmptyArray(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $sourceResolver->expects(self::once())
+            ->method('resolvePage')
+            ->with([])
+            ->willReturn(['title' => 'Current Page Mapped Title']);
+
+        $block = [
+            'type' => 'headline',
+            'title' => 'Static Headline',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'current_page',
+                    'mapping' => ['title' => 'title'],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block, []);
+        self::assertCount(1, $result);
+        self::assertSame('Current Page Mapped Title', $result[0]['title']);
+    }
+
+    public function testParentPageAndSiblingPagesSources(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $sourceResolver->expects(self::once())
+            ->method('resolveParent')
+            ->with(['id' => 'child-page'])
+            ->willReturn(['title' => 'Parent Section Title', 'url' => '/parent']);
+
+        $sourceResolver->expects(self::once())
+            ->method('resolveSiblings')
+            ->with(['id' => 'child-page'], null, 5)
+            ->willReturn([
+                ['title' => 'Sibling 1', 'url' => '/sibling-1'],
+                ['title' => 'Sibling 2', 'url' => '/sibling-2'],
+            ]);
+
+        $parentBlock = [
+            'type' => 'headline',
+            'title' => 'Fallback',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'parent_page',
+                    'mapping' => ['title' => 'title', 'link' => 'url'],
+                ],
+            ],
+        ];
+
+        $parentResult = $hydrator->hydrateBlock($parentBlock, ['id' => 'child-page']);
+        self::assertCount(1, $parentResult);
+        self::assertSame('Parent Section Title', $parentResult[0]['title']);
+        self::assertSame('/parent', $parentResult[0]['link']);
+
+        $siblingBlock = [
+            'type' => 'card',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'sibling_pages',
+                    'limit' => 5,
+                    'mapping' => ['title' => 'title', 'link' => 'url'],
+                ],
+            ],
+        ];
+
+        $siblingResult = $hydrator->hydrateBlock($siblingBlock, ['id' => 'child-page']);
+        self::assertCount(2, $siblingResult);
+        self::assertSame('Sibling 1', $siblingResult[0]['title']);
+        self::assertSame('Sibling 2', $siblingResult[1]['title']);
+    }
+
+    public function testMultiItemContainerBlockHydratesInnerItemsArrayInsteadOfRepeatingContainer(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $sourceResolver->expects(self::once())
+            ->method('resolveChildren')
+            ->with('services-root', null, 10)
+            ->willReturn([
+                ['title' => 'Cloud Architecture', 'summary' => 'Scalable cloud infra', 'url' => '/services/cloud'],
+                ['title' => 'Security Audit', 'summary' => 'Zero-trust verification', 'url' => '/services/security'],
+            ]);
+
+        $gridBlock = [
+            'type' => 'grid',
+            'items' => [
+                ['type' => 'grid_item', 'title' => 'Placeholder', 'button_text' => 'Read More'],
+            ],
+            'props' => [
+                'columns' => '3',
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_children',
+                    'parent_id' => 'services-root',
+                    'limit' => 10,
+                    'mapping' => [
+                        'title' => 'title',
+                        'summary' => 'summary',
+                        'link' => 'url',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($gridBlock);
+
+        // Must return 1 grid block with 2 inner items, NOT 2 grid blocks!
+        self::assertCount(1, $result);
+        self::assertSame('grid', $result[0]['type']);
+        self::assertIsArray($result[0]['items']);
+        /** @var list<array<string, mixed>> $items */
+        $items = $result[0]['items'];
+        self::assertCount(2, $items);
+
+        self::assertSame('grid_item', $items[0]['type']);
+        self::assertSame('Cloud Architecture', $items[0]['title']);
+        self::assertSame('Scalable cloud infra', $items[0]['summary']);
+        self::assertSame('/services/cloud', $items[0]['link']);
+        self::assertSame('Read More', $items[0]['button_text']);
+
+        self::assertSame('Security Audit', $items[1]['title']);
+    }
+
+    public function testCustomDynamicContentSourceProviderIntegration(): void
+    {
+        $customProvider = new class implements DynamicContentSourceProviderInterface {
+            public function getKey(): string
+            {
+                return 'custom_products';
+            }
+
+            public function getLabel(string $locale = 'en'): string
+            {
+                return $locale === 'tr' ? 'Ürünler' : 'Products';
+            }
+
+            public function isMultiItem(): bool
+            {
+                return true;
+            }
+
+            public function getSourceFields(string $locale = 'en'): array
+            {
+                return [
+                    ['name' => 'name', 'label' => 'Product Name', 'type' => 'string'],
+                ];
+            }
+
+            public function resolveSingle(array $config, string|object|array|null $contextPage = null, ?string $locale = null): ?array
+            {
+                return null;
+            }
+
+            public function resolveCollection(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
+            {
+                return [
+                    ['name' => 'Enterprise Suite', 'price' => 299],
+                    ['name' => 'Starter Pack', 'price' => 49],
+                ];
+            }
+        };
+
+        $hydrator = new DynamicContentHydrator(null, [$customProvider]);
+
+        $block = [
+            'type' => 'card',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'custom_products',
+                    'mapping' => ['title' => 'name'],
+                    'condition' => [
+                        'field' => 'price',
+                        'operator' => 'gte',
+                        'value' => '100',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(1, $result);
+        self::assertSame('Enterprise Suite', $result[0]['title']);
+    }
+
+    public function testExtendedDisplayConditionOperators(): void
+    {
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $sourceResolver->method('resolvePage')->willReturn([
+            'title' => 'Symfony Enterprise Guide',
+            'template' => 'article',
+            'tags' => ['php', 'symfony', 'sulu'],
+        ]);
+
+        // Test 'contains' on array
+        $blockContains = [
+            'type' => 'card',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'specific_page',
+                    'page_id' => 'p1',
+                    'mapping' => ['title' => 'title'],
+                    'condition' => ['field' => 'tags', 'operator' => 'contains', 'value' => 'sulu'],
+                ],
+            ],
+        ];
+        self::assertCount(1, $hydrator->hydrateBlock($blockContains));
+
+        // Test 'in' comma-separated list
+        $blockIn = [
+            'type' => 'card',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'specific_page',
+                    'page_id' => 'p1',
+                    'mapping' => ['title' => 'title'],
+                    'condition' => ['field' => 'template', 'operator' => 'in', 'value' => 'default, article, landing'],
+                ],
+            ],
+        ];
+        self::assertCount(1, $hydrator->hydrateBlock($blockIn));
+
+        // Test 'starts_with' failing
+        $blockStartsWith = [
+            'type' => 'card',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'specific_page',
+                    'page_id' => 'p1',
+                    'mapping' => ['title' => 'title'],
+                    'condition' => ['field' => 'title', 'operator' => 'starts_with', 'value' => 'Laravel'],
+                ],
+            ],
+        ];
+        self::assertCount(0, $hydrator->hydrateBlock($blockStartsWith));
+    }
+}

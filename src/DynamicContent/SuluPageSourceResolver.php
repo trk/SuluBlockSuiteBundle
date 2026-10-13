@@ -1,0 +1,790 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Totoglu\SuluBlockSuiteBundle\DynamicContent;
+
+use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
+use Sulu\Content\Domain\Model\DimensionContentInterface;
+use Sulu\Page\Domain\Model\PageDimensionContentInterface;
+use Sulu\Page\Domain\Model\PageInterface;
+use Sulu\Page\Domain\Repository\PageRepositoryInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+
+class SuluPageSourceResolver implements PageSourceResolverInterface
+{
+    public function __construct(
+        private readonly ?PageRepositoryInterface $pageRepository = null,
+        private readonly ?ContentResolverInterface $contentResolver = null,
+        private readonly ?RequestStack $requestStack = null,
+    ) {
+    }
+
+    /**
+     * Resolves a single page by UUID, PageInterface, PageDimensionContentInterface, or context array.
+     *
+     * @param string|object|array<mixed, mixed>|null $page
+     *
+     * @return array<string, mixed>|null
+     */
+    public function resolvePage(string|object|array|null $page = null, ?string $locale = null): ?array
+    {
+        $resolvedLocale = $this->resolveLocale($locale);
+
+        if (\is_array($page) && [] !== $page) {
+            /** @var array<string, mixed> $pageArray */
+            $pageArray = $page;
+
+            $resolved = $this->resolveCurrentPage($pageArray, $resolvedLocale);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        if (\is_object($page)) {
+            if (\method_exists($page, 'getContent') && \is_array($page->getContent())) {
+                $resolved = $this->resolveCurrentPage(['content' => $page->getContent()], $resolvedLocale);
+                if (null !== $resolved) {
+                    return $resolved;
+                }
+            }
+        }
+
+        if (\is_string($page)) {
+            $trimId = \trim($page);
+            if ('' !== $trimId && null !== $this->pageRepository) {
+                try {
+                    $pageEntity = $this->pageRepository->findOneBy(
+                        ['uuid' => $trimId],
+                        [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
+                    );
+
+                    if (null !== $pageEntity) {
+                        return $this->normalizePageEntity($pageEntity, $resolvedLocale);
+                    }
+                } catch (\Throwable) {
+                    return null;
+                }
+            }
+        }
+
+        if ($page instanceof PageDimensionContentInterface) {
+            $resource = $page->getResource();
+
+            return $this->normalizePageEntity($resource, $resolvedLocale);
+        }
+
+        if ($page instanceof PageInterface) {
+            return $this->normalizePageEntity($page, $resolvedLocale);
+        }
+
+        return $this->resolveFromRequest($resolvedLocale);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     *
+     * @return array<string, mixed>|null
+     */
+    public function resolveCurrentPage(array $context, string $locale): ?array
+    {
+        // 1. If explicit "page" is provided (e.g. from page_layout or main_content), prioritize it!
+        if (isset($context['page'])) {
+            $pageContext = $context['page'];
+            if (\is_array($pageContext) && (isset($pageContext['title']) || isset($pageContext['headline']))) {
+                return $this->resolveCurrentPage([
+                    'content' => $pageContext,
+                    'view' => $context['view'] ?? null,
+                    'extension' => $context['extension'] ?? null,
+                ], $locale);
+            }
+            if (\is_object($pageContext)) {
+                if (\method_exists($pageContext, 'getContent') && \is_array($pageContext->getContent())) {
+                    return $this->resolveCurrentPage([
+                        'content' => $pageContext->getContent(),
+                        'view' => $context['view'] ?? null,
+                        'extension' => $context['extension'] ?? null,
+                    ], $locale);
+                }
+                if ($pageContext instanceof PageDimensionContentInterface) {
+                    return $this->normalizePageEntity($pageContext->getResource(), $locale);
+                }
+                if ($pageContext instanceof PageInterface) {
+                    return $this->normalizePageEntity($pageContext, $locale);
+                }
+            }
+        }
+
+        // 2. Standard content context
+        if (isset($context['content']) && \is_array($context['content'])) {
+            /** @var array<string, mixed> $content */
+            $content = $context['content'];
+            /** @var mixed $rawId */
+            $rawId = $content['id'] ?? ($content['uuid'] ?? ($context['resource_id'] ?? null));
+            $content['id'] = \is_scalar($rawId) ? (string) $rawId : null;
+            $content['uuid'] = $content['id'];
+
+            /** @var mixed $headline */
+            $headline = $content['headline'] ?? ($content['title'] ?? null);
+            $content['headline'] = \is_string($headline) ? $headline : null;
+
+            /** @var mixed $excerptDesc */
+            $excerptDesc = null;
+            if (isset($context['extension']) && \is_array($context['extension']) && isset($context['extension']['excerpt']) && \is_array($context['extension']['excerpt'])) {
+                $excerptDesc = $context['extension']['excerpt']['description'] ?? null;
+            }
+            /** @var mixed $summary */
+            $summary = $content['summary'] ?? ($content['description'] ?? $excerptDesc);
+            $content['summary'] = \is_string($summary) ? $summary : null;
+
+            /** @var mixed $excerptImage */
+            $excerptImage = null;
+            if (isset($context['extension']) && \is_array($context['extension']) && isset($context['extension']['excerpt']) && \is_array($context['extension']['excerpt'])) {
+                $excerptImage = $context['extension']['excerpt']['image'] ?? null;
+            }
+            /** @var mixed $image */
+            $image = $content['image'] ?? $excerptImage;
+            $content['image'] = $image;
+
+            /** @var mixed $url */
+            $url = $content['url'] ?? null;
+            if (null === $url && isset($context['view']) && \is_array($context['view']) && isset($context['view']['url'])) {
+                $url = $context['view']['url'];
+            }
+            if (null === $url && isset($context['localizations']) && \is_array($context['localizations']) && isset($context['localizations'][$locale]) && \is_array($context['localizations'][$locale])) {
+                $url = $context['localizations'][$locale]['url'] ?? null;
+            }
+            $content['url'] = \is_string($url) ? $url : null;
+            $content['link'] = $content['link'] ?? $content['url'];
+
+            return $content;
+        }
+
+        if (isset($context['object']) && $context['object'] instanceof PageDimensionContentInterface) {
+            $page = $context['object']->getResource();
+
+            return $this->normalizePageEntity($page, $locale);
+        }
+
+        if (isset($context['resource']) && $context['resource'] instanceof PageInterface) {
+            return $this->normalizePageEntity($context['resource'], $locale);
+        }
+
+        if (isset($context['title']) || isset($context['headline'])) {
+            /** @var array<string, mixed> $normalized */
+            $normalized = $context;
+            /** @var mixed $title */
+            $title = $context['title'] ?? null;
+            /** @var mixed $headline */
+            $headline = $context['headline'] ?? $title;
+            $normalized['headline'] = \is_string($headline) ? $headline : null;
+
+            /** @var mixed $summary */
+            $summary = $context['summary'] ?? ($context['description'] ?? null);
+            $normalized['summary'] = \is_string($summary) ? $summary : null;
+
+            /** @var mixed $url */
+            $url = $context['url'] ?? null;
+            $normalized['link'] = $context['link'] ?? (\is_string($url) ? $url : null);
+
+            return $normalized;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveFromRequest(string $locale): ?array
+    {
+        if (null === $this->requestStack) {
+            return null;
+        }
+
+        $request = $this->requestStack->getCurrentRequest();
+        if (null === $request) {
+            return null;
+        }
+
+        // 1. Preview request query parameter (?provider=pages&id=UUID)
+        $previewId = $request->query->get('id');
+        $provider = $request->query->get('provider');
+        if (('pages' === $provider || null === $provider) && \is_string($previewId) && '' !== \trim($previewId)) {
+            $resolved = $this->resolvePage(\trim($previewId), $locale);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        // 2. Request attributes from Sulu Website routing
+        $structure = $request->attributes->get('structure');
+        if ($structure instanceof PageInterface || $structure instanceof PageDimensionContentInterface) {
+            return $this->resolvePage($structure, $locale);
+        }
+
+        $reqContent = $request->attributes->get('content');
+        if (\is_array($reqContent) && (isset($reqContent['title']) || isset($reqContent['headline']))) {
+            return $this->resolveCurrentPage(['content' => $reqContent], $locale);
+        }
+
+        $uuid = $request->attributes->get('uuid') ?? $request->attributes->get('id');
+        if (\is_string($uuid) && '' !== \trim($uuid)) {
+            return $this->resolvePage(\trim($uuid), $locale);
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolves the parent page of the given page (or of the current page when null).
+     *
+     * @param string|object|array<mixed, mixed>|null $page
+     *
+     * @return array<string, mixed>|null
+     */
+    public function resolveParent(string|object|array|null $page = null, ?string $locale = null): ?array
+    {
+        $resolvedLocale = $this->resolveLocale($locale);
+
+        if ($page instanceof PageInterface) {
+            $parent = $page->getParent();
+
+            return null !== $parent ? $this->normalizePageEntity($parent, $resolvedLocale) : null;
+        }
+
+        if ($page instanceof PageDimensionContentInterface) {
+            $parent = $page->getResource()->getParent();
+
+            return null !== $parent ? $this->normalizePageEntity($parent, $resolvedLocale) : null;
+        }
+
+        if (\is_array($page)) {
+            $rawParentId = $page['parent_id'] ?? ($page['parentId'] ?? ($page['parent_uuid'] ?? null));
+            if (\is_string($rawParentId) && '' !== \trim($rawParentId)) {
+                return $this->resolvePage(\trim($rawParentId), $resolvedLocale);
+            }
+            if (isset($page['content']) && \is_array($page['content'])) {
+                $contentParentId = $page['content']['parent_id'] ?? ($page['content']['parentId'] ?? null);
+                if (\is_string($contentParentId) && '' !== \trim($contentParentId)) {
+                    return $this->resolvePage(\trim($contentParentId), $resolvedLocale);
+                }
+            }
+        }
+
+        $targetUuid = null !== $page ? $this->resolvePageUuid($page) : null;
+        if (null === $targetUuid || '' === $targetUuid) {
+            $currentData = $this->resolveFromRequest($resolvedLocale);
+            if (null !== $currentData) {
+                $rawParent = $currentData['parent_id'] ?? ($currentData['parentId'] ?? null);
+                if (\is_string($rawParent) && '' !== \trim($rawParent)) {
+                    return $this->resolvePage(\trim($rawParent), $resolvedLocale);
+                }
+                $rawUuid = $currentData['id'] ?? ($currentData['uuid'] ?? null);
+                if (\is_string($rawUuid) && '' !== \trim($rawUuid)) {
+                    $targetUuid = \trim($rawUuid);
+                }
+            }
+        }
+
+        if (null !== $targetUuid && '' !== $targetUuid && null !== $this->pageRepository) {
+            try {
+                $pageEntity = $this->pageRepository->findOneBy(
+                    ['uuid' => $targetUuid],
+                    [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
+                );
+                if (null !== $pageEntity && null !== $pageEntity->getParent()) {
+                    return $this->normalizePageEntity($pageEntity->getParent(), $resolvedLocale);
+                }
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolves sibling pages sharing the same parent as the given page (or current page).
+     *
+     * @param string|object|array<mixed, mixed>|null $page
+     * @param array<string, mixed> $options
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function resolveSiblings(
+        string|object|array|null $page = null,
+        ?string $locale = null,
+        int $limit = 50,
+        bool $excludeCurrent = true,
+        array $options = [],
+    ): array {
+        $resolvedLocale = $this->resolveLocale($locale);
+        $currentUuid = null !== $page ? $this->resolvePageUuid($page) : null;
+        if (null === $currentUuid || '' === $currentUuid) {
+            $currentData = $this->resolveFromRequest($resolvedLocale);
+            if (null !== $currentData && isset($currentData['id']) && \is_string($currentData['id'])) {
+                $currentUuid = $currentData['id'];
+            }
+        }
+
+        $parentData = $this->resolveParent($page, $resolvedLocale);
+        $parentUuid = null !== $parentData && isset($parentData['id']) && \is_string($parentData['id'])
+            ? $parentData['id']
+            : null;
+
+        if (null === $parentUuid || '' === $parentUuid) {
+            return [];
+        }
+
+        $criteria = \array_merge($options, [
+            'parent_id' => $parentUuid,
+            'limit' => $limit,
+        ]);
+
+        if ($excludeCurrent && null !== $currentUuid && '' !== $currentUuid) {
+            $criteria['exclude_id'] = $currentUuid;
+        }
+
+        return $this->resolveQuery($criteria, $resolvedLocale);
+    }
+
+    /**
+     * Resolves child pages of a parent page.
+     *
+     * @param string|object|array<mixed, mixed> $parent
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function resolveChildren(string|object|array $parent, ?string $locale = null, int $limit = 50): array
+    {
+        if (null === $this->pageRepository) {
+            return [];
+        }
+
+        $parentId = $this->resolvePageUuid($parent);
+        if (null === $parentId || '' === $parentId) {
+            return [];
+        }
+
+        $resolvedLocale = $this->resolveLocale($locale);
+
+        /** @var array{uuid?: string, uuids?: list<string>, locale?: string, stage?: string, parentId?: string, descendantOfId?: string, webspaceKey?: string, limit?: int} $filters */
+        $filters = [
+            'parentId' => $parentId,
+            'locale' => $resolvedLocale,
+            'stage' => DimensionContentInterface::STAGE_LIVE,
+        ];
+
+        $limit = $limit > 0 ? $limit : 50;
+        $filters['limit'] = $limit;
+
+        try {
+            /** @var iterable<PageInterface> $pages */
+            $pages = $this->pageRepository->findBy(
+                $filters,
+                ['created' => 'desc'],
+                [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
+            );
+
+            $result = [];
+            foreach ($pages as $page) {
+                $data = $this->normalizePageEntity($page, $resolvedLocale);
+                if (null !== $data) {
+                    $result[] = $data;
+                }
+            }
+
+            return $result;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * Resolves pages matching category / tag / template / custom query filters.
+     *
+     * @param array<string, mixed> $criteria
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function resolveQuery(array $criteria, ?string $locale = null): array
+    {
+        if (null === $this->pageRepository) {
+            return [];
+        }
+
+        $resolvedLocale = $this->resolveLocale($locale);
+
+        /** @var array<string, mixed> $filters */
+        $filters = [
+            'locale' => $resolvedLocale,
+            'stage' => DimensionContentInterface::STAGE_LIVE,
+        ];
+
+        if (isset($criteria['parent_id']) && \is_string($criteria['parent_id']) && '' !== \trim($criteria['parent_id'])) {
+            $filters['parentId'] = \trim($criteria['parent_id']);
+        }
+
+        if (isset($criteria['descendant_of_id']) && \is_string($criteria['descendant_of_id']) && '' !== \trim($criteria['descendant_of_id'])) {
+            $filters['descendantOfId'] = \trim($criteria['descendant_of_id']);
+        }
+
+        if (isset($criteria['webspace_key']) && \is_string($criteria['webspace_key']) && '' !== \trim($criteria['webspace_key'])) {
+            $filters['webspaceKey'] = \trim($criteria['webspace_key']);
+        }
+
+        $templateKeys = $this->normalizeStringList($criteria['template_keys'] ?? ($criteria['templates'] ?? ($criteria['template'] ?? null)));
+        if ([] !== $templateKeys) {
+            $filters['templateKeys'] = $templateKeys;
+        }
+
+        $tagNames = $this->normalizeStringList($criteria['tag_names'] ?? ($criteria['tags'] ?? ($criteria['tag'] ?? null)));
+        if ([] !== $tagNames) {
+            $filters['tagNames'] = $tagNames;
+        }
+
+        $categoryKeys = $this->normalizeStringList($criteria['category_keys'] ?? ($criteria['categories'] ?? null));
+        if ([] !== $categoryKeys) {
+            $filters['categoryKeys'] = $categoryKeys;
+        }
+
+        $categoryIds = $this->normalizeIntList($criteria['category_ids'] ?? null);
+        if ([] !== $categoryIds) {
+            $filters['categoryIds'] = $categoryIds;
+        }
+
+        $navigationContexts = $this->normalizeStringList($criteria['navigation_contexts'] ?? ($criteria['navigation_context'] ?? null));
+        if ([] !== $navigationContexts) {
+            $filters['navigationContexts'] = $navigationContexts;
+        }
+
+        if (isset($criteria['depth']) && \is_numeric($criteria['depth']) && (int) $criteria['depth'] > 0) {
+            $filters['depth'] = (int) $criteria['depth'];
+        }
+
+        $offset = isset($criteria['offset']) && \is_numeric($criteria['offset']) && (int) $criteria['offset'] > 0
+            ? (int) $criteria['offset']
+            : 0;
+        $excludedIds = $this->normalizeStringList($criteria['exclude_ids'] ?? ($criteria['exclude_id'] ?? null));
+
+        $limit = isset($criteria['limit']) && \is_numeric($criteria['limit']) ? (int) $criteria['limit'] : 10;
+        if ($limit > 0) {
+            // Fetch extra rows when offset or excluded IDs are applied in memory
+            $filters['limit'] = $limit + $offset + \count($excludedIds);
+        }
+
+        /** @var array<string, 'asc'|'desc'> $sortBy */
+        $sortBy = ['created' => 'desc'];
+        if (isset($criteria['sort_by']) && \is_string($criteria['sort_by']) && '' !== \trim($criteria['sort_by'])) {
+            $rawOrder = $criteria['sort_order'] ?? 'desc';
+            $order = (\is_string($rawOrder) && 'asc' === \strtolower($rawOrder)) ? 'asc' : 'desc';
+            $sortField = \trim($criteria['sort_by']);
+            $sortBy = [$sortField => $order];
+        }
+
+        try {
+            /**
+             * @var array{
+             *     uuid?: string,
+             *     uuids?: list<string>,
+             *     locale?: string,
+             *     stage?: string,
+             *     categoryIds?: list<int>,
+             *     categoryKeys?: list<string>,
+             *     tagNames?: list<string>,
+             *     templateKeys?: list<string>,
+             *     parentId?: string|null,
+             *     descendantOfId?: string,
+             *     limit?: int,
+             *     navigationContexts?: list<string>,
+             *     depth?: int,
+             * } $typedFilters
+             */
+            $typedFilters = $filters;
+            /** @var array{id?: 'asc'|'desc', title?: 'asc'|'desc'} $typedSortBy */
+            $typedSortBy = $sortBy;
+
+            /** @var iterable<PageInterface> $pages */
+            $pages = $this->pageRepository->findBy(
+                $typedFilters,
+                $typedSortBy,
+                [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
+            );
+
+            $excludedMap = \array_fill_keys($excludedIds, true);
+            $result = [];
+            foreach ($pages as $page) {
+                if (isset($excludedMap[$page->getUuid()])) {
+                    continue;
+                }
+                $data = $this->normalizePageEntity($page, $resolvedLocale);
+                if (null !== $data) {
+                    $result[] = $data;
+                }
+            }
+
+            if ($offset > 0 || ($limit > 0 && \count($result) > $limit)) {
+                $result = \array_slice($result, $offset, $limit > 0 ? $limit : null);
+            }
+
+            return $result;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeStringList(mixed $raw): array
+    {
+        if (\is_string($raw)) {
+            return \array_values(\array_filter(
+                \array_map('trim', \explode(',', $raw)),
+                static fn (string $v): bool => '' !== $v,
+            ));
+        }
+
+        if (\is_array($raw)) {
+            $list = [];
+            foreach ($raw as $item) {
+                if (\is_string($item) && '' !== \trim($item)) {
+                    $list[] = \trim($item);
+                }
+            }
+
+            return $list;
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function normalizeIntList(mixed $raw): array
+    {
+        if (\is_int($raw)) {
+            return [$raw];
+        }
+
+        if (\is_string($raw)) {
+            $raw = \explode(',', $raw);
+        }
+
+        if (\is_array($raw)) {
+            $list = [];
+            foreach ($raw as $item) {
+                if (\is_numeric($item)) {
+                    $list[] = (int) $item;
+                }
+            }
+
+            return $list;
+        }
+
+        return [];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function normalizePageEntity(PageInterface $page, string $locale): ?array
+    {
+        $dimensionContent = $this->extractDimensionContent($page, $locale);
+        if (null === $dimensionContent) {
+            return null;
+        }
+
+        if (null !== $this->contentResolver) {
+            try {
+                $resolved = $this->contentResolver->resolve($dimensionContent);
+                /** @var array<string, mixed> $pageData */
+                $pageData = $resolved['content'];
+                $pageData['id'] = $page->getUuid();
+                $pageData['uuid'] = $page->getUuid();
+
+                $title = $dimensionContent->getTitle();
+                if (null !== $title) {
+                    $pageData['title'] = $title;
+                }
+                $pageData['headline'] = $pageData['headline'] ?? ($pageData['title'] ?? null);
+
+                /** @var mixed $excerptDesc */
+                $excerptDesc = null;
+                /** @var mixed $excerptImage */
+                $excerptImage = null;
+                $excerpt = $resolved['extension']['excerpt'] ?? null;
+                if (\is_array($excerpt)) {
+                    $excerptDesc = $excerpt['description'] ?? null;
+                    $excerptImage = $excerpt['image'] ?? null;
+                }
+
+                $pageData['summary'] = $pageData['summary'] ?? ($pageData['description'] ?? $excerptDesc);
+                $pageData['description'] = $pageData['description'] ?? $excerptDesc;
+                $pageData['image'] = $pageData['image'] ?? $excerptImage;
+
+                if (isset($resolved['view']['url']) && \is_string($resolved['view']['url'])) {
+                    $pageData['url'] = $resolved['view']['url'];
+                    $pageData['link'] = $resolved['view']['url'];
+                }
+
+                if (null !== $dimensionContent->getAuthored()) {
+                    $pageData['authored'] = $dimensionContent->getAuthored()->format('c');
+                    $pageData['date'] = $pageData['authored'];
+                }
+
+                if (null !== $dimensionContent->getAuthor()) {
+                    $pageData['author'] = $dimensionContent->getAuthor();
+                }
+
+                return $this->enrichPageMetadata($pageData, $page, $dimensionContent);
+            } catch (\Throwable) {
+                // Fallback to direct entity getters
+            }
+        }
+
+        /** @var array<string, mixed> $pageData */
+        $pageData = $dimensionContent->getTemplateData();
+        $pageData['id'] = $page->getUuid();
+        $pageData['uuid'] = $page->getUuid();
+        $entityTitle = $dimensionContent->getTitle();
+        $pageData['title'] = $entityTitle;
+        $existingHeadline = $pageData['headline'] ?? null;
+        if (!\is_string($existingHeadline) || '' === \trim($existingHeadline)) {
+            $pageData['headline'] = $entityTitle;
+        }
+        $pageData['summary'] = $pageData['summary'] ?? ($pageData['description'] ?? $dimensionContent->getExcerptDescription());
+        $pageData['description'] = $pageData['description'] ?? $dimensionContent->getExcerptDescription();
+        $pageData['image'] = $pageData['image'] ?? $dimensionContent->getExcerptImage();
+
+        $route = $dimensionContent->getRoute();
+        if (null !== $route) {
+            $pageData['url'] = $route->getSlug();
+            $pageData['link'] = $route->getSlug();
+        }
+
+        if (null !== $dimensionContent->getAuthored()) {
+            $pageData['authored'] = $dimensionContent->getAuthored()->format('c');
+            $pageData['date'] = $pageData['authored'];
+        }
+
+        if (null !== $dimensionContent->getAuthor()) {
+            $pageData['author'] = $dimensionContent->getAuthor();
+        }
+
+        return $this->enrichPageMetadata($pageData, $page, $dimensionContent);
+    }
+
+    /**
+     * @param array<string, mixed> $pageData
+     *
+     * @return array<string, mixed>
+     */
+    private function enrichPageMetadata(
+        array $pageData,
+        PageInterface $page,
+        PageDimensionContentInterface $dimensionContent,
+    ): array {
+        $parent = $page->getParent();
+        if (null !== $parent) {
+            $pageData['parent_id'] ??= $parent->getUuid();
+        }
+
+        $templateKey = $dimensionContent->getTemplateKey();
+        if (null !== $templateKey && '' !== $templateKey) {
+            $pageData['template'] ??= $templateKey;
+        }
+
+        $tagNames = $dimensionContent->getExcerptTagNames();
+        if ([] !== $tagNames) {
+            $pageData['tags'] ??= \array_values($tagNames);
+            $pageData['badge'] ??= $tagNames[\array_key_first($tagNames)];
+        }
+
+        $categoryIds = $dimensionContent->getExcerptCategoryIds();
+        if ([] !== $categoryIds) {
+            $pageData['categories'] ??= \array_values($categoryIds);
+        }
+
+        return $pageData;
+    }
+
+    private function extractDimensionContent(PageInterface $page, string $locale): ?PageDimensionContentInterface
+    {
+        /** @var iterable<PageDimensionContentInterface> $dimensionContents */
+        $dimensionContents = $page->getDimensionContents();
+
+        $fallback = null;
+        foreach ($dimensionContents as $content) {
+            if ($content->getLocale() === $locale) {
+                if (DimensionContentInterface::STAGE_LIVE === $content->getStage()) {
+                    return $content;
+                }
+                $fallback ??= $content;
+            }
+        }
+
+        if (null !== $fallback) {
+            return $fallback;
+        }
+
+        // Secondary fallback: check unlocalized
+        foreach ($dimensionContents as $content) {
+            if (null === $content->getLocale() || '' === $content->getLocale()) {
+                return $content;
+            }
+        }
+
+        foreach ($dimensionContents as $content) {
+            return $content;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string|object|array<mixed, mixed> $page
+     */
+    private function resolvePageUuid(string|object|array $page): ?string
+    {
+        if (\is_array($page)) {
+            $rawId = $page['id'] ?? ($page['uuid'] ?? ($page['resource_id'] ?? null));
+
+            return \is_scalar($rawId) ? (string) $rawId : null;
+        }
+
+        if (\is_string($page)) {
+            $trimId = \trim($page);
+
+            return '' !== $trimId ? $trimId : null;
+        }
+
+        if ($page instanceof PageInterface) {
+            return $page->getUuid();
+        }
+
+        if ($page instanceof PageDimensionContentInterface) {
+            return $page->getResource()->getUuid();
+        }
+
+        return null;
+    }
+
+    private function resolveLocale(?string $locale): string
+    {
+        if (null !== $locale && '' !== \trim($locale)) {
+            return \trim($locale);
+        }
+
+        if (null !== $this->requestStack) {
+            $request = $this->requestStack->getCurrentRequest();
+            if (null !== $request && '' !== $request->getLocale()) {
+                return $request->getLocale();
+            }
+        }
+
+        return 'en';
+    }
+}
