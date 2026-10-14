@@ -55,6 +55,7 @@ services:
             $twig: '@?twig'
             $requestStack: '@?request_stack'
             $layoutsDirectory: '%sulu_block_suite.layout.yaml_dir%'
+            $referenceStore: '@?sulu_http_cache.reference_store'
 
     Totoglu\SuluBlockSuiteBundle\Twig\LayoutTwigExtension:
         tags: ['twig.extension']
@@ -63,7 +64,14 @@ services:
         tags: ['sulu.content.property_resolver']
 
     Totoglu\SuluBlockSuiteBundle\Content\Type\SingleReusableBlockSelectionPropertyResolver:
+        arguments:
+            $referenceStore: '@?sulu_http_cache.reference_store'
         tags: ['sulu.content.property_resolver']
+
+    Totoglu\SuluBlockSuiteBundle\EventSubscriber\ReusableBlockCacheInvalidationSubscriber:
+        arguments:
+            $cacheManager: '@?sulu_http_cache.cache_manager'
+        tags: ['kernel.event_subscriber']
 
     Totoglu\SuluBlockSuiteBundle\Content\Type\HotspotPickerPropertyResolver:
         tags: ['sulu.content.property_resolver']
@@ -101,6 +109,25 @@ services:
             $pageRepository: '@?sulu_page.page_repository'
             $contentResolver: '@?sulu_content.content_resolver'
             $requestStack: '@?request_stack'
+
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluArticleSourceProvider:
+        arguments:
+            $articleRepository: '@?sulu_article.article_repository'
+            $contentResolver: '@?sulu_content.content_resolver'
+            $requestStack: '@?request_stack'
+        tags: ['sulu_block_suite.dynamic_source_provider']
+
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluCategorySourceProvider:
+        arguments:
+            $categoryManager: '@?sulu_category.category_manager'
+            $requestStack: '@?request_stack'
+        tags: ['sulu_block_suite.dynamic_source_provider']
+
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluMediaCollectionSourceProvider:
+        arguments:
+            $mediaManager: '@?sulu_media.media_manager'
+            $requestStack: '@?request_stack'
+        tags: ['sulu_block_suite.dynamic_source_provider']
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface:
         alias: Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator

@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Content\Type;
 
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Content\Application\ContentResolver\Value\ContentView;
 use Sulu\Content\Application\PropertyResolver\Resolver\PropertyResolverInterface;
 use Sulu\Snippet\Domain\Model\SnippetInterface;
 use Sulu\Snippet\Infrastructure\Sulu\Content\ResourceLoader\SnippetResourceLoader;
 
 /**
- * Resolves a single reusable block snippet selection with automatic reference tracking.
+ * Resolves a single reusable block snippet selection with automatic reference tracking and HTTP cache tagging.
  */
 final class SingleReusableBlockSelectionPropertyResolver implements PropertyResolverInterface
 {
+    public function __construct(
+        private readonly ?ReferenceStoreInterface $referenceStore = null,
+    ) {
+    }
+
     /**
      * @param array<string, mixed> $params
      */
@@ -22,6 +28,8 @@ final class SingleReusableBlockSelectionPropertyResolver implements PropertyReso
         if (!\is_string($data) || '' === $data) {
             return ContentView::create(null, \array_merge(['id' => null], $params));
         }
+
+        $this->referenceStore?->add($data, SnippetInterface::RESOURCE_KEY);
 
         /** @var string $resourceLoaderKey */
         $resourceLoaderKey = isset($params['resourceLoader']) && \is_string($params['resourceLoader'])

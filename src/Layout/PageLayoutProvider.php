@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Layout;
 
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface;
 use Sulu\Snippet\Domain\Model\SnippetInterface;
@@ -33,6 +34,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
         private readonly ?Environment $twig = null,
         private readonly ?RequestStack $requestStack = null,
         string|array $layoutsDirectory = '',
+        private readonly ?ReferenceStoreInterface $referenceStore = null,
     ) {
         $dirs = \is_array($layoutsDirectory) ? \array_values($layoutsDirectory) : [$layoutsDirectory];
         $this->layoutsDirectories = \array_values(\array_filter($dirs, static fn (string $dir): bool => '' !== \trim($dir)));
@@ -228,6 +230,8 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
                     $templateData = $content->getTemplateData();
                     $title = $content->getTitle();
 
+                    $this->referenceStore?->add($snippet->getUuid(), SnippetInterface::RESOURCE_KEY);
+
                     return $this->cache[$cacheKey] = [
                         'id' => $snippet->getUuid(),
                         'uuid' => $snippet->getUuid(),
@@ -268,6 +272,8 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
         if (null === $targetContent) {
             return null;
         }
+
+        $this->referenceStore?->add($snippet->getUuid(), SnippetInterface::RESOURCE_KEY);
 
         /** @var array<string, mixed> $templateData */
         $templateData = $targetContent->getTemplateData();
