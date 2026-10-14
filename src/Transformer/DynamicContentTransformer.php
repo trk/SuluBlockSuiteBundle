@@ -24,30 +24,61 @@ final class DynamicContentTransformer implements BlockTransformerInterface
 
     public function supports(array $block, array $context): bool
     {
-        return true;
+        return empty($block['_dynamic_content_resolved']);
     }
 
     public function transform(array $block, array $context): array
     {
-        $rawContextPage = $context['page'] ?? ($context['content'] ?? null);
-        /** @var array<string, mixed>|object|string|null $contextPage */
-        $contextPage = \is_string($rawContextPage) || \is_object($rawContextPage) || \is_array($rawContextPage) ? $rawContextPage : null;
+        $contextPage = $this->extractContextPage($context);
 
         $results = $this->hydrator->hydrateBlock($block, $contextPage);
 
         if ([] === $results) {
             $block['_hidden'] = true;
+            $block['_dynamic_content_resolved'] = true;
 
             return $block;
         }
 
+        foreach ($results as $idx => $item) {
+            $results[$idx]['_dynamic_content_resolved'] = true;
+        }
+
         /** @var array<string, mixed> $transformed */
         $transformed = $results[0];
-        $transformed['_dynamic_content_resolved'] = true;
         if (\count($results) > 1) {
             $transformed['_expanded_blocks'] = $results;
         }
 
         return $transformed;
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     *
+     * @return array<string, mixed>|object|string|null
+     */
+    private function extractContextPage(array $context): array|object|string|null
+    {
+        if ([] === $context) {
+            return null;
+        }
+
+        if (
+            isset($context['resource'])
+            || isset($context['object'])
+            || isset($context['view'])
+            || isset($context['extension'])
+        ) {
+            return $context;
+        }
+
+        $rawContextPage = $context['page'] ?? ($context['content'] ?? null);
+        if (\is_string($rawContextPage) || \is_object($rawContextPage) || \is_array($rawContextPage)) {
+            /** @var array<string, mixed>|object|string $rawContextPage */
+            return $rawContextPage;
+        }
+
+        return $context;
     }
 }

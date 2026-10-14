@@ -13,6 +13,8 @@
             {% if block.type in ['main_content', 'page_blocks'] %}
                 {{ sulu_block_render(block|merge({type: 'main_content'}), _context|merge({
                     page: page|default(null),
+                    resource: resource|default(_context.resource|default(null)),
+                    object: object|default(_context.object|default(null)),
                     page_blocks: page_blocks|default([]),
                     view: view|default(_context.view|default(null)),
                     extension: extension|default(_context.extension|default(null)),
@@ -20,6 +22,8 @@
             {% else %}
                 {{ sulu_block_render(block, _context|merge({
                     page: page|default(null),
+                    resource: resource|default(_context.resource|default(null)),
+                    object: object|default(_context.object|default(null)),
                     view: view|default(_context.view|default(null)),
                     extension: extension|default(_context.extension|default(null)),
                     loop: loop,
@@ -32,6 +36,8 @@
 {% if not has_content_slot and page_blocks|default([])|length > 0 %}
     {{ sulu_blocks_render(page_blocks, _context|merge({
         content: page|default(_context.content|default([])),
+        resource: resource|default(_context.resource|default(null)),
+        object: object|default(_context.object|default(null)),
         view: view|default(_context.view|default(null)),
         extension: extension|default(_context.extension|default(null)),
     })) }}

@@ -9,7 +9,7 @@
 
 {% if inner_blocks is not empty %}
     <div {% if block_id %}id="{{ block_id }}"{% endif %} class="{{ wrapper_classes }}">
-        {% for inner_block in inner_blocks %}
+        {% for inner_block in inner_blocks|hydrate_blocks(_context) %}
             {% if inner_block.type is defined and inner_block.type != 'reusable' %}
                 {{ sulu_block_render(inner_block, _context) }}
             {% endif %}

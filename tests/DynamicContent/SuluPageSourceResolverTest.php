@@ -36,7 +36,11 @@ class SuluPageSourceResolverTest extends TestCase
         $pageRepositoryMock = $this->createMock(PageRepositoryInterface::class);
         $pageRepositoryMock->expects($this->once())
             ->method('findOneBy')
-            ->with(['uuid' => 'page-target-123'])
+            ->with([
+                'uuid' => 'page-target-123',
+                'locale' => 'en',
+                'stage' => 'live',
+            ])
             ->willReturn($pageStub);
 
         $resolver = new SuluPageSourceResolver($pageRepositoryMock);
@@ -100,7 +104,11 @@ class SuluPageSourceResolverTest extends TestCase
         $pageRepositoryMock = $this->createMock(PageRepositoryInterface::class);
         $pageRepositoryMock->expects($this->once())
             ->method('findOneBy')
-            ->with(['uuid' => 'preview-uuid-789'])
+            ->with([
+                'uuid' => 'preview-uuid-789',
+                'locale' => 'en',
+                'stage' => 'live',
+            ])
             ->willReturn($pageStub);
 
         $request = new Request(query: ['provider' => 'pages', 'id' => 'preview-uuid-789', 'locale' => 'en']);
@@ -333,5 +341,158 @@ class SuluPageSourceResolverTest extends TestCase
 
         $this->assertCount(1, $results);
         $this->assertSame('page-2', $results[0]['id']);
+    }
+
+    public function testResolveParentFromSulu3TwigContextReloadsUninitializedParentDimensionContent(): void
+    {
+        $unlocalizedDim = $this->createStub(PageDimensionContentInterface::class);
+        $unlocalizedDim->method('getLocale')->willReturn(null);
+        $unlocalizedDim->method('getStage')->willReturn('live');
+        $unlocalizedDim->method('getTitle')->willReturn(null);
+        $unlocalizedDim->method('getTemplateData')->willReturn([]);
+
+        // Proxy parent with only unlocalized dimension content initially loaded
+        $parentProxy = $this->createStub(PageInterface::class);
+        $parentProxy->method('getUuid')->willReturn('01a11348-6256-7b4e-adc2-3008ba037f03');
+        $parentProxy->method('getDimensionContents')->willReturn(new ArrayCollection([$unlocalizedDim]));
+
+        // Reloaded parent with localized 'en' live dimension content
+        $localizedDim = $this->createStub(PageDimensionContentInterface::class);
+        $localizedDim->method('getLocale')->willReturn('en');
+        $localizedDim->method('getStage')->willReturn('live');
+        $localizedDim->method('getTitle')->willReturn('Website');
+        $localizedDim->method('getTemplateData')->willReturn(['title' => 'Website']);
+
+        $reloadedParent = $this->createStub(PageInterface::class);
+        $reloadedParent->method('getUuid')->willReturn('01a11348-6256-7b4e-adc2-3008ba037f03');
+        $reloadedParent->method('getDimensionContents')->willReturn(new ArrayCollection([$unlocalizedDim, $localizedDim]));
+
+        $aboutUsPage = $this->createStub(PageInterface::class);
+        $aboutUsPage->method('getUuid')->willReturn('01a12d46-1e27-7310-860e-6fc8595d76c6');
+        $aboutUsPage->method('getParent')->willReturn($parentProxy);
+
+        $pageRepositoryMock = $this->createMock(PageRepositoryInterface::class);
+        $pageRepositoryMock->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'uuid' => '01a11348-6256-7b4e-adc2-3008ba037f03',
+                'locale' => 'en',
+                'stage' => 'live',
+            ])
+            ->willReturn($reloadedParent);
+
+        $resolver = new SuluPageSourceResolver($pageRepositoryMock);
+
+        $sulu3TwigContext = [
+            'content' => [
+                'title' => 'About us',
+            ],
+            'resource' => $aboutUsPage,
+        ];
+
+        $parentData = $resolver->resolveParent($sulu3TwigContext, 'en');
+
+        $this->assertNotNull($parentData);
+        $this->assertSame('01a11348-6256-7b4e-adc2-3008ba037f03', $parentData['id']);
+        $this->assertSame('Website', $parentData['title']);
+        $this->assertSame('Website', $parentData['headline']);
+    }
+
+    public function testAboutUsThreeHeadlineBlocksResolveEndToEnd(): void
+    {
+        $unlocalizedDim = $this->createStub(PageDimensionContentInterface::class);
+        $unlocalizedDim->method('getLocale')->willReturn(null);
+        $unlocalizedDim->method('getStage')->willReturn('live');
+        $unlocalizedDim->method('getTitle')->willReturn(null);
+        $unlocalizedDim->method('getTemplateData')->willReturn([]);
+
+        $homepageLiveDim = $this->createStub(PageDimensionContentInterface::class);
+        $homepageLiveDim->method('getLocale')->willReturn('en');
+        $homepageLiveDim->method('getStage')->willReturn('live');
+        $homepageLiveDim->method('getTitle')->willReturn('Website');
+        $homepageLiveDim->method('getTemplateData')->willReturn(['title' => 'Website']);
+
+        $homepageProxy = $this->createStub(PageInterface::class);
+        $homepageProxy->method('getUuid')->willReturn('01a11348-6256-7b4e-adc2-3008ba037f03');
+        $homepageProxy->method('getDimensionContents')->willReturn(new ArrayCollection([$unlocalizedDim]));
+
+        $homepageFull = $this->createStub(PageInterface::class);
+        $homepageFull->method('getUuid')->willReturn('01a11348-6256-7b4e-adc2-3008ba037f03');
+        $homepageFull->method('getDimensionContents')->willReturn(new ArrayCollection([$unlocalizedDim, $homepageLiveDim]));
+
+        $aboutUsPage = $this->createStub(PageInterface::class);
+        $aboutUsPage->method('getUuid')->willReturn('01a12d46-1e27-7310-860e-6fc8595d76c6');
+        $aboutUsPage->method('getParent')->willReturn($homepageProxy);
+
+        $pageRepositoryStub = $this->createStub(PageRepositoryInterface::class);
+        $pageRepositoryStub->method('findOneBy')->willReturnCallback(
+            static function (array $filters) use ($homepageFull): ?PageInterface {
+                if (
+                    ($filters['uuid'] ?? null) === '01a11348-6256-7b4e-adc2-3008ba037f03'
+                    && ($filters['locale'] ?? null) === 'en'
+                    && ($filters['stage'] ?? null) === 'live'
+                ) {
+                    return $homepageFull;
+                }
+
+                return null;
+            },
+        );
+
+        $resolver = new SuluPageSourceResolver($pageRepositoryStub);
+        $hydrator = new \Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator($resolver);
+        $transformer = new \Totoglu\SuluBlockSuiteBundle\Transformer\DynamicContentTransformer($hydrator);
+        $pipeline = new \Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipeline([$transformer]);
+
+        $blocks = [
+            [
+                'type' => 'headline',
+                'title' => 'Static 1',
+                'props' => [
+                    '_dynamic' => [
+                        'enabled' => true,
+                        'source_type' => 'current_page',
+                        'mapping' => ['title' => 'title'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'headline',
+                'title' => 'Static 2',
+                'props' => [
+                    '_dynamic' => [
+                        'enabled' => true,
+                        'source_type' => 'parent_page',
+                        'mapping' => ['title' => 'title'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'headline',
+                'title' => 'Static 3',
+                'props' => [
+                    '_dynamic' => [
+                        'enabled' => true,
+                        'source_type' => 'specific_page',
+                        'page_id' => '01a11348-6256-7b4e-adc2-3008ba037f03',
+                        'mapping' => ['title' => 'title'],
+                    ],
+                ],
+            ],
+        ];
+
+        $sulu3TwigContext = [
+            'content' => ['title' => 'About us'],
+            'resource' => $aboutUsPage,
+            'view' => ['url' => '/about-us'],
+            'extension' => [],
+        ];
+
+        $processed = $pipeline->processCollection($blocks, $sulu3TwigContext);
+
+        $this->assertCount(3, $processed);
+        $this->assertSame('About us', $processed[0]['title']);
+        $this->assertSame('Website', $processed[1]['title']);
+        $this->assertSame('Website', $processed[2]['title']);
     }
 }

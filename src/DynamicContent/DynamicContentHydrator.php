@@ -130,10 +130,12 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 
         // 2. Child pages (page_children)
         if ('page_children' === $sourceType) {
-            /** @var mixed $rawParentId */
-            $rawParentId = $dynamicConfig['parent_id'] ?? ($dynamicConfig['page_id'] ?? $contextPage);
+            $rawParentId = $this->resolveTargetOrContext(
+                $dynamicConfig['parent_id'] ?? ($dynamicConfig['page_id'] ?? null),
+                $contextPage,
+            );
             if (!\is_string($rawParentId) && !\is_object($rawParentId) && !\is_array($rawParentId)) {
-                return [$block];
+                $rawParentId = [];
             }
             /** @var string|object|array<mixed, mixed> $parentId */
             $parentId = $rawParentId;
@@ -142,9 +144,9 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
                 : 50;
 
             $queryOptions = $this->extractQueryOptions($dynamicConfig);
-            if ([] !== $queryOptions && \is_string($parentId) && '' !== \trim($parentId)) {
+            if ([] !== $queryOptions) {
                 $items = $this->sourceResolver->resolveQuery(\array_merge($queryOptions, [
-                    'parent_id' => \trim($parentId),
+                    'parent_id' => $parentId,
                     'limit' => $limit,
                 ]));
             } else {
@@ -156,10 +158,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 
         // 3. Sibling pages (sibling_pages)
         if ('sibling_pages' === $sourceType) {
-            /** @var mixed $rawTarget */
-            $rawTarget = $dynamicConfig['page_id'] ?? $contextPage;
-            /** @var string|object|array<mixed, mixed>|null $targetPage */
-            $targetPage = (\is_string($rawTarget) || \is_object($rawTarget) || \is_array($rawTarget)) ? $rawTarget : null;
+            $targetPage = $this->resolveTargetOrContext($contextPage, $dynamicConfig['page_id'] ?? null);
             $limit = isset($dynamicConfig['limit']) && \is_numeric($dynamicConfig['limit'])
                 ? (int) $dynamicConfig['limit']
                 : 50;
@@ -191,10 +190,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 
         // 5. Parent page (parent_page)
         if ('parent_page' === $sourceType) {
-            /** @var mixed $rawTarget */
-            $rawTarget = $dynamicConfig['page_id'] ?? $contextPage;
-            /** @var string|object|array<mixed, mixed>|null $targetPage */
-            $targetPage = (\is_string($rawTarget) || \is_object($rawTarget) || \is_array($rawTarget)) ? $rawTarget : null;
+            $targetPage = $this->resolveTargetOrContext($contextPage, $dynamicConfig['page_id'] ?? null);
 
             $pageData = $this->sourceResolver->resolveParent($targetPage);
 
@@ -214,6 +210,10 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         $rawTargetPage = 'current_page' === $sourceType
             ? $contextPage
             : ($dynamicConfig['page_id'] ?? null);
+
+        if (\is_string($rawTargetPage) && '' === \trim($rawTargetPage)) {
+            $rawTargetPage = null;
+        }
 
         if (!\is_string($rawTargetPage) && !\is_object($rawTargetPage) && !\is_array($rawTargetPage)) {
             if ('current_page' === $sourceType) {
@@ -249,6 +249,32 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         }
 
         return $hydrated;
+    }
+
+    /**
+     * @return string|object|array<mixed, mixed>|null
+     */
+    private function resolveTargetOrContext(
+        mixed $configuredTarget,
+        mixed $fallbackTarget,
+    ): string|object|array|null {
+        if (\is_string($configuredTarget) && '' !== \trim($configuredTarget)) {
+            return \trim($configuredTarget);
+        }
+
+        if (\is_object($configuredTarget) || (\is_array($configuredTarget) && [] !== $configuredTarget)) {
+            return $configuredTarget;
+        }
+
+        if (\is_string($fallbackTarget) && '' !== \trim($fallbackTarget)) {
+            return \trim($fallbackTarget);
+        }
+
+        if (\is_object($fallbackTarget) || \is_array($fallbackTarget)) {
+            return $fallbackTarget;
+        }
+
+        return null;
     }
 
     /**

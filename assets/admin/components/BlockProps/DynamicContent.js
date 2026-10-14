@@ -273,7 +273,12 @@ class DynamicContent extends React.Component<Props> {
         };
 
         const trimmedId = this.pageId ? String(this.pageId).trim() : '';
-        if (trimmedId !== '') {
+        const usesExplicitTargetId =
+            sourceType === 'specific_page' ||
+            sourceType === 'page_children' ||
+            sourceType === 'sulu_media_collection' ||
+            sourceType === 'sulu_categories';
+        if (trimmedId !== '' && usesExplicitTargetId) {
             clean.page_id = trimmedId;
             if (sourceType === 'sulu_media_collection') {
                 clean.collection_id = trimmedId;

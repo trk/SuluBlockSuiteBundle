@@ -45,4 +45,29 @@ final class DynamicContentTransformerTest extends TestCase
 
         $this->assertTrue($result['_hidden']);
     }
+
+    public function testPreservesSulu3TwigContextWithResource(): void
+    {
+        $hydrator = $this->createMock(DynamicContentHydratorInterface::class);
+        $transformer = new DynamicContentTransformer($hydrator);
+
+        $block = ['type' => 'headline', 'title' => 'Static'];
+        $resourceStub = new \stdClass();
+        $context = [
+            'content' => ['title' => 'About us'],
+            'resource' => $resourceStub,
+            'view' => ['url' => '/about-us'],
+        ];
+
+        $hydrator->expects($this->once())
+            ->method('hydrateBlock')
+            ->with($block, $context)
+            ->willReturn([['type' => 'headline', 'title' => 'Website']]);
+
+        $result = $transformer->transform($block, $context);
+
+        $this->assertSame('Website', $result['title']);
+        $this->assertTrue($result['_dynamic_content_resolved']);
+        $this->assertFalse($transformer->supports($result, $context));
+    }
 }

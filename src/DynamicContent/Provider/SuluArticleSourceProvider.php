@@ -87,6 +87,15 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
                 [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_WEBSITE => true],
             );
 
+            $article ??= $this->articleRepository->findOneBy(
+                [
+                    'uuid' => \trim($uuid),
+                    'locale' => $resolvedLocale,
+                    'stage' => DimensionContentInterface::STAGE_DRAFT,
+                ],
+                [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_ADMIN => true],
+            );
+
             return null !== $article ? $this->normalizeArticleEntity($article, $resolvedLocale) : null;
         } catch (\Throwable) {
             return null;
@@ -140,14 +149,16 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
             $filters['limit'] = $limit + $offset + \count($excludedIds);
         }
 
-        /** @var array{id?: 'asc'|'desc', title?: 'asc'|'desc'} $sortBy */
-        $sortBy = ['id' => 'desc'];
+        /** @var array<string, 'asc'|'desc'> $sortBy */
+        $sortBy = ['created' => 'desc'];
         if (isset($query['sort_by']) && \is_string($query['sort_by']) && '' !== \trim($query['sort_by'])) {
             $rawOrder = $query['sort_order'] ?? 'desc';
             $order = (\is_string($rawOrder) && 'asc' === \strtolower($rawOrder)) ? 'asc' : 'desc';
             $sortField = \trim($query['sort_by']);
-            if (\in_array($sortField, ['id', 'title'], true)) {
-                /** @var array{id?: 'asc'|'desc', title?: 'asc'|'desc'} $sortBy */
+            if ('published' === $sortField) {
+                $sortField = 'workflowPublished';
+            }
+            if (\in_array($sortField, ['id', 'uuid', 'title', 'authored', 'workflowPublished', 'created', 'changed'], true)) {
                 $sortBy = [$sortField => $order];
             }
         }
@@ -167,10 +178,12 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
              * } $typedFilters
              */
             $typedFilters = $filters;
+            /** @var array{id?: 'asc'|'desc', title?: 'asc'|'desc'} $typedSortBy */
+            $typedSortBy = $sortBy;
 
             $articles = $this->articleRepository->findBy(
                 $typedFilters,
-                $sortBy,
+                $typedSortBy,
                 [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_WEBSITE => true],
             );
 
