@@ -208,6 +208,9 @@
     "sulu_block_suite.dynamic_op_not_contains": "Ne contient pas",
     "sulu_block_suite.dynamic_op_starts_with": "Commence par",
     "sulu_block_suite.dynamic_op_ends_with": "Se termine par",
-    "sulu_block_suite.dynamic_op_in": "Dans la liste (séparé par des virgules)"
+    "sulu_block_suite.dynamic_op_in": "Dans la liste (séparé par des virgules)",
+    "sulu_block_suite.dynamic_source_sulu_articles": "Articles (Sulu Article Bundle)",
+    "sulu_block_suite.dynamic_source_sulu_categories": "Catégories (Sulu Category Bundle)",
+    "sulu_block_suite.dynamic_source_sulu_media_collection": "Collection Média (Sulu Media Bundle)"
 }
 

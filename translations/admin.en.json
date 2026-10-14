@@ -207,6 +207,9 @@
     "sulu_block_suite.dynamic_op_not_contains": "Does Not Contain",
     "sulu_block_suite.dynamic_op_starts_with": "Starts With",
     "sulu_block_suite.dynamic_op_ends_with": "Ends With",
-    "sulu_block_suite.dynamic_op_in": "In List (Comma-Separated)"
+    "sulu_block_suite.dynamic_op_in": "In List (Comma-Separated)",
+    "sulu_block_suite.dynamic_source_sulu_articles": "Articles (Sulu Article Bundle)",
+    "sulu_block_suite.dynamic_source_sulu_categories": "Categories (Sulu Category Bundle)",
+    "sulu_block_suite.dynamic_source_sulu_media_collection": "Media Collection (Sulu Media Bundle)"
 }
 
