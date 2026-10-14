@@ -223,6 +223,7 @@ final class BlockSuiteAdmin extends Admin
                 ->setFormKey('snippet')
                 ->setTabTitle('sulu_content.content')
                 ->addToolbarActions($formToolbarActions)
+                ->addMetadataRequestParameters(['overwriteDefaultType' => $snippetType])
                 ->setParent($viewPrefix . '.edit'),
         );
 

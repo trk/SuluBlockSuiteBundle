@@ -10,15 +10,18 @@ use Sulu\Snippet\Domain\Event\SnippetRemovedEvent;
 use Sulu\Snippet\Domain\Event\SnippetWorkflowTransitionAppliedEvent;
 use Sulu\Snippet\Domain\Model\SnippetInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\Preset\YamlBlockPresetProvider;
 
 /**
- * Automatically invalidates reverse-proxy HTTP cache tags and references when a reusable block
- * or page layout snippet is modified, published/unpublished, or removed.
+ * Automatically invalidates reverse-proxy HTTP cache tags and references when a reusable block,
+ * block preset, or page layout snippet is modified, published/unpublished, or removed.
  */
 final class ReusableBlockCacheInvalidationSubscriber implements EventSubscriberInterface
 {
     public function __construct(
         private readonly ?CacheManagerInterface $cacheManager = null,
+        private readonly ?BlockPresetProviderInterface $presetProvider = null,
     ) {
     }
 
@@ -48,6 +51,10 @@ final class ReusableBlockCacheInvalidationSubscriber implements EventSubscriberI
 
     private function invalidateSnippetUuid(string $uuid): void
     {
+        if ($this->presetProvider instanceof YamlBlockPresetProvider) {
+            $this->presetProvider->clearCache();
+        }
+
         if (null === $this->cacheManager || '' === \trim($uuid)) {
             return;
         }
@@ -56,3 +63,4 @@ final class ReusableBlockCacheInvalidationSubscriber implements EventSubscriberI
         $this->cacheManager->invalidateReference(SnippetInterface::RESOURCE_KEY, $uuid);
     }
 }
+
