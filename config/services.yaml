@@ -71,6 +71,7 @@ services:
     Totoglu\SuluBlockSuiteBundle\EventSubscriber\ReusableBlockCacheInvalidationSubscriber:
         arguments:
             $cacheManager: '@?sulu_http_cache.cache_manager'
+            $presetProvider: '@?Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
         tags: ['kernel.event_subscriber']
 
     Totoglu\SuluBlockSuiteBundle\Content\Type\HotspotPickerPropertyResolver:
@@ -183,3 +184,15 @@ services:
             $targetFieldResolver: '@Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver'
             $customProviders: !tagged_iterator sulu_block_suite.dynamic_source_provider
         tags: ['controller.service_arguments']
+
+    Totoglu\SuluBlockSuiteBundle\Command\ExportBlockPresetsCommand:
+        arguments:
+            $yamlDirectory: '%sulu_block_suite.presets.yaml_dir%'
+            $snippetRepository: '@?sulu_snippet.snippet_repository'
+        tags: ['console.command']
+
+    Totoglu\SuluBlockSuiteBundle\Search\BlockSuitePageReindexEnhancer:
+        arguments:
+            $snippetRepository: '@?sulu_snippet.snippet_repository'
+        tags: ['sulu_page.website_page_reindex_provider_enhancer']
+
