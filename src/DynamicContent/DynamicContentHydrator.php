@@ -24,6 +24,34 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         'subnav',
         'switcher',
         'table',
+        'nav',
+        'map',
+        'popover',
+        'social',
+        'breadcrumbs',
+    ];
+
+    /**
+     * Default child item block type for multi-item container blocks when `items` is initially empty.
+     *
+     * @var array<string, string>
+     */
+    private const DEFAULT_CONTAINER_ITEM_TYPES = [
+        'grid' => 'card',
+        'gallery' => 'overlay',
+        'panel_slider' => 'card',
+        'overlay_slider' => 'overlay',
+        'accordion' => 'accordion_item',
+        'list' => 'list_item',
+        'description_list' => 'description_list_item',
+        'slideshow' => 'slideshow_item',
+        'subnav' => 'subnav_item',
+        'switcher' => 'switcher_item',
+        'table' => 'table_item',
+        'nav' => 'nav_item',
+        'map' => 'map_item',
+        'popover' => 'popover_item',
+        'social' => 'social_item',
     ];
 
     /**
@@ -298,7 +326,13 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         $blockType = isset($block['type']) && \is_string($block['type']) ? $block['type'] : '';
 
         $shouldHydrateInnerItems = 'items' === $hydrateMode
-            || ('repeater' !== $hydrateMode && \in_array($blockType, self::MULTI_ITEM_CONTAINER_BLOCKS, true));
+            || (
+                'repeater' !== $hydrateMode
+                && (
+                    \in_array($blockType, self::MULTI_ITEM_CONTAINER_BLOCKS, true)
+                    || (isset($block['items']) && \is_array($block['items']))
+                )
+            );
 
         if ($shouldHydrateInnerItems) {
             /** @var array<string, mixed> $templateItem */
@@ -306,9 +340,24 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
                 ? $block['items'][0]
                 : [];
 
+            if (!isset($templateItem['type']) && isset(self::DEFAULT_CONTAINER_ITEM_TYPES[$blockType])) {
+                $templateItem['type'] = self::DEFAULT_CONTAINER_ITEM_TYPES[$blockType];
+            }
+
+            /** @var array<string, string> $itemMapping */
+            $itemMapping = [];
+            foreach ($mapping as $targetKey => $sourcePath) {
+                $normalizedTarget = \str_starts_with($targetKey, 'items.')
+                    ? \substr($targetKey, 6)
+                    : $targetKey;
+                if ('' !== $normalizedTarget) {
+                    $itemMapping[$normalizedTarget] = $sourcePath;
+                }
+            }
+
             $hydratedInnerItems = [];
             foreach ($filteredItems as $itemData) {
-                $hydratedInnerItems[] = $this->applyMapping($templateItem, $itemData, $mapping);
+                $hydratedInnerItems[] = $this->applyMapping($templateItem, $itemData, $itemMapping);
             }
 
             $hydratedBlock = $block;

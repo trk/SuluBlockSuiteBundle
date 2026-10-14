@@ -78,6 +78,7 @@ const VALUE_CONDITION_OPERATORS = [
 class DynamicContent extends React.Component<Props> {
     @observable sourceType: string = 'none';
     @observable pageId: string = '';
+    @observable categoryFilter: string = '';
     @observable limit: number = 10;
     @observable offset: number = 0;
     @observable sortBy: string = 'created';
@@ -129,6 +130,7 @@ class DynamicContent extends React.Component<Props> {
         if (!val) {
             this.sourceType = 'none';
             this.pageId = '';
+            this.categoryFilter = '';
             this.limit = 10;
             this.offset = 0;
             this.sortBy = 'created';
@@ -146,7 +148,8 @@ class DynamicContent extends React.Component<Props> {
 
         const raw = toJS(val);
         this.sourceType = raw.source_type || 'none';
-        this.pageId = raw.page_id || raw.parent_id || '';
+        this.pageId = String(raw.page_id || raw.parent_id || raw.collection_id || raw.parent_key || '');
+        this.categoryFilter = String(raw.categories || raw.category_keys || (raw.query && raw.query.categories) || '');
         this.limit = raw.limit !== undefined ? Number(raw.limit) : 10;
         this.offset = raw.offset !== undefined ? Number(raw.offset) : 0;
         this.sortBy = raw.sort_by || (raw.query && raw.query.sort_by) || 'created';
@@ -240,7 +243,14 @@ class DynamicContent extends React.Component<Props> {
     };
 
     isMultiItemSource(sourceType: string): boolean {
-        if (sourceType === 'page_children' || sourceType === 'sibling_pages' || sourceType === 'custom_query') {
+        if (
+            sourceType === 'page_children' ||
+            sourceType === 'sibling_pages' ||
+            sourceType === 'custom_query' ||
+            sourceType === 'sulu_articles' ||
+            sourceType === 'sulu_categories' ||
+            sourceType === 'sulu_media_collection'
+        ) {
             return true;
         }
         const custom = this.customSources.find((s) => s.key === sourceType);
@@ -262,8 +272,18 @@ class DynamicContent extends React.Component<Props> {
             mapping,
         };
 
-        if (this.pageId && String(this.pageId).trim() !== '') {
-            clean.page_id = String(this.pageId).trim();
+        const trimmedId = this.pageId ? String(this.pageId).trim() : '';
+        if (trimmedId !== '') {
+            clean.page_id = trimmedId;
+            if (sourceType === 'sulu_media_collection') {
+                clean.collection_id = trimmedId;
+            } else if (sourceType === 'sulu_categories') {
+                if (/^\d+$/.test(trimmedId)) {
+                    clean.parent_id = Number(trimmedId);
+                } else {
+                    clean.parent_key = trimmedId;
+                }
+            }
         }
 
         if (this.isMultiItemSource(sourceType)) {
@@ -282,6 +302,9 @@ class DynamicContent extends React.Component<Props> {
             }
             if (this.tagFilter && String(this.tagFilter).trim() !== '') {
                 clean.tags = String(this.tagFilter).trim();
+            }
+            if (this.categoryFilter && String(this.categoryFilter).trim() !== '') {
+                clean.categories = String(this.categoryFilter).trim();
             }
             if (sourceType === 'sibling_pages') {
                 clean.exclude_current = Boolean(this.excludeCurrent);
@@ -312,6 +335,11 @@ class DynamicContent extends React.Component<Props> {
         if (this.pageId) {
             this.loadSourceFields();
         }
+    };
+
+    @action handleCategoryFilterChange = (categories: ?string) => {
+        this.categoryFilter = categories || '';
+        this.syncToParent();
     };
 
     @action handleLimitChange = (limit: ?number) => {
@@ -398,6 +426,13 @@ class DynamicContent extends React.Component<Props> {
 
         const isMultiItem = this.isMultiItemSource(sourceType);
         const needsPageId = sourceType === 'specific_page' || sourceType === 'page_children';
+        const isMediaCollection = sourceType === 'sulu_media_collection';
+        const isCategorySource = sourceType === 'sulu_categories';
+        const supportsCategoryAndTagFilters =
+            sourceType === 'page_children' ||
+            sourceType === 'sibling_pages' ||
+            sourceType === 'custom_query' ||
+            sourceType === 'sulu_articles';
         const targetFields = this.targetFields;
 
         return (
@@ -442,7 +477,8 @@ class DynamicContent extends React.Component<Props> {
                         <Form.Field
                             description={
                                 sourceType === 'page_children'
-                                    ? 'Optional parent page UUID. Leave empty to use the current page as parent.'
+                                    ? (translate('sulu_block_suite.dynamic_parent_page_id_desc') ||
+                                        'Optional parent page UUID. Leave empty to use the current page as parent.')
                                     : (translate('sulu_block_suite.dynamic_page_id_desc') || 'Enter the UUID or ID of the target page.')
                             }
                             label={translate('sulu_block_suite.dynamic_page_id') || 'Source Page ID / UUID'}
@@ -451,6 +487,38 @@ class DynamicContent extends React.Component<Props> {
                             <Input
                                 onChange={this.handlePageIdChange}
                                 placeholder="e.g. 01a11348-6256-7b4e-adc2-3008ba037f03"
+                                value={pageId}
+                            />
+                        </Form.Field>
+                    )}
+
+                    {isMediaCollection && (
+                        <Form.Field
+                            description={
+                                translate('sulu_block_suite.dynamic_collection_id_desc') ||
+                                'Optional Sulu Media Collection ID. Leave empty to fetch latest media assets.'
+                            }
+                            label={translate('sulu_block_suite.dynamic_collection_id') || 'Media Collection ID'}
+                        >
+                            <Input
+                                onChange={this.handlePageIdChange}
+                                placeholder="e.g. 1"
+                                value={pageId}
+                            />
+                        </Form.Field>
+                    )}
+
+                    {isCategorySource && (
+                        <Form.Field
+                            description={
+                                translate('sulu_block_suite.dynamic_parent_category_desc') ||
+                                'Optional parent category key or ID to fetch child categories from.'
+                            }
+                            label={translate('sulu_block_suite.dynamic_parent_category') || 'Parent Category Key / ID'}
+                        >
+                            <Input
+                                onChange={this.handlePageIdChange}
+                                placeholder="e.g. products, blog"
                                 value={pageId}
                             />
                         </Form.Field>
@@ -476,8 +544,11 @@ class DynamicContent extends React.Component<Props> {
 
                             <Form.Field
                                 colSpan={6}
-                                description="Number of initial items to skip (pagination offset)."
-                                label="Offset (Skip Items)"
+                                description={
+                                    translate('sulu_block_suite.dynamic_offset_desc') ||
+                                    'Number of initial items to skip (pagination offset).'
+                                }
+                                label={translate('sulu_block_suite.dynamic_offset') || 'Offset (Skip Items)'}
                             >
                                 <NumberField
                                     max={100}
@@ -489,55 +560,92 @@ class DynamicContent extends React.Component<Props> {
 
                             <Form.Field
                                 colSpan={6}
-                                label="Sort By"
+                                label={translate('sulu_block_suite.dynamic_sort_by') || 'Sort By'}
                             >
                                 <SingleSelect
                                     onChange={this.handleSortByChange}
                                     value={this.sortBy || 'created'}
                                 >
-                                    <SingleSelect.Option value="created">Created Date</SingleSelect.Option>
-                                    <SingleSelect.Option value="changed">Last Modified Date</SingleSelect.Option>
-                                    <SingleSelect.Option value="authored">Authored / Published Date</SingleSelect.Option>
-                                    <SingleSelect.Option value="title">Title (Alphabetical)</SingleSelect.Option>
+                                    <SingleSelect.Option value="created">
+                                        {translate('sulu_block_suite.dynamic_sort_created') || 'Created Date'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="changed">
+                                        {translate('sulu_block_suite.dynamic_sort_changed') || 'Last Modified Date'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="authored">
+                                        {translate('sulu_block_suite.dynamic_sort_authored') || 'Authored / Published Date'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="title">
+                                        {translate('sulu_block_suite.dynamic_sort_title') || 'Title (Alphabetical)'}
+                                    </SingleSelect.Option>
                                 </SingleSelect>
                             </Form.Field>
 
                             <Form.Field
                                 colSpan={6}
-                                label="Sort Direction"
+                                label={translate('sulu_block_suite.dynamic_sort_order') || 'Sort Direction'}
                             >
                                 <SingleSelect
                                     onChange={this.handleSortOrderChange}
                                     value={this.sortOrder || 'desc'}
                                 >
-                                    <SingleSelect.Option value="desc">Descending (Newest / Z-A)</SingleSelect.Option>
-                                    <SingleSelect.Option value="asc">Ascending (Oldest / A-Z)</SingleSelect.Option>
+                                    <SingleSelect.Option value="desc">
+                                        {translate('sulu_block_suite.dynamic_sort_desc') || 'Descending (Newest / Z-A)'}
+                                    </SingleSelect.Option>
+                                    <SingleSelect.Option value="asc">
+                                        {translate('sulu_block_suite.dynamic_sort_asc') || 'Ascending (Oldest / A-Z)'}
+                                    </SingleSelect.Option>
                                 </SingleSelect>
                             </Form.Field>
 
-                            <Form.Field
-                                colSpan={6}
-                                description="Optional comma-separated template keys (e.g. default,article)."
-                                label="Filter by Template Key"
-                            >
-                                <Input
-                                    onChange={this.handleTemplateFilterChange}
-                                    placeholder="e.g. default"
-                                    value={this.templateFilter}
-                                />
-                            </Form.Field>
+                            {supportsCategoryAndTagFilters && (
+                                <>
+                                    <Form.Field
+                                        colSpan={4}
+                                        description={
+                                            translate('sulu_block_suite.dynamic_filter_template_desc') ||
+                                            'Optional comma-separated template keys (e.g. default,article).'
+                                        }
+                                        label={translate('sulu_block_suite.dynamic_filter_template') || 'Filter by Template Key'}
+                                    >
+                                        <Input
+                                            onChange={this.handleTemplateFilterChange}
+                                            placeholder="e.g. default"
+                                            value={this.templateFilter}
+                                        />
+                                    </Form.Field>
 
-                            <Form.Field
-                                colSpan={6}
-                                description="Optional comma-separated tag names."
-                                label="Filter by Tags"
-                            >
-                                <Input
-                                    onChange={this.handleTagFilterChange}
-                                    placeholder="e.g. featured,news"
-                                    value={this.tagFilter}
-                                />
-                            </Form.Field>
+                                    <Form.Field
+                                        colSpan={4}
+                                        description={
+                                            translate('sulu_block_suite.dynamic_filter_tags_desc') ||
+                                            'Optional comma-separated tag names.'
+                                        }
+                                        label={translate('sulu_block_suite.dynamic_filter_tags') || 'Filter by Tags'}
+                                    >
+                                        <Input
+                                            onChange={this.handleTagFilterChange}
+                                            placeholder="e.g. featured,news"
+                                            value={this.tagFilter}
+                                        />
+                                    </Form.Field>
+
+                                    <Form.Field
+                                        colSpan={4}
+                                        description={
+                                            translate('sulu_block_suite.dynamic_filter_categories_desc') ||
+                                            'Optional comma-separated category keys.'
+                                        }
+                                        label={translate('sulu_block_suite.dynamic_filter_categories') || 'Filter by Categories'}
+                                    >
+                                        <Input
+                                            onChange={this.handleCategoryFilterChange}
+                                            placeholder="e.g. tech,updates"
+                                            value={this.categoryFilter}
+                                        />
+                                    </Form.Field>
+                                </>
+                            )}
 
                             {sourceType === 'sibling_pages' && (
                                 <Form.Field colSpan={12}>
@@ -545,7 +653,8 @@ class DynamicContent extends React.Component<Props> {
                                         checked={this.excludeCurrent}
                                         onChange={this.handleExcludeCurrentChange}
                                     >
-                                        Exclude current page from sibling results
+                                        {translate('sulu_block_suite.dynamic_exclude_current') ||
+                                            'Exclude current page from sibling results'}
                                     </Checkbox>
                                 </Form.Field>
                             )}
@@ -650,19 +759,19 @@ class DynamicContent extends React.Component<Props> {
                                                     {translate('sulu_block_suite.dynamic_op_not_equals') || 'Does Not Equal'}
                                                 </SingleSelect.Option>
                                                 <SingleSelect.Option value="contains">
-                                                    Contains
+                                                    {translate('sulu_block_suite.dynamic_op_contains') || 'Contains'}
                                                 </SingleSelect.Option>
                                                 <SingleSelect.Option value="not_contains">
-                                                    Does Not Contain
+                                                    {translate('sulu_block_suite.dynamic_op_not_contains') || 'Does Not Contain'}
                                                 </SingleSelect.Option>
                                                 <SingleSelect.Option value="starts_with">
-                                                    Starts With
+                                                    {translate('sulu_block_suite.dynamic_op_starts_with') || 'Starts With'}
                                                 </SingleSelect.Option>
                                                 <SingleSelect.Option value="ends_with">
-                                                    Ends With
+                                                    {translate('sulu_block_suite.dynamic_op_ends_with') || 'Ends With'}
                                                 </SingleSelect.Option>
                                                 <SingleSelect.Option value="in">
-                                                    In List (Comma-Separated)
+                                                    {translate('sulu_block_suite.dynamic_op_in') || 'In List (Comma-Separated)'}
                                                 </SingleSelect.Option>
                                             </SingleSelect>
                                         </div>

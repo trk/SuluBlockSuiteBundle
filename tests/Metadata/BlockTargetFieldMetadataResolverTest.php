@@ -107,4 +107,50 @@ YAML
             ['name' => 'cta_url', 'label' => 'CTA URL (cta_url)', 'type' => 'link'],
         ], $fields);
     }
+
+    public function testResolveTargetFieldsExtractsInnerItemsBlockFields(): void
+    {
+        $accordionForm = new FormMetadata();
+        $accordionForm->setKey('accordion');
+
+        $childItemForm = new FormMetadata();
+        $childItemForm->setKey('accordion_item');
+
+        $itemTitleField = new FieldMetadata('title');
+        $itemTitleField->setType('text_line');
+        $itemTitleField->setLabel('Question Title', 'en');
+        $childItemForm->addItem($itemTitleField);
+
+        $itemContentField = new FieldMetadata('content');
+        $itemContentField->setType('text_editor');
+        $itemContentField->setLabel('Answer Body', 'en');
+        $childItemForm->addItem($itemContentField);
+
+        $itemsBlockField = new FieldMetadata('items');
+        $itemsBlockField->setType('block');
+        $itemsBlockField->addType($childItemForm);
+        $accordionForm->addItem($itemsBlockField);
+
+        $typedFormMetadata = new TypedFormMetadata();
+        $typedFormMetadata->addForm('accordion', $accordionForm);
+
+        $provider = $this->createStub(MetadataProviderInterface::class);
+        $provider->method('getMetadata')->willReturn($typedFormMetadata);
+
+        $registry = $this->createStub(MetadataProviderRegistry::class);
+        $registry->method('getMetadataProvider')->willReturn($provider);
+
+        $resolver = new BlockTargetFieldMetadataResolver(
+            $registry,
+            [$this->tempSchemaDir],
+        );
+
+        $fields = $resolver->resolveTargetFields('accordion', 'en');
+
+        $this->assertSame([
+            ['name' => 'title', 'label' => 'Question Title (title)', 'type' => 'string'],
+            ['name' => 'content', 'label' => 'Answer Body (content)', 'type' => 'text'],
+        ], $fields);
+    }
 }
+

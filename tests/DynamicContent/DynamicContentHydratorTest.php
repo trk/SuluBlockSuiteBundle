@@ -622,6 +622,53 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertSame('Security Audit', $items[1]['title']);
     }
 
+    public function testEmptyContainerBlockUsesDefaultItemTypeAndNormalizesItemsPrefix(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $sourceResolver->expects(self::once())
+            ->method('resolveChildren')
+            ->with('faq-root', null, 50)
+            ->willReturn([
+                ['title' => 'What is Sulu 3?', 'summary' => 'Modern Symfony CMS'],
+                ['title' => 'How do presets work?', 'summary' => 'Reusable prop sets'],
+            ]);
+
+        $accordionBlock = [
+            'type' => 'accordion',
+            'items' => [],
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_children',
+                    'parent_id' => 'faq-root',
+                    'mapping' => [
+                        'items.title' => 'title',
+                        'content' => 'summary',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($accordionBlock);
+
+        self::assertCount(1, $result);
+        self::assertSame('accordion', $result[0]['type']);
+        self::assertIsArray($result[0]['items']);
+        /** @var list<array<string, mixed>> $items */
+        $items = $result[0]['items'];
+        self::assertCount(2, $items);
+
+        self::assertSame('accordion_item', $items[0]['type']);
+        self::assertSame('What is Sulu 3?', $items[0]['title']);
+        self::assertSame('Modern Symfony CMS', $items[0]['content']);
+
+        self::assertSame('accordion_item', $items[1]['type']);
+        self::assertSame('How do presets work?', $items[1]['title']);
+        self::assertSame('Reusable prop sets', $items[1]['content']);
+    }
+
     public function testCustomDynamicContentSourceProviderIntegration(): void
     {
         $customProvider = new class implements DynamicContentSourceProviderInterface {

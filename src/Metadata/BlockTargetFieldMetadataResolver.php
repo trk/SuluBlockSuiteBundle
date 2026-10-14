@@ -58,7 +58,7 @@ final class BlockTargetFieldMetadataResolver
         /** @var array<string, array{name: string, label: string, type: string}> $fieldsByName */
         $fieldsByName = [];
 
-        // 1. Discover fields from Sulu FormMetadata
+        // 1. Discover fields from Sulu FormMetadata (including child `items` sub-blocks for collection blocks)
         $formMetadata = $this->getBlockFormMetadata($cleanType, $locale);
         if (null !== $formMetadata) {
             foreach ($formMetadata->getItems() as $item) {
@@ -68,6 +68,35 @@ final class BlockTargetFieldMetadataResolver
 
                 $fieldName = $item->getName();
                 $fieldType = $item->getType();
+
+                if ('items' === $fieldName && 'block' === $fieldType) {
+                    foreach ($item->getTypes() as $childFormMetadata) {
+                        foreach ($childFormMetadata->getItems() as $childItem) {
+                            if (!$childItem instanceof FieldMetadata) {
+                                continue;
+                            }
+
+                            $childFieldName = $childItem->getName();
+                            $childFieldType = $childItem->getType();
+                            if (\in_array($childFieldName, self::EXCLUDED_FIELDS, true) || 'block' === $childFieldType || 'block_props' === $childFieldType) {
+                                continue;
+                            }
+
+                            $rawChildLabel = $childItem->getLabel($locale) ?? $childItem->getLabel('en');
+                            $humanChildLabel = (null !== $rawChildLabel && '' !== \trim($rawChildLabel))
+                                ? \trim($rawChildLabel)
+                                : \ucwords(\str_replace(['_', '-'], ' ', $childFieldName));
+
+                            $fieldsByName[$childFieldName] ??= [
+                                'name' => $childFieldName,
+                                'label' => $this->formatFieldLabel($humanChildLabel, $childFieldName),
+                                'type' => $this->mapSuluFieldType($childFieldType),
+                            ];
+                        }
+                    }
+
+                    continue;
+                }
 
                 if (\in_array($fieldName, self::EXCLUDED_FIELDS, true) || 'block' === $fieldType || 'block_props' === $fieldType) {
                     continue;
