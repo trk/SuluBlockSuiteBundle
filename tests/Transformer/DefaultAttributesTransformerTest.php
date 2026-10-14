@@ -98,4 +98,24 @@ final class DefaultAttributesTransformerTest extends TestCase
         $this->assertStringContainsString('#my-block h2 { font-size: 2rem; }', $scoped);
         $this->assertStringContainsString('#my-block p { margin: 0; }', $scoped);
     }
+
+    public function testScopeCssWrapsBareDeclarationsAndStripsScriptTags(): void
+    {
+        $scoped = DefaultAttributesTransformer::scopeCss('<style>border: 2px solid red; background: #fff;</style><script>alert(1)</script>', '#card-1');
+
+        $this->assertSame('#card-1 { border: 2px solid red; background: #fff; }', $scoped);
+        $this->assertStringNotContainsString('<script>', $scoped);
+    }
+
+    public function testParseAttributesRejectsInlineEventHandlers(): void
+    {
+        $attrs = DefaultAttributesTransformer::parseAttributes("data-track=\"hero\"\nonclick=\"alert(1)\"\nONMOUSEOVER=hack()\naria-expanded=\"false\"\ndisabled");
+
+        $this->assertSame('hero', $attrs['data-track'] ?? null);
+        $this->assertSame('false', $attrs['aria-expanded'] ?? null);
+        $this->assertTrue($attrs['disabled'] ?? false);
+        $this->assertArrayNotHasKey('onclick', $attrs);
+        $this->assertArrayNotHasKey('ONMOUSEOVER', $attrs);
+    }
 }
+

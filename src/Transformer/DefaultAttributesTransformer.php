@@ -72,32 +72,8 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
         }
 
         // 5. Custom Attributes (key=value multi-line)
-        /** @var array<string, string|bool> $attributes */
-        $attributes = [];
         $rawAttrs = $props['attributes'] ?? ($block['attributes'] ?? null);
-        if (\is_string($rawAttrs) && '' !== \trim($rawAttrs)) {
-            foreach (\explode("\n", $rawAttrs) as $line) {
-                $line = \trim($line);
-                if ('' === $line) {
-                    continue;
-                }
-
-                $parts = \explode('=', $line, 2);
-                $attrName = \trim($parts[0]);
-                if ('' === $attrName || \in_array(\strtolower($attrName), ['id', 'class'], true)) {
-                    continue;
-                }
-
-                if (2 === \count($parts)) {
-                    $val = \trim($parts[1]);
-                    // Strip surrounding quotes if present
-                    $unquoted = (string) \preg_replace('/^([\'"])(.*)(\1)$/', '$2', $val);
-                    $attributes[$attrName] = $unquoted;
-                } else {
-                    $attributes[$attrName] = true;
-                }
-            }
-        }
+        $attributes = \is_string($rawAttrs) ? self::parseAttributes($rawAttrs) : [];
 
         // 6. Custom Scoped CSS
         $rawCss = $props['css'] ?? ($block['css'] ?? null);
@@ -113,18 +89,22 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
             $scopedCss = self::scopeCss(\trim($rawCss), '#' . $elementId);
         }
 
-        // Attach resolved id to attributes if present
+        // Attach resolved id to attributes and props if present
         if (null !== $elementId && '' !== $elementId) {
-            $attributes['id'] = $elementId;
+            $attributes = \array_merge(['id' => $elementId], $attributes);
             $block['_id'] = $elementId;
+            $block['id'] = $elementId;
+            $props['id'] = $elementId;
+            $block['props'] = $props;
+            $block['_props'] = $props;
         }
 
         $block['_classes'] = $classes;
         $block['_class'] = \implode(' ', $classes);
         $block['_attributes'] = $attributes;
-        $block['_attributes_string'] = $this->renderAttributesString($attributes);
+        $block['_attributes_string'] = self::renderAttributesString($attributes);
 
-        if (null !== $scopedCss) {
+        if (null !== $scopedCss && '' !== $scopedCss) {
             $block['_scoped_css'] = $scopedCss;
         }
 
@@ -148,16 +128,67 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
     }
 
     /**
-     * Scope CSS by replacing .el-element with the prefix, or prepending the prefix to each rule.
+     * Parse multi-line key=value custom HTML attributes safely, rejecting inline JS event handlers.
+     *
+     * @return array<string, string|bool>
+     */
+    public static function parseAttributes(string $rawAttrs): array
+    {
+        if ('' === \trim($rawAttrs)) {
+            return [];
+        }
+
+        /** @var array<string, string|bool> $attributes */
+        $attributes = [];
+        foreach (\explode("\n", $rawAttrs) as $line) {
+            $line = \trim($line);
+            if ('' === $line) {
+                continue;
+            }
+
+            $parts = \explode('=', $line, 2);
+            $attrName = \trim($parts[0]);
+            $lowerName = \strtolower($attrName);
+
+            if (
+                '' === $attrName
+                || \in_array($lowerName, ['id', 'class'], true)
+                || \str_starts_with($lowerName, 'on')
+                || 1 !== \preg_match('/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/', $attrName)
+            ) {
+                continue;
+            }
+
+            if (2 === \count($parts)) {
+                $val = \trim($parts[1]);
+                // Strip surrounding quotes if present
+                $unquoted = (string) \preg_replace('/^([\'"])(.*)(\1)$/', '$2', $val);
+                $attributes[$attrName] = $unquoted;
+            } else {
+                $attributes[$attrName] = true;
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Scope CSS by replacing .el-element with the prefix, wrapping bare declarations,
+     * or prepending the prefix to each rule selector.
      */
     public static function scopeCss(string $css, string $prefix): string
     {
-        if ('' === \trim($css)) {
+        $withoutScripts = (string) \preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', \trim($css));
+        $cleanCss = (string) \preg_replace('/<\/?\s*(style|script)[^>]*>/i', '', $withoutScripts);
+        if ('' === \trim($cleanCss)) {
             return '';
         }
 
-        if (\str_contains($css, '.el-element')) {
-            $scoped = \str_replace('.el-element', $prefix, $css);
+        if (\str_contains($cleanCss, '.el-element')) {
+            $scoped = \str_replace('.el-element', $prefix, $cleanCss);
+        } elseif (!\str_contains($cleanCss, '{')) {
+            $declarations = \rtrim(\trim($cleanCss), ';');
+            $scoped = $prefix . ' { ' . $declarations . '; }';
         } else {
             // Match CSS rule blocks: selector { declarations }
             $pattern = '/([@#:.\w[\]][\\\\@#:,<>~="\'+\-^$.()\w\s[\]*]*)({[^{}]+})/u';
@@ -177,7 +208,7 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
 
                     return \implode(', ', $prefixed) . ' ' . $body;
                 },
-                $css,
+                $cleanCss,
             );
         }
 
@@ -190,7 +221,7 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
     /**
      * @param array<string, string|bool> $attributes
      */
-    private function renderAttributesString(array $attributes): string
+    public static function renderAttributesString(array $attributes): string
     {
         $rendered = [];
         foreach ($attributes as $name => $value) {

@@ -122,4 +122,33 @@ final class BlockRendererTest extends TestCase
         $renderer->setCollectionRenderer($customCollectionRenderer);
         $this->assertSame('<section>[First][Second]</section>', $renderer->renderBlocks($blocks));
     }
+
+    public function testRenderBlockInjectsRootAttributesAndScopedCssAutomatically(): void
+    {
+        $loader = new ArrayLoader([
+            '@SuluBlockSuite/blocks/box.html.twig' => '<div class="box">{{ block.title }}</div>',
+        ]);
+        $twig = new Environment($loader);
+        $pipeline = new BlockTransformPipeline([new DefaultAttributesTransformer()]);
+
+        $renderer = new BlockRenderer(
+            $twig,
+            $pipeline,
+            ['@SuluBlockSuite/blocks'],
+        );
+
+        $html = $renderer->renderBlock([
+            'type' => 'box',
+            'title' => 'Scoped Box',
+            'props' => [
+                'id' => 'promo-box',
+                'attributes' => "data-campaign=\"autumn\"\naria-label=\"Promo\"",
+                'css' => '.el-element { border: 1px solid blue; }',
+            ],
+        ]);
+
+        $this->assertStringStartsWith('<style>#promo-box { border: 1px solid blue; }</style>', $html);
+        $this->assertStringContainsString('<div class="box" id="promo-box" data-campaign="autumn" aria-label="Promo">Scoped Box</div>', $html);
+    }
 }
+

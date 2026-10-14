@@ -109,9 +109,25 @@ final class BlockRenderer
             return '';
         }
 
-        return $this->twig->render($template, \array_merge($context, [
+        $html = $this->twig->render($template, \array_merge($context, [
             'block' => $block,
         ]));
+
+        if ('' === \trim($html)) {
+            return $html;
+        }
+
+        if (isset($block['_attributes']) && \is_array($block['_attributes']) && [] !== $block['_attributes']) {
+            /** @var array<string, string|bool> $attrs */
+            $attrs = $block['_attributes'];
+            $html = $this->injectRootAttributes($html, $attrs);
+        }
+
+        if (isset($block['_scoped_css']) && \is_string($block['_scoped_css']) && '' !== \trim($block['_scoped_css'])) {
+            $html = '<style>' . $block['_scoped_css'] . '</style>' . $html;
+        }
+
+        return $html;
     }
 
     /**
@@ -135,14 +151,27 @@ final class BlockRenderer
             return '';
         }
 
+        if (null !== $this->pipeline) {
+            $needsPipeline = false;
+            foreach ($normalizedBlocks as $item) {
+                if (empty($item['_pipeline_processed'])) {
+                    $needsPipeline = true;
+                    break;
+                }
+            }
+
+            if ($needsPipeline) {
+                $normalizedBlocks = $this->pipeline->processCollection($normalizedBlocks, $context);
+                foreach ($normalizedBlocks as &$item) {
+                    $item['_pipeline_processed'] = true;
+                }
+                unset($item);
+            }
+        }
+
         /** @var list<array<string, mixed>> $visibleBlocks */
         $visibleBlocks = [];
         foreach ($normalizedBlocks as $item) {
-            if (empty($item['_pipeline_processed']) && null !== $this->pipeline) {
-                $item = $this->pipeline->process($item, $context);
-                $item['_pipeline_processed'] = true;
-            }
-
             if (empty($item['_hidden'])) {
                 $visibleBlocks[] = $item;
             }
@@ -162,6 +191,59 @@ final class BlockRenderer
         }
 
         return $output;
+    }
+
+    /**
+     * Injects custom HTML attributes (such as id, data-*, aria-*) into the first root HTML element
+     * if those attributes are not already present on the element.
+     *
+     * @param array<string, string|bool> $attributes
+     */
+    private function injectRootAttributes(string $html, array $attributes): string
+    {
+        return (string) \preg_replace_callback(
+            '/^((?:\s|<!--.*?-->)*<([a-zA-Z][a-zA-Z0-9:-]*))(\s[^>]*?)?(\/?>)/s',
+            static function (array $matches) use ($attributes): string {
+                $tagStart = $matches[1];
+                $existingAttrs = $matches[3];
+                $tagEnd = $matches[4];
+
+                $injected = [];
+                foreach ($attributes as $name => $value) {
+                    if (false === $value || '' === \trim($name)) {
+                        continue;
+                    }
+
+                    $quotedName = \preg_quote($name, '/');
+                    // Skip if attribute is already present on the opening tag
+                    if (1 === \preg_match('/(?:^|\s)' . $quotedName . '(?:\s*=|\s|$)/i', $existingAttrs)) {
+                        continue;
+                    }
+
+                    if (true === $value) {
+                        $injected[] = \htmlspecialchars($name, \ENT_QUOTES, 'UTF-8');
+                    } else {
+                        $strVal = (string) $value;
+                        if ('' === $strVal && 'id' === \strtolower($name)) {
+                            continue;
+                        }
+                        $injected[] = \sprintf(
+                            '%s="%s"',
+                            \htmlspecialchars($name, \ENT_QUOTES, 'UTF-8'),
+                            \htmlspecialchars($strVal, \ENT_QUOTES, 'UTF-8'),
+                        );
+                    }
+                }
+
+                if ([] === $injected) {
+                    return $matches[0];
+                }
+
+                return $tagStart . $existingAttrs . ' ' . \implode(' ', $injected) . $tagEnd;
+            },
+            $html,
+            1,
+        );
     }
 
     /**
