@@ -198,4 +198,33 @@ YAML;
             }
         }
     }
+
+    public function testSupportsListStyleYamlAndFiltersOutTestPresets(): void
+    {
+        $yamlContent = <<<YAML
+presets:
+    - id: valid_gallery
+      name: "Masonry Lightbox"
+      description: "Clean gallery layout"
+      props:
+          columns: "3"
+    - id: test_preset_ignore
+      name: "Should Be Ignored"
+      props:
+          columns: "2"
+    - id: another_id
+      title: "Test Başlık Şablonu"
+      props:
+          columns: "4"
+YAML;
+        \file_put_contents($this->tempDir . '/gallery.yaml', $yamlContent);
+
+        $provider = new YamlBlockPresetProvider($this->tempDir);
+        $presets = $provider->getPresets('gallery', 'en');
+
+        $this->assertCount(1, $presets);
+        $this->assertSame('valid_gallery', $presets[0]['id']);
+        $this->assertSame('Masonry Lightbox', $presets[0]['title']);
+    }
 }
+

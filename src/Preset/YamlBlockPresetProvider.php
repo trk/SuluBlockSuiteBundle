@@ -80,12 +80,26 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
                             }
 
                             if (\is_array($rawPresets)) {
-                                foreach ($rawPresets as $presetId => $presetConfig) {
-                                    if (!\is_string($presetId) || !\is_array($presetConfig)) {
+                                foreach ($rawPresets as $presetKey => $presetConfig) {
+                                    if (!\is_array($presetConfig)) {
                                         continue;
                                     }
 
-                                    $title = $this->resolveLocalizedText($presetConfig['title'] ?? null, $locale, $presetId);
+                                    $presetId = \is_string($presetKey)
+                                        ? $presetKey
+                                        : (isset($presetConfig['id']) && \is_string($presetConfig['id']) ? $presetConfig['id'] : null);
+
+                                    if (null === $presetId || '' === $presetId) {
+                                        continue;
+                                    }
+
+                                    $rawTitle = $presetConfig['title'] ?? ($presetConfig['name'] ?? null);
+                                    $title = $this->resolveLocalizedText($rawTitle, $locale, $presetId) ?? $presetId;
+
+                                    if ($this->isTestPreset($presetId, $title)) {
+                                        continue;
+                                    }
+
                                     $description = $this->resolveLocalizedText($presetConfig['description'] ?? null, $locale, null);
                                     $previewImage = isset($presetConfig['preview_image']) && \is_string($presetConfig['preview_image'])
                                         ? $presetConfig['preview_image']
@@ -109,7 +123,7 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
 
                                     $presetsMap[$presetId] = [
                                         'id' => $presetId,
-                                        'title' => $title ?? $presetId,
+                                        'title' => $title,
                                         'description' => $description,
                                         'preview_image' => $previewImage,
                                         'props' => $props,
@@ -158,6 +172,11 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
                             }
 
                             if ($configuredType === $blockType) {
+                                $title = $content->getTitle() ?? $snippet->getUuid();
+                                if ($this->isTestPreset($snippet->getUuid(), $title)) {
+                                    continue;
+                                }
+
                                 /** @var array<string, mixed> $props */
                                 $props = [];
                                 $rawProps = null;
@@ -180,7 +199,6 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
                                     }
                                 }
 
-                                $title = $content->getTitle() ?? $snippet->getUuid();
                                 $description = isset($templateData['description']) && \is_string($templateData['description']) ? $templateData['description'] : null;
 
                                 $previewImage = $this->getMediaPreviewUrlResolver()->resolve($templateData['preview_image'] ?? null, $locale);
@@ -252,6 +270,12 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
         return $fallback;
     }
 
+    private function isTestPreset(string $id, string $title): bool
+    {
+        return 1 === \preg_match('/^test(\b|_|-|\s|$)/i', \trim($id))
+            || 1 === \preg_match('/^test(\b|_|-|\s|$)/i', \trim($title));
+    }
+
     public function clearCache(?string $blockType = null, ?string $locale = null): void
     {
         if (null !== $blockType && null !== $locale) {
@@ -261,3 +285,4 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
         }
     }
 }
+
