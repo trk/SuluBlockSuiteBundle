@@ -210,6 +210,7 @@
     "sulu_block_suite.dynamic_op_in": "In List (Comma-Separated)",
     "sulu_block_suite.dynamic_source_sulu_articles": "Articles (Sulu Article Bundle)",
     "sulu_block_suite.dynamic_source_sulu_categories": "Categories (Sulu Category Bundle)",
-    "sulu_block_suite.dynamic_source_sulu_media_collection": "Media Collection (Sulu Media Bundle)"
+    "sulu_block_suite.dynamic_source_sulu_media_collection": "Media Collection (Sulu Media Bundle)",
+    "sulu_block_suite.opt_soft": "Soft"
 }
 

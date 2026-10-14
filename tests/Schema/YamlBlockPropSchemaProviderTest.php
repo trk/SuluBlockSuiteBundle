@@ -241,6 +241,49 @@ YAML;
         $this->assertSame(['settings', 'custom_developer_tab', 'general', 'advanced'], $tabIds);
     }
 
+    public function testBlockTabFieldDeduplicatesSameFieldFromCommonTab(): void
+    {
+        $commonYaml = <<<YAML
+tabs:
+  general:
+    title: "General"
+    fields:
+      max_width:
+        type: select
+        label: "Max Width (Common)"
+        options:
+          - { value: 'none', label: 'None' }
+      margin_top:
+        type: select
+        label: "Margin Top"
+YAML;
+        \file_put_contents($this->tempDir . '/common.yaml', $commonYaml);
+
+        $sectionYaml = <<<YAML
+tabs:
+  settings:
+    title: "Settings"
+    fields:
+      max_width:
+        type: select
+        label: "Container Max Width"
+        options:
+          - { value: '85rem', label: 'Default (85rem)' }
+YAML;
+        \file_put_contents($this->tempDir . '/section.yaml', $sectionYaml);
+
+        $provider = new YamlBlockPropSchemaProvider($this->tempDir);
+        $schema = $provider->getSchema('section', 'en');
+
+        $this->assertCount(2, $schema['tabs']);
+        $settingsFieldNames = \array_column($schema['tabs'][0]['fields'], 'name');
+        $generalFieldNames = \array_column($schema['tabs'][1]['fields'], 'name');
+
+        $this->assertContains('max_width', $settingsFieldNames);
+        $this->assertNotContains('max_width', $generalFieldNames);
+        $this->assertContains('margin_top', $generalFieldNames);
+    }
+
     private function removeDirectory(string $dir): void
     {
         if (!\is_dir($dir)) {

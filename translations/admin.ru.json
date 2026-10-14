@@ -211,6 +211,7 @@
     "sulu_block_suite.dynamic_op_in": "В списке (через запятую)",
     "sulu_block_suite.dynamic_source_sulu_articles": "Статьи (Sulu Article Bundle)",
     "sulu_block_suite.dynamic_source_sulu_categories": "Категории (Sulu Category Bundle)",
-    "sulu_block_suite.dynamic_source_sulu_media_collection": "Медиаколлекция (Sulu Media Bundle)"
+    "sulu_block_suite.dynamic_source_sulu_media_collection": "Медиаколлекция (Sulu Media Bundle)",
+    "sulu_block_suite.opt_soft": "Мягкий (Soft)"
 }
 

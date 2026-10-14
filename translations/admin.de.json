@@ -211,6 +211,7 @@
     "sulu_block_suite.dynamic_op_in": "In Liste (Kommagetrennt)",
     "sulu_block_suite.dynamic_source_sulu_articles": "Artikel (Sulu Article Bundle)",
     "sulu_block_suite.dynamic_source_sulu_categories": "Kategorien (Sulu Category Bundle)",
-    "sulu_block_suite.dynamic_source_sulu_media_collection": "Mediensammlung (Sulu Media Bundle)"
+    "sulu_block_suite.dynamic_source_sulu_media_collection": "Mediensammlung (Sulu Media Bundle)",
+    "sulu_block_suite.opt_soft": "Sanft (Soft)"
 }
 

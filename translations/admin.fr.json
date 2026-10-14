@@ -211,6 +211,7 @@
     "sulu_block_suite.dynamic_op_in": "Dans la liste (séparé par des virgules)",
     "sulu_block_suite.dynamic_source_sulu_articles": "Articles (Sulu Article Bundle)",
     "sulu_block_suite.dynamic_source_sulu_categories": "Catégories (Sulu Category Bundle)",
-    "sulu_block_suite.dynamic_source_sulu_media_collection": "Collection Média (Sulu Media Bundle)"
+    "sulu_block_suite.dynamic_source_sulu_media_collection": "Collection Média (Sulu Media Bundle)",
+    "sulu_block_suite.opt_soft": "Doux (Soft)"
 }
 

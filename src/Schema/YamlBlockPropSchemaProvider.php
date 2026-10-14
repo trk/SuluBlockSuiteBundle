@@ -82,6 +82,30 @@ final class YamlBlockPropSchemaProvider implements BlockPropSchemaProviderInterf
             }
         }
 
+        // Deduplicate fields from commonTabs if blockTabs defines the same field in a different tab (e.g. settings vs general)
+        foreach ($blockTabs as $blockTabKey => $blockTabConfig) {
+            if (!isset($blockTabConfig['fields']) || !\is_array($blockTabConfig['fields'])) {
+                continue;
+            }
+            foreach (\array_keys($blockTabConfig['fields']) as $fieldKey) {
+                $fieldKeyStr = (string) $fieldKey;
+                foreach ($commonTabs as $commonTabKey => &$commonTabConfig) {
+                    if ($commonTabKey === $blockTabKey) {
+                        continue;
+                    }
+                    if (
+                        isset($commonTabConfig['fields'])
+                        && \is_array($commonTabConfig['fields'])
+                        && isset($commonTabConfig['fields'][$fieldKeyStr])
+                        && (!isset($blockTabs[$commonTabKey]['fields']) || !\is_array($blockTabs[$commonTabKey]['fields']) || !isset($blockTabs[$commonTabKey]['fields'][$fieldKeyStr]))
+                    ) {
+                        unset($commonTabConfig['fields'][$fieldKeyStr]);
+                    }
+                }
+                unset($commonTabConfig);
+            }
+        }
+
         // Merge commonTabs and blockTabs with canonical ordering:
         // 1) settings (block-specific settings)
         // 2) any custom developer/block tabs (excluding settings, general, advanced)
