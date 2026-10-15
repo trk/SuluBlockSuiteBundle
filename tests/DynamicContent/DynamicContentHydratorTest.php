@@ -1027,6 +1027,125 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertSame('Dynamic Subtitle', $autoResult[0]['subtitle']);
     }
 
+    public function testHideIfEmptyHidesCurrentPageBlockWhenMappedFieldsAreEmpty(): void
+    {
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $sourceResolver->method('resolvePage')->willReturn([
+            'title' => 'Platform',
+            'summary' => '',
+            'image' => null,
+        ]);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $block = [
+            'type' => 'text',
+            'content' => '<p>Static placeholder</p>',
+            'props' => [
+                'dynamic_source' => 'current_page',
+                'dynamic_hide_if_empty' => true,
+                'dynamic_mapping' => [
+                    ['type' => 'field_map', 'target_field' => 'content', 'source_field' => 'summary'],
+                ],
+            ],
+        ];
+
+        self::assertSame([], $hydrator->hydrateBlock($block, ['title' => 'Platform']));
+
+        // Without the option the static content stays as fallback.
+        $block['props']['dynamic_hide_if_empty'] = false;
+        $result = $hydrator->hydrateBlock($block, ['title' => 'Platform']);
+        self::assertCount(1, $result);
+        self::assertSame('<p>Static placeholder</p>', $result[0]['content']);
+    }
+
+    public function testHideIfEmptyKeepsBlockWhenAnyMappedFieldResolves(): void
+    {
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $sourceResolver->method('resolvePage')->willReturn([
+            'title' => 'Solutions',
+            'summary' => 'Modular content architecture.',
+            'image' => null,
+        ]);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $block = [
+            'type' => 'text',
+            'content' => '',
+            'props' => [
+                'dynamic_source' => 'current_page',
+                'dynamic_hide_if_empty' => '1',
+                'dynamic_mapping' => [
+                    ['type' => 'field_map', 'target_field' => 'content', 'source_field' => 'summary'],
+                    ['type' => 'field_map', 'target_field' => 'image', 'source_field' => 'image'],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block, ['title' => 'Solutions']);
+        self::assertCount(1, $result);
+        self::assertSame('Modular content architecture.', $result[0]['content']);
+    }
+
+    public function testHideIfEmptyHidesBlockWhenSourcePageIsMissing(): void
+    {
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $sourceResolver->method('resolvePage')->willReturn(null);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $block = [
+            'type' => 'headline',
+            'title' => 'Fallback',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'specific_page',
+                    'page_id' => 'missing-uuid',
+                    'hide_if_empty' => true,
+                    'mapping' => ['title' => 'title'],
+                ],
+            ],
+        ];
+
+        self::assertSame([], $hydrator->hydrateBlock($block));
+    }
+
+    public function testHideIfEmptyDropsEmptyCollectionItems(): void
+    {
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $sourceResolver->method('resolveChildren')->willReturn([
+            ['title' => 'Child A', 'summary' => 'Has summary'],
+            ['title' => 'Child B', 'summary' => ''],
+        ]);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $block = [
+            'type' => 'card',
+            'content' => '',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_children',
+                    'parent_id' => 'parent-uuid',
+                    'hydrate_mode' => 'repeater',
+                    'hide_if_empty' => true,
+                    'mapping' => ['content' => 'summary'],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+        self::assertCount(1, $result);
+        self::assertSame('Has summary', $result[0]['content']);
+
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $sourceResolver->method('resolveChildren')->willReturn([
+            ['title' => 'Child B', 'summary' => ''],
+        ]);
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        self::assertSame([], $hydrator->hydrateBlock($block));
+    }
+
     public function testExtractValueSupportsPipeFallbacksAndLengthModifier(): void
     {
         $hydrator = new DynamicContentHydrator();

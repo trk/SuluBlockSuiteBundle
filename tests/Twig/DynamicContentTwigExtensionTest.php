@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Totoglu\SuluBlockSuiteBundle\Tests\Twig;
 
 use PHPUnit\Framework\TestCase;
+use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformerInterface;
+use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipeline;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface;
 use Totoglu\SuluBlockSuiteBundle\Twig\DynamicContentTwigExtension;
 
@@ -135,5 +137,99 @@ class DynamicContentTwigExtensionTest extends TestCase
         $transformed = $extension->transformBlock($objectBlock);
 
         $this->assertSame(['type' => 'button', 'title' => 'Click Me Transformed'], $transformed);
+    }
+
+    public function testHydrateBlockTreeHydratesLeafBlocksAndKeepsVisibleContainers(): void
+    {
+        $extension = new DynamicContentTwigExtension(new BlockTransformPipeline([$this->createHidingTransformer()]));
+
+        $section = $this->createSection([
+            ['type' => 'headline', 'title' => 'Visible'],
+            ['type' => 'text', 'hide' => true],
+        ]);
+
+        $result = $extension->hydrateBlockTree($section, [], ['rows', 'columns', 'blocks']);
+
+        self::assertNotNull($result);
+        self::assertIsArray($result['rows']);
+        self::assertIsArray($result['rows'][0]);
+        self::assertIsArray($result['rows'][0]['columns']);
+        self::assertIsArray($result['rows'][0]['columns'][0]);
+        self::assertSame(
+            [['type' => 'headline', 'title' => 'Visible', '_transformed' => true]],
+            $result['rows'][0]['columns'][0]['blocks'],
+        );
+        self::assertSame('section', $result['type']);
+    }
+
+    public function testHydrateBlockTreeCollapsesContainerWhenEveryLeafBlockIsHidden(): void
+    {
+        $extension = new DynamicContentTwigExtension(new BlockTransformPipeline([$this->createHidingTransformer()]));
+
+        $section = $this->createSection([
+            ['type' => 'image', 'hide' => true],
+            ['type' => 'text', 'hide' => true],
+        ]);
+
+        self::assertNull($extension->hydrateBlockTree($section, [], ['rows', 'columns', 'blocks']));
+    }
+
+    public function testHydrateBlockTreeKeepsContainersWithoutLeafBlocks(): void
+    {
+        $extension = new DynamicContentTwigExtension(new BlockTransformPipeline([$this->createHidingTransformer()]));
+
+        $spacer = $this->createSection([]);
+
+        self::assertNotNull($extension->hydrateBlockTree($spacer, [], ['rows', 'columns', 'blocks']));
+        self::assertNull($extension->hydrateBlockTree(null, [], ['rows', 'columns', 'blocks']));
+        self::assertSame($spacer, $extension->hydrateBlockTree($spacer, []));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $blocks
+     *
+     * @return array<string, mixed>
+     */
+    private function createSection(array $blocks): array
+    {
+        return [
+            'type' => 'section',
+            'rows' => [
+                [
+                    'type' => 'row_item',
+                    'columns' => [
+                        ['type' => 'column_item', 'blocks' => $blocks],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function createHidingTransformer(): BlockTransformerInterface
+    {
+        return new class implements BlockTransformerInterface {
+            public static function getDefaultPriority(): int
+            {
+                return 100;
+            }
+
+            public function supports(array $block, array $context): bool
+            {
+                return true;
+            }
+
+            public function transform(array $block, array $context): array
+            {
+                if (true === ($block['hide'] ?? false)) {
+                    $block['_hidden'] = true;
+
+                    return $block;
+                }
+
+                $block['_transformed'] = true;
+
+                return $block;
+            }
+        };
     }
 }

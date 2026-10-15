@@ -235,6 +235,21 @@ Blocks can dynamically pull single items or collections from Sulu CMS sources wi
 | `single_category` / `sulu_categories` | Single / Multiple | `SuluCategorySourceProvider` | Sulu categories (`CategoryManagerInterface`) with optional parent category filtering and localized translations. |
 | `single_media` / `sulu_media` | Single / Multiple | `SuluMediaCollectionSourceProvider` | Media assets from Sulu collections (`MediaManagerInterface`) with resolved image/thumbnail structures. |
 
+#### Empty Values: Smart Fallback vs. "Hide When Empty"
+
+- By default, a mapped field only overrides the block when the resolved dynamic value is non-empty; otherwise the static block content stays as fallback.
+- Enabling **Hide When Empty** (`props.dynamic_hide_if_empty`) removes the block when the source cannot be resolved or none of its mapped fields has a value. For collections, empty items are dropped and the block disappears when no item remains.
+- Container templates can hydrate their nested leaf blocks once with `hydrate_block_tree` and skip rendering when every leaf block was hidden:
+
+```twig
+{% set block = block|block_transform(_context)|hydrate_block_tree(_context, ['rows', 'columns', 'blocks']) %}
+{% if block %}
+    {# render the container #}
+{% endif %}
+```
+
+This makes page layout snippets data-driven: bind headline, summary, image, and body blocks to the `current_page` source with **Hide When Empty**, and pages only show the parts they actually fill in.
+
 ---
 
 ### 6. Automatic Block Type Injection (`sulu_block_suite.auto_blocks`)

@@ -58,28 +58,36 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             ? $dynamicConfig['condition']
             : null;
 
+        $hideIfEmpty = $this->isTruthy($dynamicConfig['hide_if_empty'] ?? false);
+
         $entry = $this->registry->getEntry($sourceType);
         if (null === $entry) {
-            return [$block];
+            return $hideIfEmpty ? [] : [$block];
         }
 
         $provider = $entry['provider'];
         if ($entry['multi_item']) {
             $items = $provider->resolveCollection($dynamicConfig, $contextPage);
 
-            return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
+            return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig, $hideIfEmpty);
         }
 
         $itemData = $provider->resolveSingle($dynamicConfig, $contextPage);
         if (null === $itemData) {
-            return [$block];
+            return $hideIfEmpty ? [] : [$block];
         }
 
         if (null !== $condition && !$this->evaluateCondition($itemData, $condition)) {
             return [];
         }
 
-        return [$this->applyMapping($block, $itemData, $mapping)];
+        $appliedCount = 0;
+        $hydrated = $this->applyMapping($block, $itemData, $mapping, $appliedCount);
+        if ($hideIfEmpty && 0 === $appliedCount) {
+            return [];
+        }
+
+        return [$hydrated];
     }
 
     public function hydrateBlocks(iterable $blocks, string|object|array|null $contextPage = null): array
@@ -101,6 +109,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
      * @param array<string, string> $mapping
      * @param array<string, mixed>|null $condition
      * @param array<string, mixed> $dynamicConfig
+     * @param bool $hideIfEmpty drop items (and the whole block) when no mapped field resolves to a value
      *
      * @return list<array<string, mixed>>
      */
@@ -110,6 +119,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         array $mapping,
         ?array $condition,
         array $dynamicConfig = [],
+        bool $hideIfEmpty = false,
     ): array {
         if ([] === $items) {
             return [];
@@ -167,7 +177,16 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 
             $hydratedInnerItems = [];
             foreach ($filteredItems as $itemData) {
-                $hydratedInnerItems[] = $this->applyMapping($templateItem, $itemData, $itemMapping);
+                $appliedCount = 0;
+                $hydratedItem = $this->applyMapping($templateItem, $itemData, $itemMapping, $appliedCount);
+                if ($hideIfEmpty && 0 === $appliedCount) {
+                    continue;
+                }
+                $hydratedInnerItems[] = $hydratedItem;
+            }
+
+            if ([] === $hydratedInnerItems) {
+                return [];
             }
 
             $hydratedBlock = $block;
@@ -178,7 +197,12 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 
         $hydratedList = [];
         foreach ($filteredItems as $itemData) {
-            $hydratedList[] = $this->applyMapping($block, $itemData, $mapping);
+            $appliedCount = 0;
+            $hydratedItem = $this->applyMapping($block, $itemData, $mapping, $appliedCount);
+            if ($hideIfEmpty && 0 === $appliedCount) {
+                continue;
+            }
+            $hydratedList[] = $hydratedItem;
         }
 
         return $hydratedList;
@@ -295,11 +319,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             }
         }
 
-        $rawConditionEnabled = $props['dynamic_condition_enabled'] ?? null;
-        $conditionEnabled = true === $rawConditionEnabled
-            || 1 === $rawConditionEnabled
-            || 'true' === $rawConditionEnabled
-            || '1' === $rawConditionEnabled;
+        $conditionEnabled = $this->isTruthy($props['dynamic_condition_enabled'] ?? null);
         $conditionField = isset($props['dynamic_condition_field']) && \is_string($props['dynamic_condition_field'])
             ? \trim($props['dynamic_condition_field'])
             : '';
@@ -322,6 +342,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             'hydrate_mode' => isset($props['dynamic_hydrate_mode']) && \is_string($props['dynamic_hydrate_mode'])
                 ? \trim($props['dynamic_hydrate_mode'])
                 : 'auto',
+            'hide_if_empty' => $this->isTruthy($props['dynamic_hide_if_empty'] ?? null),
             'page_id' => $props['dynamic_page_id'] ?? ($props['dynamic_page'] ?? null),
             'parent_id' => $props['dynamic_parent_id'] ?? ($props['dynamic_parent_page'] ?? null),
             'uuids' => $props['dynamic_uuids'] ?? null,
@@ -367,10 +388,11 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
      * @param array<string, mixed> $block
      * @param array<string, mixed> $pageData
      * @param array<string, string> $mapping
+     * @param int $appliedCount incremented for every mapped field that received a non-empty dynamic value
      *
      * @return array<string, mixed>
      */
-    private function applyMapping(array $block, array $pageData, array $mapping): array
+    private function applyMapping(array $block, array $pageData, array $mapping, int &$appliedCount = 0): array
     {
         $hydrated = $block;
 
@@ -423,6 +445,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             // Smart Fallback: only override if the resolved dynamic value is non-empty
             if ($this->isValuePresent($value)) {
                 $hydrated[$targetField] = $value;
+                ++$appliedCount;
             }
         }
 
@@ -589,5 +612,10 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         }
 
         return true;
+    }
+
+    private function isTruthy(mixed $value): bool
+    {
+        return true === $value || 1 === $value || 'true' === $value || '1' === $value;
     }
 }

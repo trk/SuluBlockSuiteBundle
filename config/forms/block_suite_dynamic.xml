@@ -337,6 +337,23 @@
                     </types>
                 </block>
 
+                <property name="dynamic_hide_if_empty" type="checkbox" colspan="12" mandatory="false"
+                          visibleCondition="__parent.dynamic_source != null and __parent.dynamic_source != 'none' and __parent.dynamic_source != ''">
+                    <meta>
+                        <title lang="en">Hide When Empty</title>
+                        <title lang="tr">Boşsa Gizle</title>
+                        <title lang="de">Ausblenden, wenn leer</title>
+                        <title lang="ru">Скрыть, если пусто</title>
+                        <title lang="es">Ocultar si está vacío</title>
+                        <title lang="fr">Masquer si vide</title>
+                        <info_text lang="en">Do not render this block when the source is missing or none of the mapped fields has a value. Otherwise the static block content is used as fallback.</info_text>
+                        <info_text lang="tr">Kaynak bulunamazsa veya eşlenen alanların hiçbirinde değer yoksa bu blok gösterilmez. Aksi halde statik blok içeriği yedek olarak kullanılır.</info_text>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="false"/>
+                    </params>
+                </property>
+
                 <property name="dynamic_condition_enabled" type="checkbox" colspan="12" mandatory="false"
                           visibleCondition="__parent.dynamic_source != null and __parent.dynamic_source != 'none' and __parent.dynamic_source != ''">
                     <meta>
