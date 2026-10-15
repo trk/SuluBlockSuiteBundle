@@ -2,7 +2,7 @@
 import Form from 'sulu-admin-bundle/components/Form';
 import conditionDataProviderRegistry from 'sulu-admin-bundle/containers/Form/registries/conditionDataProviderRegistry';
 import fieldRegistry from 'sulu-admin-bundle/containers/Form/registries/fieldRegistry';
-import FieldBlocks, {blockPreviewTransformerRegistry} from 'sulu-admin-bundle/containers/FieldBlocks';
+import {blockPreviewTransformerRegistry} from 'sulu-admin-bundle/containers/FieldBlocks';
 import TabSection from './components/TabSection';
 import PresetSelection, {
     BlockCollectionBlockPreviewTransformer,
@@ -52,50 +52,6 @@ if (!blockPreviewTransformerRegistry.has('block')) {
         new BlockCollectionBlockPreviewTransformer(),
         256
     );
-}
-
-// 5. Bridge slash-separated `props/*` keys into FieldBlocks collapsed block preview
-if (
-    FieldBlocks
-    && FieldBlocks.prototype
-    && typeof FieldBlocks.prototype.renderCollapsedBlockContent === 'function'
-    && !FieldBlocks.prototype.__blockSuitePreviewEnhanced
-) {
-    const originalRenderCollapsed = FieldBlocks.prototype.renderCollapsedBlockContent;
-
-    FieldBlocks.prototype.renderCollapsedBlockContent = function(value: Object, type: string, index: number) {
-        let previewValue = value;
-
-        if (value && typeof value === 'object' && value.props && typeof value.props === 'object') {
-            const propsObj = value.props;
-            const flatProps = {};
-            Object.keys(propsObj).forEach((k) => {
-                flatProps[`props/${k}`] = propsObj[k];
-            });
-
-            const hasHeaderBadge = Boolean(
-                (typeof propsObj.preset === 'string' && propsObj.preset.trim() !== '')
-                || (typeof propsObj.name === 'string' && propsObj.name.trim() !== '')
-                || (typeof propsObj.dynamic_source === 'string' && propsObj.dynamic_source.trim() !== '' && propsObj.dynamic_source !== 'none')
-                || (typeof propsObj.visibility === 'string' && propsObj.visibility.trim() !== '' && propsObj.visibility !== 'visible')
-            );
-
-            if (hasHeaderBadge) {
-                flatProps['props/preset'] = {
-                    preset: propsObj.preset,
-                    name: propsObj.name,
-                    dynamic_source: propsObj.dynamic_source,
-                    visibility: propsObj.visibility,
-                };
-            }
-
-            previewValue = {...value, ...flatProps};
-        }
-
-        return originalRenderCollapsed.call(this, previewValue, type, index);
-    };
-
-    FieldBlocks.prototype.__blockSuitePreviewEnhanced = true;
 }
 
 export {
