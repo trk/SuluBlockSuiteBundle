@@ -170,7 +170,6 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $visitor = new BlockSuiteFormMetadataVisitor();
         $nonDynamicKeys = [
             'reusable',
-            'main_content',
             'spacer',
             'section',
             'row',
@@ -182,7 +181,6 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
             'html',
             'code',
             'breadcrumbs',
-            'page_header',
             'scroll_to',
             'countdown',
             'social',
@@ -309,7 +307,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $blocksField->setType('block');
         $autoBlocksTag = new TagMetadata();
         $autoBlocksTag->setName('sulu_block_suite.auto_blocks');
-        $autoBlocksTag->setAttributes(['exclude' => 'reusable,main_content']);
+        $autoBlocksTag->setAttributes(['exclude' => 'reusable']);
         $blocksField->addTag($autoBlocksTag);
         $snippetForm->addItem($blocksField);
 

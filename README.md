@@ -243,7 +243,7 @@ Instead of maintaining hardcoded `<type ref="..."/>` lists across page templates
 
 ```xml
 <property name="blocks" type="block" default-type="headline">
-    <tag name="sulu_block_suite.auto_blocks" default="headline" exclude="main_content,row,column"/>
+    <tag name="sulu_block_suite.auto_blocks" default="headline" exclude="row,column"/>
     <types>
         <type name="default">
             <properties/>

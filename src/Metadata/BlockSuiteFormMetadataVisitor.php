@@ -39,7 +39,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
     private const NON_DYNAMIC_BLOCKS = [
         'reusable' => true,
-        'main_content' => true,
         'spacer' => true,
         'section' => true,
         'row' => true,
@@ -51,7 +50,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         'html' => true,
         'code' => true,
         'breadcrumbs' => true,
-        'page_header' => true,
         'scroll_to' => true,
         'countdown' => true,
         'social' => true,
@@ -148,7 +146,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
         // 3. Legacy/programmatic support for snippet forms constructed without tags
         if ('reusable_block' === $key) {
-            $this->enhanceBlockTypes($formMetadata, $locale, 'blocks', ['reusable', 'main_content']);
+            $this->enhanceBlockTypes($formMetadata, $locale, 'blocks', ['reusable']);
 
             return;
         }
@@ -163,7 +161,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             return;
         }
 
-        $this->enhanceBlockTypes($formMetadata, $locale, 'block', ['reusable', 'main_content']);
+        $this->enhanceBlockTypes($formMetadata, $locale, 'block', ['reusable']);
 
         $items = $formMetadata->getItems();
         if (!isset($items['target_block']) || !$items['target_block'] instanceof FieldMetadata) {
@@ -1333,7 +1331,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     /**
      * @param list<string> $excludedTypes
      */
-    private function enhanceBlockTypes(FormMetadata $formMetadata, string $locale, string $propertyName = 'blocks', array $excludedTypes = ['reusable', 'main_content']): void
+    private function enhanceBlockTypes(FormMetadata $formMetadata, string $locale, string $propertyName = 'blocks', array $excludedTypes = ['reusable']): void
     {
         $items = $formMetadata->getItems();
         if (!isset($items[$propertyName]) || !$items[$propertyName] instanceof FieldMetadata) {
@@ -1431,7 +1429,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     {
         $resolvedLocale = $locale ?? 'en';
         $types = [];
-        $excluded = ['reusable', 'main_content', 'default', 'common', ''];
+        $excluded = ['reusable', 'default', 'common', ''];
 
         $blockForms = $this->getRegisteredBlockForms($resolvedLocale);
         foreach (\array_keys($blockForms) as $blockKey) {

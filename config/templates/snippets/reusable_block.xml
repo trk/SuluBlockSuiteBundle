@@ -72,7 +72,7 @@
                 <title lang="es">Bloques de Contenido de la Sección</title>
                 <title lang="fr">Blocs de Contenu de la Section</title>
             </meta>
-            <tag name="sulu_block_suite.auto_blocks" default="headline" exclude="reusable,main_content,row,column"/>
+            <tag name="sulu_block_suite.auto_blocks" default="headline" exclude="reusable,row,column"/>
             <types>
                 <type name="default">
                     <meta>

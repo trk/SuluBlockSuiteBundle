@@ -77,7 +77,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
      */
     public function resolveCurrentPage(array $context, string $locale): ?array
     {
-        // 1. If explicit "page" is provided (e.g. from page_layout or main_content), prioritize it!
+        // 1. If explicit "page" is provided (e.g. from page_layout), prioritize it!
         if (isset($context['page'])) {
             $pageContext = $context['page'];
             if (\is_array($pageContext) && (isset($pageContext['title']) || isset($pageContext['headline']))) {

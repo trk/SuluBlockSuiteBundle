@@ -376,7 +376,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 
         if ([] === $mapping) {
             $blockType = isset($block['type']) && \is_string($block['type']) ? $block['type'] : '';
-            $isFullBodyBlock = \in_array($blockType, ['text', 'html', 'main_content', 'page_header', 'code'], true);
+            $isFullBodyBlock = \in_array($blockType, ['text', 'html', 'code'], true);
 
             if (\array_key_exists('title', $block)) {
                 $mapping['title'] = 'title|headline';
