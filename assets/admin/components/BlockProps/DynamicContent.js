@@ -1,6 +1,6 @@
 // @flow
 import React from 'react';
-import {action, observable, toJS} from 'mobx';
+import {action, computed, observable, toJS} from 'mobx';
 import {observer} from 'mobx-react';
 import {
     Checkbox,
@@ -12,6 +12,7 @@ import {
 } from 'sulu-admin-bundle/components';
 import {translate} from 'sulu-admin-bundle/utils';
 import {Requester} from 'sulu-admin-bundle/services';
+import SuluNativeField from './SuluNativeField';
 import blockPropsStyles from './blockProps.scss';
 
 type SourceFieldItem = {
@@ -34,6 +35,7 @@ type TargetFieldDefinition = {
 
 type Props = {
     componentType: ?string,
+    contentLocale?: ?string,
     locale: ?string,
     onChange: (dynamicConfig: ?Object) => void,
     value: ?Object,
@@ -77,14 +79,15 @@ const VALUE_CONDITION_OPERATORS = [
 @observer
 class DynamicContent extends React.Component<Props> {
     @observable sourceType: string = 'none';
-    @observable pageId: string = '';
-    @observable categoryFilter: string = '';
+    @observable pageId: ?(string | number) = null;
+    @observable selectedIds: Array<string | number> = [];
+    @observable categoryIds: Array<number> = [];
+    @observable tagIds: Array<number> = [];
     @observable limit: number = 10;
     @observable offset: number = 0;
     @observable sortBy: string = 'created';
     @observable sortOrder: string = 'desc';
     @observable templateFilter: string = '';
-    @observable tagFilter: string = '';
     @observable excludeCurrent: boolean = true;
     @observable mapping: {[string]: string} = {};
     @observable conditionField: string = 'title';
@@ -92,7 +95,8 @@ class DynamicContent extends React.Component<Props> {
     @observable conditionValue: string = '';
     @observable hasCondition: boolean = false;
     @observable sourceFields: Array<SourceFieldItem> = [...BASE_SOURCE_FIELDS];
-    @observable customSources: Array<SourceOptionItem> = [];
+    @observable availableSources: Array<SourceOptionItem> = [];
+    @observable isMultipleBlock: boolean = false;
     @observable targetFields: Array<TargetFieldDefinition> = [...DEFAULT_FALLBACK_FIELDS];
     @observable loadingFields: boolean = false;
 
@@ -117,7 +121,7 @@ class DynamicContent extends React.Component<Props> {
 
         const prevPageId = prevVal ? prevVal.page_id : null;
         const curPageId = curVal ? curVal.page_id : null;
-        if (prevPageId !== curPageId || prevProps.locale !== this.props.locale) {
+        if (prevPageId !== curPageId || prevProps.locale !== this.props.locale || prevProps.contentLocale !== this.props.contentLocale) {
             this.loadSourceFields();
         }
 
@@ -129,14 +133,15 @@ class DynamicContent extends React.Component<Props> {
     @action initConfigFromProps(val: ?Object) {
         if (!val) {
             this.sourceType = 'none';
-            this.pageId = '';
-            this.categoryFilter = '';
+            this.pageId = null;
+            this.selectedIds = [];
+            this.categoryIds = [];
+            this.tagIds = [];
             this.limit = 10;
             this.offset = 0;
             this.sortBy = 'created';
             this.sortOrder = 'desc';
             this.templateFilter = '';
-            this.tagFilter = '';
             this.excludeCurrent = true;
             this.mapping = {};
             this.conditionField = 'title';
@@ -148,14 +153,28 @@ class DynamicContent extends React.Component<Props> {
 
         const raw = toJS(val);
         this.sourceType = raw.source_type || 'none';
-        this.pageId = String(raw.page_id || raw.parent_id || raw.collection_id || raw.parent_key || '');
-        this.categoryFilter = String(raw.categories || raw.category_keys || (raw.query && raw.query.categories) || '');
+
+        const rawTargetId = raw.page_id ?? raw.article_id ?? raw.category_id ?? raw.media_id ?? raw.parent_id ?? raw.collection_id ?? null;
+        this.pageId = rawTargetId !== '' && rawTargetId !== undefined ? rawTargetId : null;
+
+        const rawUuids = raw.uuids || raw.ids || raw.page_ids || raw.article_ids || [];
+        this.selectedIds = Array.isArray(rawUuids) ? rawUuids : [];
+
+        const rawCategories = raw.category_ids || raw.categories || (raw.query && (raw.query.category_ids || raw.query.categories)) || [];
+        this.categoryIds = Array.isArray(rawCategories)
+            ? rawCategories.map((id) => Number(id)).filter((id) => !isNaN(id))
+            : [];
+
+        const rawTags = raw.tag_ids || raw.tags || (raw.query && (raw.query.tag_ids || raw.query.tags)) || [];
+        this.tagIds = Array.isArray(rawTags)
+            ? rawTags.map((id) => Number(id)).filter((id) => !isNaN(id))
+            : [];
+
         this.limit = raw.limit !== undefined ? Number(raw.limit) : 10;
         this.offset = raw.offset !== undefined ? Number(raw.offset) : 0;
         this.sortBy = raw.sort_by || (raw.query && raw.query.sort_by) || 'created';
         this.sortOrder = raw.sort_order || (raw.query && raw.query.sort_order) || 'desc';
         this.templateFilter = raw.template || (raw.query && raw.query.template) || '';
-        this.tagFilter = raw.tags || (raw.query && raw.query.tags) || '';
         this.excludeCurrent = raw.exclude_current !== undefined ? Boolean(raw.exclude_current) : true;
         this.mapping = raw.mapping ? {...raw.mapping} : {};
 
@@ -178,16 +197,7 @@ class DynamicContent extends React.Component<Props> {
         Requester.get(`/admin/api/block-suite/dynamic/sources?locale=${encodeURIComponent(locale)}`)
             .then(action((sources) => {
                 if (Array.isArray(sources)) {
-                    const builtinKeys = [
-                        'none',
-                        'current_page',
-                        'parent_page',
-                        'specific_page',
-                        'page_children',
-                        'sibling_pages',
-                        'custom_query',
-                    ];
-                    this.customSources = sources.filter((s) => s && s.key && !builtinKeys.includes(s.key));
+                    this.availableSources = sources.filter((s) => s && s.key);
                 }
             }))
             .catch(() => {});
@@ -196,10 +206,10 @@ class DynamicContent extends React.Component<Props> {
     @action loadSourceFields = () => {
         const pageId = this.pageId;
         const sourceType = this.sourceType || 'none';
-        const locale = this.props.locale || 'en';
+        const locale = this.props.contentLocale || this.props.locale || 'en';
 
         let url = `/admin/api/block-suite/dynamic/source-fields?locale=${encodeURIComponent(locale)}&source_type=${encodeURIComponent(sourceType)}`;
-        if (pageId && String(pageId).trim() !== '') {
+        if (pageId !== null && pageId !== undefined && String(pageId).trim() !== '') {
             url += `&page_id=${encodeURIComponent(String(pageId).trim())}`;
         }
 
@@ -222,6 +232,7 @@ class DynamicContent extends React.Component<Props> {
     @action loadTargetFields = () => {
         const type = String(this.props.componentType || '').toLowerCase().trim();
         if (!type || type === 'general') {
+            this.isMultipleBlock = false;
             this.targetFields = [...DEFAULT_FALLBACK_FIELDS];
             return;
         }
@@ -230,31 +241,45 @@ class DynamicContent extends React.Component<Props> {
         const url = `/admin/api/block-suite/dynamic/target-fields/${encodeURIComponent(type)}?locale=${encodeURIComponent(locale)}`;
 
         Requester.get(url)
-            .then(action((fields) => {
-                if (Array.isArray(fields) && fields.length > 0) {
-                    this.targetFields = fields;
+            .then(action((response) => {
+                if (response && typeof response === 'object' && Array.isArray(response.fields)) {
+                    this.isMultipleBlock = Boolean(response.multiple);
+                    this.targetFields = response.fields.length > 0
+                        ? response.fields
+                        : [...DEFAULT_FALLBACK_FIELDS];
                 } else {
+                    this.isMultipleBlock = false;
                     this.targetFields = [...DEFAULT_FALLBACK_FIELDS];
                 }
             }))
             .catch(action(() => {
+                this.isMultipleBlock = false;
                 this.targetFields = [...DEFAULT_FALLBACK_FIELDS];
             }));
     };
 
-    isMultiItemSource(sourceType: string): boolean {
-        if (
-            sourceType === 'page_children' ||
-            sourceType === 'sibling_pages' ||
-            sourceType === 'custom_query' ||
-            sourceType === 'sulu_articles' ||
-            sourceType === 'sulu_categories' ||
-            sourceType === 'sulu_media_collection'
-        ) {
-            return true;
+    @computed get filteredSourceOptions(): Array<SourceOptionItem> {
+        if (this.availableSources.length === 0) {
+            return [];
         }
-        const custom = this.customSources.find((s) => s.key === sourceType);
-        return Boolean(custom && custom.multi_item);
+
+        return this.availableSources.filter((source) => {
+            if (source.key === 'none') {
+                return true;
+            }
+            if (source.key === this.sourceType) {
+                return true;
+            }
+            return Boolean(source.multi_item) === this.isMultipleBlock;
+        });
+    }
+
+    isMultiItemSource(sourceType: string): boolean {
+        const matched = this.availableSources.find((s) => s.key === sourceType);
+        if (matched) {
+            return Boolean(matched.multi_item);
+        }
+        return this.isMultipleBlock;
     }
 
     syncToParent = () => {
@@ -272,22 +297,25 @@ class DynamicContent extends React.Component<Props> {
             mapping,
         };
 
-        const trimmedId = this.pageId ? String(this.pageId).trim() : '';
-        const usesExplicitTargetId =
-            sourceType === 'specific_page' ||
-            sourceType === 'page_children' ||
-            sourceType === 'sulu_media_collection' ||
-            sourceType === 'sulu_categories';
-        if (trimmedId !== '' && usesExplicitTargetId) {
-            clean.page_id = trimmedId;
-            if (sourceType === 'sulu_media_collection') {
-                clean.collection_id = trimmedId;
+        if (this.pageId !== null && this.pageId !== undefined && String(this.pageId).trim() !== '') {
+            clean.page_id = this.pageId;
+            if (sourceType === 'single_article') {
+                clean.article_id = String(this.pageId);
+            } else if (sourceType === 'single_category') {
+                clean.category_id = Number(this.pageId);
             } else if (sourceType === 'sulu_categories') {
-                if (/^\d+$/.test(trimmedId)) {
-                    clean.parent_id = Number(trimmedId);
-                } else {
-                    clean.parent_key = trimmedId;
-                }
+                clean.parent_id = Number(this.pageId);
+            } else if (sourceType === 'single_media') {
+                clean.media_id = Number(this.pageId);
+            } else if (sourceType === 'sulu_media_collection') {
+                clean.collection_id = Number(this.pageId);
+            }
+        }
+
+        if (this.selectedIds.length > 0 && (sourceType === 'page_selection' || sourceType === 'sulu_articles')) {
+            clean.uuids = toJS(this.selectedIds);
+            if (sourceType === 'sulu_articles') {
+                clean.article_ids = toJS(this.selectedIds);
             }
         }
 
@@ -305,11 +333,11 @@ class DynamicContent extends React.Component<Props> {
             if (this.templateFilter && String(this.templateFilter).trim() !== '') {
                 clean.template = String(this.templateFilter).trim();
             }
-            if (this.tagFilter && String(this.tagFilter).trim() !== '') {
-                clean.tags = String(this.tagFilter).trim();
+            if (this.tagIds.length > 0) {
+                clean.tag_ids = toJS(this.tagIds);
             }
-            if (this.categoryFilter && String(this.categoryFilter).trim() !== '') {
-                clean.categories = String(this.categoryFilter).trim();
+            if (this.categoryIds.length > 0) {
+                clean.category_ids = toJS(this.categoryIds);
             }
             if (sourceType === 'sibling_pages') {
                 clean.exclude_current = Boolean(this.excludeCurrent);
@@ -329,26 +357,44 @@ class DynamicContent extends React.Component<Props> {
 
     @action handleSourceTypeChange = (sourceType: ?string) => {
         const cleanType = sourceType || 'none';
+        if (this.sourceType !== cleanType) {
+            this.pageId = null;
+            this.selectedIds = [];
+        }
         this.sourceType = cleanType;
         this.syncToParent();
         this.loadSourceFields();
     };
 
-    @action handlePageIdChange = (pageId: ?string) => {
-        this.pageId = pageId || '';
+    @action handlePageIdChange = (pageId: any) => {
+        this.pageId = pageId !== undefined && pageId !== '' ? pageId : null;
         this.syncToParent();
-        if (this.pageId) {
+        if (this.pageId !== null) {
             this.loadSourceFields();
         }
     };
 
-    @action handleCategoryFilterChange = (categories: ?string) => {
-        this.categoryFilter = categories || '';
+    @action handleSelectedIdsChange = (ids: Array<string | number>) => {
+        this.selectedIds = Array.isArray(ids) ? ids : [];
+        this.syncToParent();
+    };
+
+    @action handleCategoryIdsChange = (ids: Array<number>) => {
+        this.categoryIds = Array.isArray(ids)
+            ? ids.map((id) => Number(id)).filter((id) => !isNaN(id))
+            : [];
+        this.syncToParent();
+    };
+
+    @action handleTagIdsChange = (ids: Array<number>) => {
+        this.tagIds = Array.isArray(ids)
+            ? ids.map((id) => Number(id)).filter((id) => !isNaN(id))
+            : [];
         this.syncToParent();
     };
 
     @action handleLimitChange = (limit: ?number) => {
-        this.limit = limit ? Number(this.limit) : 10;
+        this.limit = limit ? Number(limit) : 10;
         this.syncToParent();
     };
 
@@ -369,11 +415,6 @@ class DynamicContent extends React.Component<Props> {
 
     @action handleTemplateFilterChange = (template: ?string) => {
         this.templateFilter = template || '';
-        this.syncToParent();
-    };
-
-    @action handleTagFilterChange = (tags: ?string) => {
-        this.tagFilter = tags || '';
         this.syncToParent();
     };
 
@@ -415,24 +456,22 @@ class DynamicContent extends React.Component<Props> {
 
     render() {
         const sourceType = this.sourceType || 'none';
-        const pageId = this.pageId || '';
         const limit = this.limit !== undefined ? this.limit : 10;
         const offset = this.offset !== undefined ? this.offset : 0;
         const mapping = this.mapping || {};
+        const contentLocale = this.props.contentLocale || this.props.locale || 'en';
 
         const noneLabel = translate('sulu_block_suite.dynamic_source_none') || 'None (Static Manual Content)';
-        const currentPageLabel = translate('sulu_block_suite.dynamic_source_current_page') || 'Current Page';
-        const parentPageLabel = translate('sulu_block_suite.dynamic_source_parent_page') || 'Parent Page';
-        const specificPageLabel = translate('sulu_block_suite.dynamic_source_specific_page') || 'Specific Page';
-        const pageChildrenLabel = translate('sulu_block_suite.dynamic_source_page_children') || 'Child Pages (Repeater / Multi-Item)';
-        const siblingPagesLabel = translate('sulu_block_suite.dynamic_source_sibling_pages') || 'Sibling Pages (Repeater / Multi-Item)';
-        const customQueryLabel = translate('sulu_block_suite.dynamic_source_custom_query') || 'Smart Query (Repeater / Multi-Item)';
         const mapNoneLabel = translate('sulu_block_suite.dynamic_map_none') || '-- Static (No Dynamic Mapping) --';
 
         const isMultiItem = this.isMultiItemSource(sourceType);
-        const needsPageId = sourceType === 'specific_page' || sourceType === 'page_children';
-        const isMediaCollection = sourceType === 'sulu_media_collection';
-        const isCategorySource = sourceType === 'sulu_categories';
+        const needsSinglePageSelection = sourceType === 'specific_page' || sourceType === 'page_children';
+        const needsMultiPageSelection = sourceType === 'page_selection';
+        const needsSingleArticleSelection = sourceType === 'single_article';
+        const needsMultiArticleSelection = sourceType === 'sulu_articles';
+        const needsSingleCategorySelection = sourceType === 'single_category' || sourceType === 'sulu_categories';
+        const needsSingleMediaSelection = sourceType === 'single_media';
+        const needsSingleCollectionSelection = sourceType === 'sulu_media_collection';
         const supportsCategoryAndTagFilters =
             sourceType === 'page_children' ||
             sourceType === 'sibling_pages' ||
@@ -446,7 +485,7 @@ class DynamicContent extends React.Component<Props> {
                     <Icon name="su-magic" />
                     <span>
                         {translate('sulu_block_suite.dynamic_mapping_desc') ||
-                            'Map block properties dynamically to source page fields. If empty, the manual static block value is preserved.'}
+                            'Map block properties dynamically to source fields. If empty, the manual static block value is preserved.'}
                     </span>
                 </div>
 
@@ -463,14 +502,10 @@ class DynamicContent extends React.Component<Props> {
                             onChange={this.handleSourceTypeChange}
                             value={sourceType}
                         >
-                            <SingleSelect.Option value="none">{noneLabel}</SingleSelect.Option>
-                            <SingleSelect.Option value="current_page">{currentPageLabel}</SingleSelect.Option>
-                            <SingleSelect.Option value="parent_page">{parentPageLabel}</SingleSelect.Option>
-                            <SingleSelect.Option value="specific_page">{specificPageLabel}</SingleSelect.Option>
-                            <SingleSelect.Option value="page_children">{pageChildrenLabel}</SingleSelect.Option>
-                            <SingleSelect.Option value="sibling_pages">{siblingPagesLabel}</SingleSelect.Option>
-                            <SingleSelect.Option value="custom_query">{customQueryLabel}</SingleSelect.Option>
-                            {this.customSources.map((source) => (
+                            {this.filteredSourceOptions.length === 0 && (
+                                <SingleSelect.Option value="none">{noneLabel}</SingleSelect.Option>
+                            )}
+                            {this.filteredSourceOptions.map((source) => (
                                 <SingleSelect.Option key={source.key} value={source.key}>
                                     {source.label}
                                 </SingleSelect.Option>
@@ -478,53 +513,134 @@ class DynamicContent extends React.Component<Props> {
                         </SingleSelect>
                     </Form.Field>
 
-                    {needsPageId && (
+                    {needsSinglePageSelection && (
                         <Form.Field
                             description={
                                 sourceType === 'page_children'
                                     ? (translate('sulu_block_suite.dynamic_parent_page_id_desc') ||
-                                        'Optional parent page UUID. Leave empty to use the current page as parent.')
-                                    : (translate('sulu_block_suite.dynamic_page_id_desc') || 'Enter the UUID or ID of the target page.')
+                                        'Optional parent page. Leave empty to use the current page as parent.')
+                                    : (translate('sulu_block_suite.dynamic_page_id_desc') || 'Select the target page.')
                             }
-                            label={translate('sulu_block_suite.dynamic_page_id') || 'Source Page ID / UUID'}
+                            label={translate('sulu_block_suite.dynamic_page_id') || 'Source Page'}
                             required={sourceType === 'specific_page'}
                         >
-                            <Input
+                            <SuluNativeField
+                                fieldType="single_page_selection"
+                                locale={contentLocale}
                                 onChange={this.handlePageIdChange}
-                                placeholder="e.g. 01a11348-6256-7b4e-adc2-3008ba037f03"
-                                value={pageId}
+                                value={this.pageId}
                             />
                         </Form.Field>
                     )}
 
-                    {isMediaCollection && (
+                    {needsMultiPageSelection && (
+                        <Form.Field
+                            description={
+                                translate('sulu_block_suite.dynamic_page_selection_desc') ||
+                                'Select the pages to populate this collection block.'
+                            }
+                            label={translate('sulu_block_suite.dynamic_page_selection') || 'Selected Pages'}
+                            required={true}
+                        >
+                            <SuluNativeField
+                                fieldType="page_selection"
+                                locale={contentLocale}
+                                onChange={this.handleSelectedIdsChange}
+                                value={this.selectedIds}
+                            />
+                        </Form.Field>
+                    )}
+
+                    {needsSingleArticleSelection && (
+                        <Form.Field
+                            description={
+                                translate('sulu_block_suite.dynamic_single_article_desc') ||
+                                'Select the target Sulu article.'
+                            }
+                            label={translate('sulu_block_suite.dynamic_single_article') || 'Source Article'}
+                            required={true}
+                        >
+                            <SuluNativeField
+                                fieldType="single_article_selection"
+                                locale={contentLocale}
+                                onChange={this.handlePageIdChange}
+                                value={this.pageId}
+                            />
+                        </Form.Field>
+                    )}
+
+                    {needsMultiArticleSelection && (
+                        <Form.Field
+                            description={
+                                translate('sulu_block_suite.dynamic_article_selection_desc') ||
+                                'Optional specific articles. Leave empty to query latest articles dynamically.'
+                            }
+                            label={translate('sulu_block_suite.dynamic_article_selection') || 'Specific Articles (Optional)'}
+                        >
+                            <SuluNativeField
+                                fieldType="article_selection"
+                                locale={contentLocale}
+                                onChange={this.handleSelectedIdsChange}
+                                value={this.selectedIds}
+                            />
+                        </Form.Field>
+                    )}
+
+                    {needsSingleCategorySelection && (
+                        <Form.Field
+                            description={
+                                sourceType === 'sulu_categories'
+                                    ? (translate('sulu_block_suite.dynamic_parent_category_desc') ||
+                                        'Optional parent category to fetch child categories from.')
+                                    : (translate('sulu_block_suite.dynamic_single_category_desc') || 'Select the target category.')
+                            }
+                            label={
+                                sourceType === 'sulu_categories'
+                                    ? (translate('sulu_block_suite.dynamic_parent_category') || 'Parent Category')
+                                    : (translate('sulu_block_suite.dynamic_single_category') || 'Source Category')
+                            }
+                            required={sourceType === 'single_category'}
+                        >
+                            <SuluNativeField
+                                fieldType="single_category_selection"
+                                locale={contentLocale}
+                                onChange={this.handlePageIdChange}
+                                value={this.pageId}
+                            />
+                        </Form.Field>
+                    )}
+
+                    {needsSingleMediaSelection && (
+                        <Form.Field
+                            description={
+                                translate('sulu_block_suite.dynamic_single_media_desc') ||
+                                'Select the target Sulu media asset.'
+                            }
+                            label={translate('sulu_block_suite.dynamic_single_media') || 'Source Media'}
+                            required={true}
+                        >
+                            <SuluNativeField
+                                fieldType="single_media_selection"
+                                locale={contentLocale}
+                                onChange={this.handlePageIdChange}
+                                value={this.pageId}
+                            />
+                        </Form.Field>
+                    )}
+
+                    {needsSingleCollectionSelection && (
                         <Form.Field
                             description={
                                 translate('sulu_block_suite.dynamic_collection_id_desc') ||
-                                'Optional Sulu Media Collection ID. Leave empty to fetch latest media assets.'
+                                'Optional Sulu Media Collection. Leave empty to fetch latest media assets.'
                             }
-                            label={translate('sulu_block_suite.dynamic_collection_id') || 'Media Collection ID'}
+                            label={translate('sulu_block_suite.dynamic_collection_id') || 'Media Collection'}
                         >
-                            <Input
+                            <SuluNativeField
+                                fieldType="single_collection_selection"
+                                locale={contentLocale}
                                 onChange={this.handlePageIdChange}
-                                placeholder="e.g. 1"
-                                value={pageId}
-                            />
-                        </Form.Field>
-                    )}
-
-                    {isCategorySource && (
-                        <Form.Field
-                            description={
-                                translate('sulu_block_suite.dynamic_parent_category_desc') ||
-                                'Optional parent category key or ID to fetch child categories from.'
-                            }
-                            label={translate('sulu_block_suite.dynamic_parent_category') || 'Parent Category Key / ID'}
-                        >
-                            <Input
-                                onChange={this.handlePageIdChange}
-                                placeholder="e.g. products, blog"
-                                value={pageId}
+                                value={this.pageId}
                             />
                         </Form.Field>
                     )}
@@ -624,14 +740,15 @@ class DynamicContent extends React.Component<Props> {
                                         colSpan={4}
                                         description={
                                             translate('sulu_block_suite.dynamic_filter_tags_desc') ||
-                                            'Optional comma-separated tag names.'
+                                            'Optional tags to filter items.'
                                         }
                                         label={translate('sulu_block_suite.dynamic_filter_tags') || 'Filter by Tags'}
                                     >
-                                        <Input
-                                            onChange={this.handleTagFilterChange}
-                                            placeholder="e.g. featured,news"
-                                            value={this.tagFilter}
+                                        <SuluNativeField
+                                            fieldType="tag_selection"
+                                            locale={contentLocale}
+                                            onChange={this.handleTagIdsChange}
+                                            value={this.tagIds}
                                         />
                                     </Form.Field>
 
@@ -639,14 +756,15 @@ class DynamicContent extends React.Component<Props> {
                                         colSpan={4}
                                         description={
                                             translate('sulu_block_suite.dynamic_filter_categories_desc') ||
-                                            'Optional comma-separated category keys.'
+                                            'Optional categories to filter items.'
                                         }
                                         label={translate('sulu_block_suite.dynamic_filter_categories') || 'Filter by Categories'}
                                     >
-                                        <Input
-                                            onChange={this.handleCategoryFilterChange}
-                                            placeholder="e.g. tech,updates"
-                                            value={this.categoryFilter}
+                                        <SuluNativeField
+                                            fieldType="category_selection"
+                                            locale={contentLocale}
+                                            onChange={this.handleCategoryIdsChange}
+                                            value={this.categoryIds}
                                         />
                                     </Form.Field>
                                 </>
@@ -674,7 +792,7 @@ class DynamicContent extends React.Component<Props> {
                             </h4>
                             <div className={blockPropsStyles.sectionHint}>
                                 {translate('sulu_block_suite.dynamic_mapping_hint') ||
-                                    'Select which source page field should populate each block property on the left.'}
+                                    'Select which source field should populate each block property on the left.'}
                             </div>
 
                             <div className={blockPropsStyles.mappingGrid}>

@@ -137,6 +137,7 @@ services:
         arguments:
             $sourceResolver: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface'
             $customProviders: !tagged_iterator sulu_block_suite.dynamic_source_provider
+            $targetFieldResolver: '@Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver'
 
     Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface:
         alias: Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipeline

@@ -570,6 +570,7 @@ class BlockProps extends React.Component<Props> {
 
                 <Properties
                     componentType={this.componentType}
+                    contentLocale={this.currentLocale}
                     locale={this.uiLocale}
                     onCancel={this.handleCloseProperties}
                     onConfirm={this.handleConfirmProperties}

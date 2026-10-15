@@ -17,6 +17,7 @@ import blockPropsStyles from './blockProps.scss';
 
 type Props = {
     componentType: string,
+    contentLocale?: string,
     locale: string,
     onCancel: () => void,
     onConfirm: (values: Object) => void,
@@ -260,10 +261,12 @@ class Properties extends React.Component<Props> {
         }
 
         const activeTab = tabs[this.activeTabIndex] || tabs[0];
+        const contentLocale = this.props.contentLocale || this.props.locale;
         if (activeTab && activeTab.isDynamicTab) {
             return (
                 <DynamicContent
                     componentType={this.props.componentType}
+                    contentLocale={contentLocale}
                     locale={this.props.locale}
                     onChange={this.handleDynamicChange}
                     value={this.draftValues._dynamic}
@@ -286,6 +289,7 @@ class Properties extends React.Component<Props> {
             <Form>
                 {fields.map((field) => (
                     <FieldRenderer
+                        contentLocale={contentLocale}
                         defaultOptionLabel={defaultOptionLabel}
                         field={field}
                         key={field.name}

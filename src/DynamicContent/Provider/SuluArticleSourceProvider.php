@@ -119,24 +119,42 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
             'stage' => DimensionContentInterface::STAGE_LIVE,
         ];
 
+        $uuids = $this->normalizeStringList($query['uuids'] ?? ($query['ids'] ?? ($query['article_ids'] ?? null)));
+        if ([] !== $uuids) {
+            $filters['uuids'] = $uuids;
+        }
+
         $templateKeys = $this->normalizeStringList($query['template_keys'] ?? ($query['templates'] ?? ($query['template'] ?? null)));
         if ([] !== $templateKeys) {
             $filters['templateKeys'] = $templateKeys;
         }
 
-        $tagNames = $this->normalizeStringList($query['tag_names'] ?? ($query['tags'] ?? ($query['tag'] ?? null)));
-        if ([] !== $tagNames) {
-            $filters['tagNames'] = $tagNames;
+        $tagIds = $this->normalizeIntList($query['tag_ids'] ?? null);
+        $rawTags = $query['tag_names'] ?? ($query['tags'] ?? ($query['tag'] ?? null));
+        if ([] === $tagIds && null !== $rawTags) {
+            $tagIds = $this->normalizeIntList($rawTags);
         }
-
-        $categoryKeys = $this->normalizeStringList($query['category_keys'] ?? ($query['categories'] ?? null));
-        if ([] !== $categoryKeys) {
-            $filters['categoryKeys'] = $categoryKeys;
+        if ([] !== $tagIds) {
+            $filters['tagIds'] = $tagIds;
+        } else {
+            $tagNames = $this->normalizeStringList($rawTags);
+            if ([] !== $tagNames) {
+                $filters['tagNames'] = $tagNames;
+            }
         }
 
         $categoryIds = $this->normalizeIntList($query['category_ids'] ?? null);
+        $rawCategories = $query['category_keys'] ?? ($query['categories'] ?? null);
+        if ([] === $categoryIds && null !== $rawCategories) {
+            $categoryIds = $this->normalizeIntList($rawCategories);
+        }
         if ([] !== $categoryIds) {
             $filters['categoryIds'] = $categoryIds;
+        } else {
+            $categoryKeys = $this->normalizeStringList($rawCategories);
+            if ([] !== $categoryKeys) {
+                $filters['categoryKeys'] = $categoryKeys;
+            }
         }
 
         $offset = isset($query['offset']) && \is_numeric($query['offset']) && (int) $query['offset'] > 0
@@ -172,6 +190,7 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
              *     stage?: string,
              *     categoryIds?: list<int>,
              *     categoryKeys?: list<string>,
+             *     tagIds?: list<int>,
              *     tagNames?: list<string>,
              *     templateKeys?: list<string>,
              *     limit?: int,

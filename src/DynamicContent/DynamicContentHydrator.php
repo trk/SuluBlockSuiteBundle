@@ -4,56 +4,10 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\DynamicContent;
 
+use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
+
 final class DynamicContentHydrator implements DynamicContentHydratorInterface
 {
-    /**
-     * Block types whose multi-item dynamic content populates their internal `items` list
-     * rather than repeating the outer container block itself.
-     *
-     * @var list<string>
-     */
-    private const MULTI_ITEM_CONTAINER_BLOCKS = [
-        'grid',
-        'gallery',
-        'accordion',
-        'list',
-        'description_list',
-        'panel_slider',
-        'overlay_slider',
-        'slideshow',
-        'subnav',
-        'switcher',
-        'table',
-        'nav',
-        'map',
-        'popover',
-        'social',
-        'breadcrumbs',
-    ];
-
-    /**
-     * Default child item block type for multi-item container blocks when `items` is initially empty.
-     *
-     * @var array<string, string>
-     */
-    private const DEFAULT_CONTAINER_ITEM_TYPES = [
-        'grid' => 'card',
-        'gallery' => 'overlay',
-        'panel_slider' => 'card',
-        'overlay_slider' => 'overlay',
-        'accordion' => 'accordion_item',
-        'list' => 'list_item',
-        'description_list' => 'description_list_item',
-        'slideshow' => 'slideshow_item',
-        'subnav' => 'subnav_item',
-        'switcher' => 'switcher_item',
-        'table' => 'table_item',
-        'nav' => 'nav_item',
-        'map' => 'map_item',
-        'popover' => 'popover_item',
-        'social' => 'social_item',
-    ];
-
     /**
      * @var array<string, DynamicContentSourceProviderInterface>
      */
@@ -65,6 +19,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
     public function __construct(
         private readonly ?PageSourceResolverInterface $sourceResolver = null,
         iterable $customProviders = [],
+        private readonly ?BlockTargetFieldMetadataResolver $targetFieldResolver = null,
     ) {
         foreach ($customProviders as $provider) {
             $this->customProviders[$provider->getKey()] = $provider;
@@ -103,10 +58,19 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             ? $dynamicConfig['condition']
             : null;
 
-        // 1. Custom registered source provider
-        if (isset($this->customProviders[$sourceType])) {
-            $provider = $this->customProviders[$sourceType];
-            if ($provider->isMultiItem()) {
+        // 1. Custom registered source provider (or single-item alias mapped to a provider)
+        $singleProviderAliases = [
+            'single_article' => 'sulu_articles',
+            'single_category' => 'sulu_categories',
+            'single_media' => 'sulu_media_collection',
+        ];
+
+        $providerKey = $singleProviderAliases[$sourceType] ?? $sourceType;
+        $forceSingle = isset($singleProviderAliases[$sourceType]);
+
+        if (isset($this->customProviders[$providerKey])) {
+            $provider = $this->customProviders[$providerKey];
+            if (!$forceSingle && $provider->isMultiItem()) {
                 $items = $provider->resolveCollection($dynamicConfig, $contextPage);
 
                 return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
@@ -128,7 +92,20 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             return [$block];
         }
 
-        // 2. Child pages (page_children)
+        // 2. Selected pages (page_selection)
+        if ('page_selection' === $sourceType) {
+            $rawIds = $dynamicConfig['page_ids'] ?? ($dynamicConfig['uuids'] ?? ($dynamicConfig['ids'] ?? null));
+            $queryOptions = $this->extractQueryOptions($dynamicConfig);
+            $queryOptions['uuids'] = $rawIds;
+            if (isset($dynamicConfig['limit']) && \is_numeric($dynamicConfig['limit'])) {
+                $queryOptions['limit'] = (int) $dynamicConfig['limit'];
+            }
+            $items = $this->sourceResolver->resolveQuery($queryOptions);
+
+            return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
+        }
+
+        // 3. Child pages (page_children)
         if ('page_children' === $sourceType) {
             $rawParentId = $this->resolveTargetOrContext(
                 $dynamicConfig['parent_id'] ?? ($dynamicConfig['page_id'] ?? null),
@@ -156,7 +133,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
         }
 
-        // 3. Sibling pages (sibling_pages)
+        // 4. Sibling pages (sibling_pages)
         if ('sibling_pages' === $sourceType) {
             $targetPage = $this->resolveTargetOrContext($contextPage, $dynamicConfig['page_id'] ?? null);
             $limit = isset($dynamicConfig['limit']) && \is_numeric($dynamicConfig['limit'])
@@ -170,7 +147,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
         }
 
-        // 4. Custom query / Smart Content (custom_query)
+        // 5. Custom query / Smart Content (custom_query)
         if ('custom_query' === $sourceType) {
             /** @var array<string, mixed> $query */
             $query = isset($dynamicConfig['query']) && \is_array($dynamicConfig['query'])
@@ -188,7 +165,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
         }
 
-        // 5. Parent page (parent_page)
+        // 6. Parent page (parent_page)
         if ('parent_page' === $sourceType) {
             $targetPage = $this->resolveTargetOrContext($contextPage, $dynamicConfig['page_id'] ?? null);
 
@@ -205,7 +182,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             return [$this->applyMapping($block, $pageData, $mapping)];
         }
 
-        // 6. Single-page source (specific_page or current_page)
+        // 7. Single-page source (specific_page or current_page)
         /** @var mixed $rawTargetPage */
         $rawTargetPage = 'current_page' === $sourceType
             ? $contextPage
@@ -295,6 +272,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             'tag',
             'tags',
             'tag_names',
+            'tag_ids',
             'category',
             'categories',
             'category_keys',
@@ -303,6 +281,10 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             'descendant_of_id',
             'exclude_id',
             'exclude_ids',
+            'uuids',
+            'ids',
+            'page_ids',
+            'article_ids',
         ];
 
         foreach ($allowedKeys as $key) {
@@ -351,14 +333,17 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             : 'auto';
         $blockType = isset($block['type']) && \is_string($block['type']) ? $block['type'] : '';
 
+        $blockMetadata = (null !== $this->targetFieldResolver && '' !== $blockType)
+            ? $this->targetFieldResolver->resolveBlockMetadata($blockType)
+            : null;
+        $isMultipleBlock = (null !== $blockMetadata && $blockMetadata['multiple'])
+            || (\array_key_exists('items', $block) && \is_array($block['items']));
+        $defaultItemType = null !== $blockMetadata
+            ? $blockMetadata['default_item_type']
+            : ('' !== $blockType ? $blockType . '_item' : null);
+
         $shouldHydrateInnerItems = 'items' === $hydrateMode
-            || (
-                'repeater' !== $hydrateMode
-                && (
-                    \in_array($blockType, self::MULTI_ITEM_CONTAINER_BLOCKS, true)
-                    || (isset($block['items']) && \is_array($block['items']))
-                )
-            );
+            || ('repeater' !== $hydrateMode && $isMultipleBlock);
 
         if ($shouldHydrateInnerItems) {
             /** @var array<string, mixed> $templateItem */
@@ -366,8 +351,8 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
                 ? $block['items'][0]
                 : [];
 
-            if (!isset($templateItem['type']) && isset(self::DEFAULT_CONTAINER_ITEM_TYPES[$blockType])) {
-                $templateItem['type'] = self::DEFAULT_CONTAINER_ITEM_TYPES[$blockType];
+            if (!isset($templateItem['type']) && null !== $defaultItemType && '' !== $defaultItemType) {
+                $templateItem['type'] = $defaultItemType;
             }
 
             /** @var array<string, string> $itemMapping */

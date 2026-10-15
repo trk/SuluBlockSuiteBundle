@@ -145,12 +145,43 @@ YAML
             [$this->tempSchemaDir],
         );
 
-        $fields = $resolver->resolveTargetFields('accordion', 'en');
+        $metadata = $resolver->resolveBlockMetadata('accordion', 'en');
 
+        $this->assertTrue($metadata['multiple']);
+        $this->assertSame('accordion_item', $metadata['default_item_type']);
         $this->assertSame([
             ['name' => 'title', 'label' => 'Question Title (title)', 'type' => 'string'],
             ['name' => 'content', 'label' => 'Answer Body (content)', 'type' => 'text'],
-        ], $fields);
+        ], $metadata['fields']);
+    }
+
+    public function testResolveBlockMetadataHonorsYamlMultipleAndDefaultItemTypeOverrides(): void
+    {
+        \file_put_contents(
+            $this->tempSchemaDir . '/breadcrumbs.yaml',
+            <<<'YAML'
+multiple: true
+default_item_type: breadcrumb_item
+dynamic_fields:
+    - name: title
+      label: Breadcrumb Label
+      type: string
+    - name: url
+      label: Target URL
+      type: link
+YAML
+        );
+
+        $resolver = new BlockTargetFieldMetadataResolver(
+            null,
+            [$this->tempSchemaDir],
+        );
+
+        $metadata = $resolver->resolveBlockMetadata('breadcrumbs', 'en');
+
+        $this->assertTrue($metadata['multiple']);
+        $this->assertSame('breadcrumb_item', $metadata['default_item_type']);
+        $this->assertCount(2, $metadata['fields']);
     }
 }
 

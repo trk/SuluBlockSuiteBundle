@@ -464,6 +464,11 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             'stage' => DimensionContentInterface::STAGE_LIVE,
         ];
 
+        $uuids = $this->normalizeStringList($criteria['uuids'] ?? ($criteria['ids'] ?? null));
+        if ([] !== $uuids) {
+            $filters['uuids'] = $uuids;
+        }
+
         if (\array_key_exists('parent_id', $criteria)) {
             $rawParentCriteria = $criteria['parent_id'];
             $resolvedParentUuid = (\is_string($rawParentCriteria) || \is_object($rawParentCriteria) || \is_array($rawParentCriteria))
@@ -494,19 +499,32 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             $filters['templateKeys'] = $templateKeys;
         }
 
-        $tagNames = $this->normalizeStringList($criteria['tag_names'] ?? ($criteria['tags'] ?? ($criteria['tag'] ?? null)));
-        if ([] !== $tagNames) {
-            $filters['tagNames'] = $tagNames;
+        $tagIds = $this->normalizeIntList($criteria['tag_ids'] ?? null);
+        $rawTags = $criteria['tag_names'] ?? ($criteria['tags'] ?? ($criteria['tag'] ?? null));
+        if ([] === $tagIds && null !== $rawTags) {
+            $tagIds = $this->normalizeIntList($rawTags);
         }
-
-        $categoryKeys = $this->normalizeStringList($criteria['category_keys'] ?? ($criteria['categories'] ?? null));
-        if ([] !== $categoryKeys) {
-            $filters['categoryKeys'] = $categoryKeys;
+        if ([] !== $tagIds) {
+            $filters['tagIds'] = $tagIds;
+        } else {
+            $tagNames = $this->normalizeStringList($rawTags);
+            if ([] !== $tagNames) {
+                $filters['tagNames'] = $tagNames;
+            }
         }
 
         $categoryIds = $this->normalizeIntList($criteria['category_ids'] ?? null);
+        $rawCategories = $criteria['category_keys'] ?? ($criteria['categories'] ?? null);
+        if ([] === $categoryIds && null !== $rawCategories) {
+            $categoryIds = $this->normalizeIntList($rawCategories);
+        }
         if ([] !== $categoryIds) {
             $filters['categoryIds'] = $categoryIds;
+        } else {
+            $categoryKeys = $this->normalizeStringList($rawCategories);
+            if ([] !== $categoryKeys) {
+                $filters['categoryKeys'] = $categoryKeys;
+            }
         }
 
         $navigationContexts = $this->normalizeStringList($criteria['navigation_contexts'] ?? ($criteria['navigation_context'] ?? null));
@@ -550,6 +568,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
              *     stage?: string,
              *     categoryIds?: list<int>,
              *     categoryKeys?: list<string>,
+             *     tagIds?: list<int>,
              *     tagNames?: list<string>,
              *     templateKeys?: list<string>,
              *     parentId?: string|null,

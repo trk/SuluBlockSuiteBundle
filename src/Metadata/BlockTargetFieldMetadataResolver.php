@@ -50,15 +50,33 @@ final class BlockTargetFieldMetadataResolver
      */
     public function resolveTargetFields(string $blockType, string $locale = 'en'): array
     {
+        return $this->resolveBlockMetadata($blockType, $locale)['fields'];
+    }
+
+    /**
+     * @return array{
+     *     multiple: bool,
+     *     default_item_type: string|null,
+     *     fields: list<array{name: string, label: string, type: string}>
+     * }
+     */
+    public function resolveBlockMetadata(string $blockType, string $locale = 'en'): array
+    {
         $cleanType = \strtolower(\trim($blockType));
         if ('' === $cleanType) {
-            return $this->getDefaultFallbackFields();
+            return [
+                'multiple' => false,
+                'default_item_type' => null,
+                'fields' => $this->getDefaultFallbackFields(),
+            ];
         }
 
         /** @var array<string, array{name: string, label: string, type: string}> $fieldsByName */
         $fieldsByName = [];
+        $isMultiple = false;
+        $defaultItemType = null;
 
-        // 1. Discover fields from Sulu FormMetadata (including child `items` sub-blocks for collection blocks)
+        // 1. Discover fields and multiplicity from Sulu FormMetadata
         $formMetadata = $this->getBlockFormMetadata($cleanType, $locale);
         if (null !== $formMetadata) {
             foreach ($formMetadata->getItems() as $item) {
@@ -70,7 +88,13 @@ final class BlockTargetFieldMetadataResolver
                 $fieldType = $item->getType();
 
                 if ('items' === $fieldName && 'block' === $fieldType) {
-                    foreach ($item->getTypes() as $childFormMetadata) {
+                    $isMultiple = true;
+                    $defaultItemType = $item->getDefaultType();
+
+                    foreach ($item->getTypes() as $typeKey => $childFormMetadata) {
+                        if (null === $defaultItemType && \is_string($typeKey) && '' !== $typeKey) {
+                            $defaultItemType = $typeKey;
+                        }
                         foreach ($childFormMetadata->getItems() as $childItem) {
                             if (!$childItem instanceof FieldMetadata) {
                                 continue;
@@ -115,52 +139,79 @@ final class BlockTargetFieldMetadataResolver
             }
         }
 
-        // 2. Merge/override with optional YAML `dynamic_fields` in props schema directories
+        // 2. Merge/override with optional YAML `multiple`, `default_item_type`, and `dynamic_fields` in props schema directories
         foreach ($this->schemaDirectories as $dir) {
-            $yamlFile = \rtrim($dir, '/') . '/' . $cleanType . '.yaml';
-            if (!\is_file($yamlFile)) {
-                continue;
-            }
+            $basePath = \rtrim($dir, '/');
+            $candidates = [
+                $basePath . '/' . $cleanType . '.yaml',
+                $basePath . '/' . $cleanType . '.yml',
+                $basePath . '/props/' . $cleanType . '.yaml',
+                $basePath . '/props/' . $cleanType . '.yml',
+            ];
 
-            try {
-                $parsed = Yaml::parseFile($yamlFile);
-                if (!\is_array($parsed) || !isset($parsed['dynamic_fields']) || !\is_array($parsed['dynamic_fields'])) {
+            foreach ($candidates as $yamlFile) {
+                if (!\is_file($yamlFile)) {
                     continue;
                 }
 
-                foreach ($parsed['dynamic_fields'] as $entry) {
-                    if (!\is_array($entry) || !isset($entry['name']) || !\is_string($entry['name'])) {
-                        continue;
+                try {
+                    $parsed = Yaml::parseFile($yamlFile);
+                    if (!\is_array($parsed)) {
+                        break;
                     }
 
-                    $name = \trim($entry['name']);
-                    if ('' === $name) {
-                        continue;
+                    if (isset($parsed['multiple']) && \is_bool($parsed['multiple'])) {
+                        $isMultiple = $parsed['multiple'];
+                    } elseif (isset($parsed['is_multiple']) && \is_bool($parsed['is_multiple'])) {
+                        $isMultiple = $parsed['is_multiple'];
                     }
 
-                    $rawLabel = isset($entry['label']) && \is_string($entry['label']) && '' !== \trim($entry['label'])
-                        ? \trim($entry['label'])
-                        : \ucwords(\str_replace(['_', '-'], ' ', $name));
-                    $type = isset($entry['type']) && \is_string($entry['type']) && '' !== \trim($entry['type'])
-                        ? \trim($entry['type'])
-                        : 'string';
+                    if (isset($parsed['default_item_type']) && \is_string($parsed['default_item_type']) && '' !== \trim($parsed['default_item_type'])) {
+                        $defaultItemType = \trim($parsed['default_item_type']);
+                    }
 
-                    $fieldsByName[$name] = [
-                        'name' => $name,
-                        'label' => $this->formatFieldLabel($rawLabel, $name),
-                        'type' => $type,
-                    ];
+                    if (isset($parsed['dynamic_fields']) && \is_array($parsed['dynamic_fields'])) {
+                        foreach ($parsed['dynamic_fields'] as $entry) {
+                            if (!\is_array($entry) || !isset($entry['name']) || !\is_string($entry['name'])) {
+                                continue;
+                            }
+
+                            $name = \trim($entry['name']);
+                            if ('' === $name) {
+                                continue;
+                            }
+
+                            $rawLabel = isset($entry['label']) && \is_string($entry['label']) && '' !== \trim($entry['label'])
+                                ? \trim($entry['label'])
+                                : \ucwords(\str_replace(['_', '-'], ' ', $name));
+                            $type = isset($entry['type']) && \is_string($entry['type']) && '' !== \trim($entry['type'])
+                                ? \trim($entry['type'])
+                                : 'string';
+
+                            $fieldsByName[$name] = [
+                                'name' => $name,
+                                'label' => $this->formatFieldLabel($rawLabel, $name),
+                                'type' => $type,
+                            ];
+                        }
+                    }
+                } catch (ParseException) {
+                    // Ignore invalid YAML
                 }
-            } catch (ParseException) {
-                // Ignore invalid YAML
+
+                break;
             }
         }
 
-        if ([] === $fieldsByName) {
-            return $this->getDefaultFallbackFields();
-        }
+        $fields = [] === $fieldsByName
+            ? $this->getDefaultFallbackFields()
+            : \array_values($fieldsByName);
 
-        return \array_values($fieldsByName);
+        return [
+            'multiple' => $isMultiple,
+            'default_item_type' => $defaultItemType,
+            'fields' => $fields,
+        ];
     }
 
     private function getBlockFormMetadata(string $blockType, string $locale): ?FormMetadata

@@ -10,7 +10,9 @@ import {
 } from 'sulu-admin-bundle/components';
 import ColorPicker from 'sulu-admin-bundle/components/ColorPicker';
 import TextArea from 'sulu-admin-bundle/components/TextArea';
+import {fieldRegistry} from 'sulu-admin-bundle/containers/Form';
 import {translate} from 'sulu-admin-bundle/utils';
+import SuluNativeField from './SuluNativeField';
 
 type FieldOption = {
     label: string,
@@ -20,6 +22,7 @@ type FieldOption = {
 type FieldSchema = {
     col_span?: number,
     default?: any,
+    icon_set?: string,
     label: string,
     name: string,
     options?: Array<FieldOption>,
@@ -28,11 +31,20 @@ type FieldSchema = {
 };
 
 type Props = {
+    contentLocale?: ?string,
     defaultOptionLabel?: string,
     field: FieldSchema,
     onChange: (name: string, value: any) => void,
     value: any,
 };
+
+const SPECIAL_NATIVE_FIELD_TYPES = [
+    'single_media_selection',
+    'media_selection',
+    'teaser_selection',
+    'contact_account_selection',
+    'single_icon_selection',
+];
 
 @observer
 class FieldRenderer extends React.Component<Props> {
@@ -41,11 +53,40 @@ class FieldRenderer extends React.Component<Props> {
         onChange(field.name, value);
     };
 
+    isNativeSelectionField(fieldType: string): boolean {
+        if (SPECIAL_NATIVE_FIELD_TYPES.includes(fieldType)) {
+            return true;
+        }
+        if (fieldRegistry.has(fieldType)) {
+            try {
+                const opts = fieldRegistry.getOptions(fieldType);
+                return Boolean(opts && opts.resource_key);
+            } catch (e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
     render() {
-        const {defaultOptionLabel = 'Default', field, value} = this.props;
+        const {contentLocale, defaultOptionLabel = 'Default', field, value} = this.props;
         const colSpan = typeof field.col_span === 'number' ? field.col_span : 6;
         const label = translate(field.label) || field.label;
         const placeholder = field.placeholder ? (translate(field.placeholder) || field.placeholder) : undefined;
+
+        if (this.isNativeSelectionField(field.type)) {
+            return (
+                <Form.Field colSpan={colSpan} key={field.name} label={label}>
+                    <SuluNativeField
+                        fieldType={field.type}
+                        iconSet={field.icon_set || 'default'}
+                        locale={contentLocale}
+                        onChange={this.handleChange}
+                        value={value}
+                    />
+                </Form.Field>
+            );
+        }
 
         switch (field.type) {
             case 'select':

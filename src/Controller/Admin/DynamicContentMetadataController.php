@@ -48,10 +48,14 @@ final class DynamicContentMetadataController extends AbstractController
             ['key' => 'none', 'label' => 'None (Static Manual Content)', 'multi_item' => false],
             ['key' => 'current_page', 'label' => 'Current Page', 'multi_item' => false],
             ['key' => 'parent_page', 'label' => 'Parent Page', 'multi_item' => false],
-            ['key' => 'specific_page', 'label' => 'Specific Page', 'multi_item' => false],
-            ['key' => 'page_children', 'label' => 'Child Pages (Repeater / Multi-Item)', 'multi_item' => true],
-            ['key' => 'sibling_pages', 'label' => 'Sibling Pages (Repeater / Multi-Item)', 'multi_item' => true],
-            ['key' => 'custom_query', 'label' => 'Smart Query (Repeater / Multi-Item)', 'multi_item' => true],
+            ['key' => 'specific_page', 'label' => 'Single Page Selection', 'multi_item' => false],
+            ['key' => 'single_article', 'label' => 'Single Article Selection', 'multi_item' => false],
+            ['key' => 'single_category', 'label' => 'Single Category Selection', 'multi_item' => false],
+            ['key' => 'single_media', 'label' => 'Single Media Selection', 'multi_item' => false],
+            ['key' => 'page_selection', 'label' => 'Page Selection (Multiple)', 'multi_item' => true],
+            ['key' => 'page_children', 'label' => 'Child Pages', 'multi_item' => true],
+            ['key' => 'sibling_pages', 'label' => 'Sibling Pages', 'multi_item' => true],
+            ['key' => 'custom_query', 'label' => 'Smart Content Query (Pages)', 'multi_item' => true],
         ];
 
         foreach ($this->customProviders as $provider) {
@@ -69,13 +73,13 @@ final class DynamicContentMetadataController extends AbstractController
     public function targetFields(Request $request, string $blockType): JsonResponse
     {
         if (1 !== \preg_match('/^[a-z0-9_-]+$/i', $blockType)) {
-            return new JsonResponse([], JsonResponse::HTTP_BAD_REQUEST);
+            return new JsonResponse(['multiple' => false, 'default_item_type' => null, 'fields' => []], JsonResponse::HTTP_BAD_REQUEST);
         }
 
         $locale = $request->query->getString('locale', $request->getLocale());
         $resolver = $this->targetFieldResolver ?? new BlockTargetFieldMetadataResolver();
 
-        return new JsonResponse($resolver->resolveTargetFields($blockType, $locale));
+        return new JsonResponse($resolver->resolveBlockMetadata($blockType, $locale));
     }
 
     #[Route('/admin/api/block-suite/dynamic/source-fields', name: 'sulu_block_suite_dynamic_source_fields_list', methods: ['GET'])]
@@ -84,8 +88,15 @@ final class DynamicContentMetadataController extends AbstractController
         $locale = $request->query->getString('locale', $request->getLocale());
         $sourceType = $request->query->getString('source_type', '');
 
-        if ('' !== $sourceType && isset($this->customProviders[$sourceType])) {
-            return new JsonResponse($this->customProviders[$sourceType]->getSourceFields($locale));
+        $providerKeyMap = [
+            'single_article' => 'sulu_articles',
+            'single_category' => 'sulu_categories',
+            'single_media' => 'sulu_media_collection',
+        ];
+        $mappedSourceType = $providerKeyMap[$sourceType] ?? $sourceType;
+
+        if ('' !== $mappedSourceType && isset($this->customProviders[$mappedSourceType])) {
+            return new JsonResponse($this->customProviders[$mappedSourceType]->getSourceFields($locale));
         }
 
         /** @var list<array{name: string, label: string, type: string}> $fields */

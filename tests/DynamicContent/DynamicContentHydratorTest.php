@@ -788,4 +788,62 @@ final class DynamicContentHydratorTest extends TestCase
         ];
         self::assertCount(0, $hydrator->hydrateBlock($blockStartsWith));
     }
+
+    public function testPageSelectionSourceAndDynamicBlockMetadataMultiplicity(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $sourceResolver->expects(self::once())
+            ->method('resolveQuery')
+            ->with([
+                'uuids' => ['uuid-1', 'uuid-2'],
+                'limit' => 2,
+            ])
+            ->willReturn([
+                ['title' => 'Home', 'url' => '/'],
+                ['title' => 'About', 'url' => '/about'],
+            ]);
+
+        $tempDir = \sys_get_temp_dir() . '/hydrator_meta_' . \uniqid('', true);
+        \mkdir($tempDir, 0777, true);
+        \file_put_contents(
+            $tempDir . '/breadcrumbs.yaml',
+            "multiple: true\ndefault_item_type: breadcrumb_item\n",
+        );
+
+        try {
+            $targetFieldResolver = new \Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver(null, [$tempDir]);
+            $hydrator = new DynamicContentHydrator($sourceResolver, [], $targetFieldResolver);
+
+            $breadcrumbsBlock = [
+                'type' => 'breadcrumbs',
+                'props' => [
+                    '_dynamic' => [
+                        'enabled' => true,
+                        'source_type' => 'page_selection',
+                        'uuids' => ['uuid-1', 'uuid-2'],
+                        'limit' => 2,
+                        'mapping' => [
+                            'title' => 'title',
+                            'url' => 'url',
+                        ],
+                    ],
+                ],
+            ];
+
+            $result = $hydrator->hydrateBlock($breadcrumbsBlock);
+
+            self::assertCount(1, $result);
+            self::assertSame('breadcrumbs', $result[0]['type']);
+            self::assertIsArray($result[0]['items']);
+            /** @var list<array<string, mixed>> $items */
+            $items = $result[0]['items'];
+            self::assertCount(2, $items);
+            self::assertSame('breadcrumb_item', $items[0]['type']);
+            self::assertSame('Home', $items[0]['title']);
+            self::assertSame('/about', $items[1]['url']);
+        } finally {
+            @\unlink($tempDir . '/breadcrumbs.yaml');
+            @\rmdir($tempDir);
+        }
+    }
 }

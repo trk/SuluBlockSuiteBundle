@@ -108,13 +108,43 @@ class DynamicContentMetadataControllerTest extends TestCase
         $response = $controller->targetFields($request, 'card');
 
         $this->assertSame(200, $response->getStatusCode());
-        /** @var list<array{name: string, label: string, type: string}> $data */
+        /** @var array{multiple: bool, default_item_type: ?string, fields: list<array{name: string, label: string, type: string}>} $data */
         $data = \json_decode((string) $response->getContent(), true);
 
-        $this->assertCount(2, $data);
-        $this->assertSame('title', $data[0]['name']);
-        $this->assertSame('Card Title (title)', $data[0]['label']);
-        $this->assertSame('media', $data[1]['name']);
+        $this->assertFalse($data['multiple']);
+        $this->assertNull($data['default_item_type']);
+        $this->assertCount(2, $data['fields']);
+        $this->assertSame('title', $data['fields'][0]['name']);
+        $this->assertSame('Card Title (title)', $data['fields'][0]['label']);
+        $this->assertSame('media', $data['fields'][1]['name']);
+    }
+
+    public function testSourcesIncludesSingleAndMultiItemSources(): void
+    {
+        $controller = new DynamicContentMetadataController();
+        $request = new Request(['locale' => 'en']);
+
+        $response = $controller->sources($request);
+
+        $this->assertSame(200, $response->getStatusCode());
+        /** @var list<array{key: string, label: string, multi_item: bool}> $sources */
+        $sources = \json_decode((string) $response->getContent(), true);
+
+        $byKey = \array_column($sources, null, 'key');
+        $this->assertArrayHasKey('current_page', $byKey);
+        $this->assertFalse($byKey['current_page']['multi_item']);
+
+        $this->assertArrayHasKey('single_article', $byKey);
+        $this->assertFalse($byKey['single_article']['multi_item']);
+
+        $this->assertArrayHasKey('single_category', $byKey);
+        $this->assertFalse($byKey['single_category']['multi_item']);
+
+        $this->assertArrayHasKey('single_media', $byKey);
+        $this->assertFalse($byKey['single_media']['multi_item']);
+
+        $this->assertArrayHasKey('page_selection', $byKey);
+        $this->assertTrue($byKey['page_selection']['multi_item']);
     }
 }
 

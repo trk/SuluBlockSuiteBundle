@@ -99,12 +99,16 @@ final class SuluCategorySourceProvider implements DynamicContentSourceProviderIn
             /** @var list<CategoryInterface> $entities */
             $entities = [];
 
-            $parentKey = $query['parent_key'] ?? ($query['category_keys'] ?? ($query['categories'] ?? ($query['category'] ?? null)));
+            $parentId = $query['parent_id'] ?? ($query['page_id'] ?? null);
+            $parentKey = $query['parent_key'] ?? null;
             if (\is_array($parentKey)) {
                 $parentKey = $parentKey[0] ?? null;
             }
 
             $categoryIds = $query['category_ids'] ?? null;
+            if (\is_string($categoryIds) && '' !== \trim($categoryIds)) {
+                $categoryIds = \explode(',', $categoryIds);
+            }
             if (\is_array($categoryIds) && [] !== $categoryIds) {
                 $intIds = [];
                 foreach ($categoryIds as $id) {
@@ -116,12 +120,15 @@ final class SuluCategorySourceProvider implements DynamicContentSourceProviderIn
                     /** @var list<CategoryInterface> $entities */
                     $entities = \array_values($this->categoryManager->findByIds($intIds));
                 }
+            } elseif (\is_numeric($parentId) && (int) $parentId > 0) {
+                /** @var list<CategoryInterface> $entities */
+                $entities = \array_values($this->categoryManager->findChildrenByParentId((int) $parentId));
             } elseif (\is_string($parentKey) && '' !== \trim($parentKey)) {
                 /** @var list<CategoryInterface> $entities */
                 $entities = \array_values($this->categoryManager->findChildrenByParentKey(\trim($parentKey)));
-            } elseif (isset($query['parent_id']) && \is_numeric($query['parent_id'])) {
+            } elseif (\is_string($parentId) && '' !== \trim($parentId)) {
                 /** @var list<CategoryInterface> $entities */
-                $entities = \array_values($this->categoryManager->findChildrenByParentId((int) $query['parent_id']));
+                $entities = \array_values($this->categoryManager->findChildrenByParentKey(\trim($parentId)));
             } else {
                 /** @var list<CategoryInterface> $entities */
                 $entities = \array_values($this->categoryManager->findChildrenByParentId(null));
