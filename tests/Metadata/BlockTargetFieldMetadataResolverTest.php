@@ -73,15 +73,27 @@ final class BlockTargetFieldMetadataResolverTest extends TestCase
         $childItemForm = new FormMetadata();
         $childItemForm->setKey('accordion_item');
 
+        $childContentSection = new SectionMetadata('content');
         $itemTitleField = new FieldMetadata('title');
         $itemTitleField->setType('text_line');
         $itemTitleField->setLabel('Question Title', 'en');
-        $childItemForm->addItem($itemTitleField);
+        $childContentSection->addItem($itemTitleField);
 
         $itemContentField = new FieldMetadata('content');
         $itemContentField->setType('text_editor');
         $itemContentField->setLabel('Answer Body', 'en');
-        $childItemForm->addItem($itemContentField);
+        $childContentSection->addItem($itemContentField);
+
+        $childSettingsSection = new SectionMetadata('settings');
+        $panelStyleField = new FieldMetadata('panel_style');
+        $panelStyleField->setType('single_select');
+        $panelStyleField->setLabel('Card Style Override', 'en');
+        $childSettingsSection->addItem($panelStyleField);
+
+        $childTabsSection = new SectionMetadata('__tabs');
+        $childTabsSection->addItem($childContentSection);
+        $childTabsSection->addItem($childSettingsSection);
+        $childItemForm->addItem($childTabsSection);
 
         $itemsBlockField = new FieldMetadata('items');
         $itemsBlockField->setType('block');

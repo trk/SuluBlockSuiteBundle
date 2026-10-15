@@ -859,13 +859,13 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         /** @var array<string, array{name: string, label: string}> $fieldsByName */
         $fieldsByName = [];
 
-        foreach ($this->collectFlatFieldMetadata($contentSection->getItems()) as $field) {
+        foreach ($this->collectContentFieldMetadata($contentSection->getItems()) as $field) {
             $fieldName = $field->getName();
             $fieldType = $this->getFieldType($field);
 
             if ('items' === $fieldName && 'block' === $fieldType) {
                 foreach ($field->getTypes() as $childForm) {
-                    foreach ($this->collectFlatFieldMetadata($childForm->getItems()) as $childField) {
+                    foreach ($this->collectContentFieldMetadata($childForm->getItems()) as $childField) {
                         $childName = $childField->getName();
                         $childType = $this->getFieldType($childField);
                         if (isset(self::EXCLUDED_TARGET_FIELDS[$childName]) || 'block' === $childType || \str_starts_with($childName, 'props/')) {
@@ -905,6 +905,38 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         }
 
         return \array_values($fieldsByName);
+    }
+
+    /**
+     * Collects FieldMetadata items exclusively from root fields and `content`/`media` sections
+     * (including `__tabs -> content`), skipping `settings`, `style`, `layout`, `general`, `dynamic_content`, and `advanced`.
+     *
+     * @param array<array-key, ItemMetadata> $items
+     *
+     * @return list<FieldMetadata>
+     */
+    private function collectContentFieldMetadata(array $items): array
+    {
+        if (isset($items[self::TABS_SECTION_NAME]) && $items[self::TABS_SECTION_NAME] instanceof SectionMetadata) {
+            $contentTab = $items[self::TABS_SECTION_NAME]->getItems()['content'] ?? null;
+
+            return $contentTab instanceof SectionMetadata
+                ? $this->collectContentFieldMetadata($contentTab->getItems())
+                : [];
+        }
+
+        $fields = [];
+        foreach ($items as $item) {
+            if ($item instanceof FieldMetadata) {
+                $fields[] = $item;
+            } elseif ($item instanceof SectionMetadata && \in_array($item->getName(), ['content', 'media'], true)) {
+                foreach ($this->collectContentFieldMetadata($item->getItems()) as $subField) {
+                    $fields[] = $subField;
+                }
+            }
+        }
+
+        return $fields;
     }
 
     /**

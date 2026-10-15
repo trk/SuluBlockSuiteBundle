@@ -87,6 +87,7 @@ export default class TabSection extends React.Component<Props> {
 
     @observable activeTab: ?string = null;
     instanceId: string;
+    previousTotalErrors: number = 0;
     tabButtonRefs: {[string]: ?HTMLButtonElement} = {};
 
     constructor(props: Props) {
@@ -95,9 +96,69 @@ export default class TabSection extends React.Component<Props> {
         this.instanceId = `bs-tabs-${instanceCounter}`;
     }
 
+    componentDidUpdate() {
+        if (this.props.label !== '__tabs') {
+            return;
+        }
+
+        const tabs = this.buildTabs();
+        const totalErrors = tabs.reduce((sum, tab) => sum + tab.errorCount, 0);
+
+        if (totalErrors > this.previousTotalErrors && tabs.length > 0) {
+            const currentActiveKey = (this.activeTab && tabs.some((t) => t.key === this.activeTab))
+                ? this.activeTab
+                : tabs[0].key;
+            const activeTabObj = tabs.find((t) => t.key === currentActiveKey);
+            if (!activeTabObj || activeTabObj.errorCount === 0) {
+                const firstErrorTab = tabs.find((t) => t.errorCount > 0);
+                if (firstErrorTab) {
+                    this.handleSelectTab(firstErrorTab.key);
+                }
+            }
+        }
+
+        this.previousTotalErrors = totalErrors;
+    }
+
     @action handleSelectTab = (tabKey: string) => {
         this.activeTab = tabKey;
     };
+
+    buildTabs(): Array<Object> {
+        const rawChildren = React.Children.toArray(this.props.children);
+        const tabs = [];
+
+        rawChildren.forEach((child) => {
+            if (!child || typeof child !== 'object' || !child.props) {
+                return;
+            }
+
+            const tabKey = child.props.name || String(child.key || '');
+            if (!tabKey) {
+                return;
+            }
+
+            if (!evalTabVisibleCondition(child)) {
+                return;
+            }
+
+            const tabSchema = child.props.schema || {};
+            const tabLabel = tabSchema.label || tabKey;
+            const tabChildren = child.props.children;
+            const errorCount = countElementErrors(tabChildren);
+            const icon = resolveTabIcon(tabKey, tabSchema);
+
+            tabs.push({
+                key: tabKey,
+                label: tabLabel,
+                icon,
+                errorCount,
+                children: tabChildren,
+            });
+        });
+
+        return tabs;
+    }
 
     handleKeyDown = (event: SyntheticKeyboardEvent<HTMLButtonElement>, tabs: Array<Object>, currentIndex: number) => {
         if (tabs.length <= 1) {
@@ -140,37 +201,7 @@ export default class TabSection extends React.Component<Props> {
             );
         }
 
-        const rawChildren = React.Children.toArray(children);
-        const tabs = [];
-
-        rawChildren.forEach((child) => {
-            if (!child || typeof child !== 'object' || !child.props) {
-                return;
-            }
-
-            const tabKey = child.props.name || String(child.key || '');
-            if (!tabKey) {
-                return;
-            }
-
-            if (!evalTabVisibleCondition(child)) {
-                return;
-            }
-
-            const tabSchema = child.props.schema || {};
-            const tabLabel = tabSchema.label || tabKey;
-            const tabChildren = child.props.children;
-            const errorCount = countElementErrors(tabChildren);
-            const icon = resolveTabIcon(tabKey, tabSchema);
-
-            tabs.push({
-                key: tabKey,
-                label: tabLabel,
-                icon,
-                errorCount,
-                children: tabChildren,
-            });
-        });
+        const tabs = this.buildTabs();
 
         if (tabs.length === 0) {
             return null;

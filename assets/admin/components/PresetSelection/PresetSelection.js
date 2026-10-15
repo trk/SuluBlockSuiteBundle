@@ -235,7 +235,7 @@ export default class PresetSelection extends React.Component<Props> {
     };
 
     applyPresetToForm(presetId: ?string, preset: ?Object, includeContentValues: boolean = false) {
-        const {formInspector, onChange} = this.props;
+        const {formInspector, onChange, value} = this.props;
         const blockPath = this.blockPath;
         const formStore = formInspector ? formInspector.formStore : null;
 
@@ -249,6 +249,18 @@ export default class PresetSelection extends React.Component<Props> {
         const changes = {
             [`${blockPath}/props/preset`]: presetId,
         };
+
+        const previousPresetId = value ? String(value).trim() : '';
+        if (previousPresetId && previousPresetId !== (presetId || '')) {
+            const previousPreset = this.presets.find((p) => p.id === previousPresetId);
+            if (previousPreset && previousPreset.props && typeof previousPreset.props === 'object') {
+                Object.keys(previousPreset.props).forEach((prevPropKey) => {
+                    if (prevPropKey !== '_preset' && prevPropKey !== 'preset') {
+                        changes[`${blockPath}/props/${prevPropKey}`] = undefined;
+                    }
+                });
+            }
+        }
 
         if (preset && preset.props && typeof preset.props === 'object') {
             Object.keys(preset.props).forEach((propKey) => {
