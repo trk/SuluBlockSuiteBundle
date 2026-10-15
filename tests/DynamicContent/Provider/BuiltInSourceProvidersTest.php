@@ -115,4 +115,67 @@ final class BuiltInSourceProvidersTest extends TestCase
         $this->assertIsArray($items[0]['image']);
         $this->assertSame('/media/99/download/arch.png', $items[0]['image']['url']);
     }
+
+    public function testCategoryAndMediaSortingAndReferenceStoreTagging(): void
+    {
+        $cat1 = $this->createStub(Category::class);
+        $cat1->method('getId')->willReturn(10);
+        $cat1->method('getKey')->willReturn('zeta');
+        $cat1->method('getName')->willReturn('Zeta Category');
+        $cat1->method('getMedias')->willReturn([]);
+
+        $cat2 = $this->createStub(Category::class);
+        $cat2->method('getId')->willReturn(20);
+        $cat2->method('getKey')->willReturn('alpha');
+        $cat2->method('getName')->willReturn('Alpha Category');
+        $cat2->method('getMedias')->willReturn([]);
+
+        $categoryEntity = $this->createStub(CategoryInterface::class);
+        $categoryManager = $this->createStub(CategoryManagerInterface::class);
+        $categoryManager->method('findChildrenByParentId')->willReturn([$categoryEntity, $categoryEntity]);
+        $categoryManager->method('getApiObjects')->willReturn([$cat1, $cat2]);
+
+        $catRefStore = $this->createMock(\Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface::class);
+        $catRefStore->expects($this->exactly(2))
+            ->method('add')
+            ->with($this->logicalOr('10', '20'), CategoryInterface::RESOURCE_KEY);
+
+        $categoryProvider = new SuluCategorySourceProvider($categoryManager, null, $catRefStore);
+        $sortedCategories = $categoryProvider->resolveCollection([
+            'sort_by' => 'title',
+            'sort_order' => 'asc',
+        ], null, 'en');
+
+        $this->assertCount(2, $sortedCategories);
+        $this->assertSame('Alpha Category', $sortedCategories[0]['title']);
+        $this->assertSame('Zeta Category', $sortedCategories[1]['title']);
+
+        $media1 = $this->createStub(Media::class);
+        $media1->method('getId')->willReturn(1);
+        $media1->method('getTitle')->willReturn('B Asset');
+        $media1->method('getFormats')->willReturn([]);
+
+        $media2 = $this->createStub(Media::class);
+        $media2->method('getId')->willReturn(2);
+        $media2->method('getTitle')->willReturn('A Asset');
+        $media2->method('getFormats')->willReturn([]);
+
+        $mediaManager = $this->createStub(MediaManagerInterface::class);
+        $mediaManager->method('get')->willReturn([$media1, $media2]);
+
+        $mediaRefStore = $this->createMock(\Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface::class);
+        $mediaRefStore->expects($this->exactly(2))
+            ->method('add')
+            ->with($this->logicalOr('1', '2'), \Sulu\Bundle\MediaBundle\Entity\MediaInterface::RESOURCE_KEY);
+
+        $mediaProvider = new SuluMediaCollectionSourceProvider($mediaManager, null, $mediaRefStore);
+        $sortedMedias = $mediaProvider->resolveCollection([
+            'sort_by' => 'title',
+            'sort_order' => 'asc',
+        ], null, 'en');
+
+        $this->assertCount(2, $sortedMedias);
+        $this->assertSame('A Asset', $sortedMedias[0]['title']);
+        $this->assertSame('B Asset', $sortedMedias[1]['title']);
+    }
 }

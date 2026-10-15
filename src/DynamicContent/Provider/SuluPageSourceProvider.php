@@ -298,7 +298,7 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
 
         if ('page_children' === $sourceType) {
             $rawParentId = $this->resolveTargetOrContext(
-                $config['parent_id'] ?? ($config['page_id'] ?? null),
+                $config['page_id'] ?? ($config['parent_id'] ?? null),
                 $contextPage,
             );
             if (!\is_string($rawParentId) && !\is_object($rawParentId) && !\is_array($rawParentId)) {

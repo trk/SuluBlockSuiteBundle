@@ -344,7 +344,9 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
                 : 'auto',
             'hide_if_empty' => $this->isTruthy($props['dynamic_hide_if_empty'] ?? null),
             'page_id' => $props['dynamic_page_id'] ?? ($props['dynamic_page'] ?? null),
-            'parent_id' => $props['dynamic_parent_id'] ?? ($props['dynamic_parent_page'] ?? null),
+            'parent_id' => 'sulu_categories' === $sourceType
+                ? ($props['dynamic_parent_id'] ?? null)
+                : ($props['dynamic_parent_page'] ?? ($props['dynamic_page_id'] ?? ($props['dynamic_parent_id'] ?? null))),
             'uuids' => $props['dynamic_uuids'] ?? null,
             'article_id' => $props['dynamic_article_id'] ?? null,
             'article_ids' => $props['dynamic_article_ids'] ?? null,
@@ -486,8 +488,8 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 
             $val = $this->extractSinglePathValue($data, $fieldPath);
 
-            if ($stripHtml && \is_scalar($val)) {
-                $val = self::truncatePlainText((string) $val, $maxLength);
+            if ($stripHtml) {
+                $val = \is_scalar($val) ? self::truncatePlainText((string) $val, $maxLength) : null;
             }
 
             $lastValue = $val;

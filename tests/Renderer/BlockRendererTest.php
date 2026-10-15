@@ -150,4 +150,34 @@ final class BlockRendererTest extends TestCase
         $this->assertStringStartsWith('<style>#promo-box { border: 1px solid blue; }</style>', $html);
         $this->assertStringContainsString('<div class="box" id="promo-box" data-campaign="autumn" aria-label="Promo">Scoped Box</div>', $html);
     }
+
+    public function testRenderBlockPreventsInfiniteReusableBlockCycle(): void
+    {
+        /** @var array{renderer: ?BlockRenderer} $box */
+        $box = ['renderer' => null];
+        $loader = new ArrayLoader([
+            '@SuluBlockSuite/blocks/reusable.html.twig' => 'REUSABLE',
+        ]);
+        $twig = $this->createStub(Environment::class);
+        $twig->method('getLoader')->willReturn($loader);
+        $twig->method('render')->willReturnCallback(static function (string $name, array $context) use (&$box): string {
+            if (null !== $box['renderer']) {
+                /** @var array<string, mixed> $block */
+                $block = $context['block'] ?? [];
+
+                return 'START:' . $box['renderer']->renderBlock($block) . ':END';
+            }
+
+            return '';
+        });
+
+        $renderer = new BlockRenderer($twig);
+        $box['renderer'] = $renderer;
+        $output = $renderer->renderBlock([
+            'type' => 'reusable',
+            'snippet' => ['uuid' => 'reusable-self-cycle-1'],
+        ]);
+
+        $this->assertSame('START::END', $output);
+    }
 }

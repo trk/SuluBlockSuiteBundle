@@ -565,4 +565,58 @@ class SuluPageSourceResolverTest extends TestCase
         $resolver = new SuluPageSourceResolver($pageRepositoryMock, null, $requestStack);
         $this->assertNull($resolver->resolvePage(null, 'en'));
     }
+
+    public function testResolvePageTagsReferenceStoreAndDefaultsWebspaceKey(): void
+    {
+        $pageStub = $this->createStub(PageInterface::class);
+        $pageStub->method('getUuid')->willReturn('cached-page-uuid');
+
+        $dimensionContentStub = $this->createStub(PageDimensionContentInterface::class);
+        $dimensionContentStub->method('getLocale')->willReturn('en');
+        $dimensionContentStub->method('getStage')->willReturn('live');
+        $dimensionContentStub->method('getTitle')->willReturn('Cached Page');
+        $dimensionContentStub->method('getTemplateData')->willReturn(['title' => 'Cached Page']);
+        $pageStub->method('getDimensionContents')->willReturn(new ArrayCollection([$dimensionContentStub]));
+
+        $referenceStore = $this->createMock(\Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface::class);
+        $referenceStore->expects($this->once())
+            ->method('add')
+            ->with('cached-page-uuid', PageInterface::RESOURCE_KEY);
+
+        $webspace = new \Sulu\Component\Webspace\Webspace();
+        $webspace->setKey('website');
+
+        $requestAnalyzer = $this->createStub(\Sulu\Component\Webspace\Analyzer\RequestAnalyzerInterface::class);
+        $requestAnalyzer->method('getWebspace')->willReturn($webspace);
+
+        $pageRepositoryMock = $this->createMock(PageRepositoryInterface::class);
+        $pageRepositoryMock->expects($this->once())
+            ->method('findBy')
+            ->with(
+                $this->callback(static function (array $filters): bool {
+                    return ($filters['webspaceKey'] ?? null) === 'website';
+                }),
+                $this->callback(static function (array $sortBy): bool {
+                    return ($sortBy['workflowPublished'] ?? null) === 'desc';
+                }),
+            )
+            ->willReturn(new \ArrayIterator([$pageStub]));
+
+        $resolver = new SuluPageSourceResolver(
+            $pageRepositoryMock,
+            null,
+            null,
+            $referenceStore,
+            null,
+            $requestAnalyzer,
+        );
+
+        $items = $resolver->resolveQuery([
+            'sort_by' => 'published',
+            'sort_order' => 'desc',
+        ], 'en');
+
+        $this->assertCount(1, $items);
+        $this->assertSame('cached-page-uuid', $items[0]['id']);
+    }
 }

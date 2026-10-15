@@ -53,18 +53,41 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
             $mergedPropsContent = isset($hydratedData['props']) && \is_array($hydratedData['props'])
                 ? $this->unwrapContentViews($hydratedData['props'])
                 : [];
+            /** @var array<string, mixed> $mergedPropsView */
+            $mergedPropsView = [];
 
-            foreach ($propsItems as $propPath => $propField) {
-                $subPath = \substr($propPath, 6);
-                if ('' === $subPath) {
-                    continue;
+            if ([] !== $propsItems) {
+                $resolvedProps = parent::resolveItems($propsItems, $hydratedData, $locale);
+                if (isset($resolvedProps['props'])) {
+                    $resolvedPropsContent = $this->unwrapContentViews($resolvedProps['props']->getContent());
+                    if (\is_array($resolvedPropsContent)) {
+                        /** @var array<string, mixed> $resolvedPropsContent */
+                        $mergedPropsContent = \array_replace_recursive($mergedPropsContent, $resolvedPropsContent);
+                    }
+                    /** @var array<string, mixed> $mergedPropsView */
+                    $mergedPropsView = $resolvedProps['props']->getView();
+                } else {
+                    foreach ($propsItems as $propPath => $propField) {
+                        $subPath = \substr($propPath, 6);
+                        if ('' === $subPath) {
+                            continue;
+                        }
+
+                        if (isset($resolvedProps[$propPath])) {
+                            $val = $this->unwrapContentViews($resolvedProps[$propPath]->getContent());
+                            $viewVal = $resolvedProps[$propPath]->getView();
+                            if ([] !== $viewVal) {
+                                $this->writeValueByPath($mergedPropsView, $subPath, $viewVal);
+                            }
+                        } else {
+                            $val = $this->unwrapContentViews($this->readValueByPath($hydratedData, $propPath));
+                        }
+                        $this->writeValueByPath($mergedPropsContent, $subPath, $val);
+                    }
                 }
-
-                $val = $this->unwrapContentViews($this->readValueByPath($hydratedData, $propPath));
-                $this->writeValueByPath($mergedPropsContent, $subPath, $val);
             }
 
-            $resolved['props'] = ContentView::create($mergedPropsContent, []);
+            $resolved['props'] = ContentView::create($mergedPropsContent, $mergedPropsView);
         }
 
         return $resolved;

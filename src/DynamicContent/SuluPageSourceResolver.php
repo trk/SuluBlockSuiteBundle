@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\DynamicContent;
 
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Component\Webspace\Analyzer\RequestAnalyzerInterface;
+use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
 use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Page\Domain\Model\PageDimensionContentInterface;
@@ -17,6 +20,9 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         private readonly ?PageRepositoryInterface $pageRepository = null,
         private readonly ?ContentResolverInterface $contentResolver = null,
         private readonly ?RequestStack $requestStack = null,
+        private readonly ?ReferenceStoreInterface $referenceStore = null,
+        private readonly ?ContentAggregatorInterface $contentAggregator = null,
+        private readonly ?RequestAnalyzerInterface $requestAnalyzer = null,
     ) {
     }
 
@@ -487,6 +493,11 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
 
         if (isset($criteria['webspace_key']) && \is_string($criteria['webspace_key']) && '' !== \trim($criteria['webspace_key'])) {
             $filters['webspaceKey'] = \trim($criteria['webspace_key']);
+        } elseif (null !== $this->requestAnalyzer) {
+            $webspaceKey = $this->requestAnalyzer->getWebspace()?->getKey();
+            if (\is_string($webspaceKey) && '' !== \trim($webspaceKey)) {
+                $filters['webspaceKey'] = \trim($webspaceKey);
+            }
         }
 
         $templateKeys = $this->normalizeStringList($criteria['template_keys'] ?? ($criteria['templates'] ?? ($criteria['template'] ?? null)));
@@ -551,7 +562,9 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             if ('published' === $sortField) {
                 $sortField = 'workflowPublished';
             }
-            $sortBy = [$sortField => $order];
+            if (\in_array($sortField, ['id', 'uuid', 'title', 'authored', 'workflowPublished', 'created', 'changed'], true)) {
+                $sortBy = [$sortField => $order];
+            }
         }
 
         try {
@@ -667,6 +680,10 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         $dimensionContent = $this->extractDimensionContent($page, $locale);
         if (null === $dimensionContent) {
             return null;
+        }
+
+        if ('' !== $page->getUuid()) {
+            $this->referenceStore?->add($page->getUuid(), PageInterface::RESOURCE_KEY);
         }
 
         if (null !== $this->contentResolver) {
@@ -795,10 +812,37 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         string $locale,
         bool $allowReload = true,
     ): ?PageDimensionContentInterface {
+        $isPreview = $this->isPreviewContext();
+
+        if (null !== $this->contentAggregator) {
+            try {
+                /** @var PageDimensionContentInterface $aggregated */
+                $aggregated = $this->contentAggregator->aggregate($page, [
+                    'locale' => $locale,
+                    'stage' => DimensionContentInterface::STAGE_LIVE,
+                ]);
+
+                return $aggregated;
+            } catch (\Throwable) {
+                if ($isPreview) {
+                    try {
+                        /** @var PageDimensionContentInterface $aggregatedDraft */
+                        $aggregatedDraft = $this->contentAggregator->aggregate($page, [
+                            'locale' => $locale,
+                            'stage' => DimensionContentInterface::STAGE_DRAFT,
+                        ]);
+
+                        return $aggregatedDraft;
+                    } catch (\Throwable) {
+                        // Fall back to direct dimension inspection / reload
+                    }
+                }
+            }
+        }
+
         /** @var iterable<PageDimensionContentInterface> $dimensionContents */
         $dimensionContents = $page->getDimensionContents();
 
-        $isPreview = $this->isPreviewContext();
         $draftFallback = null;
         foreach ($dimensionContents as $content) {
             if ($content->getLocale() === $locale) {

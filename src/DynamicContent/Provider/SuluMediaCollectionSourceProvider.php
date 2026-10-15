@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider;
 
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Bundle\MediaBundle\Api\Media;
+use Sulu\Bundle\MediaBundle\Entity\MediaInterface;
 use Sulu\Bundle\MediaBundle\Media\Manager\MediaManagerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
@@ -17,6 +19,7 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
     public function __construct(
         private readonly ?MediaManagerInterface $mediaManager = null,
         private readonly ?RequestStack $requestStack = null,
+        private readonly ?ReferenceStoreInterface $referenceStore = null,
     ) {
     }
 
@@ -175,6 +178,29 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
                 $result[] = $this->normalizeMedia($media);
             }
 
+            $sortBy = isset($query['sort_by']) && \is_string($query['sort_by']) ? \trim($query['sort_by']) : '';
+            if ('' !== $sortBy && \count($result) > 1) {
+                $rawOrder = $query['sort_order'] ?? 'desc';
+                $isDesc = !\is_string($rawOrder) || 'asc' !== \strtolower(\trim($rawOrder));
+                $field = match ($sortBy) {
+                    'title', 'name' => 'title',
+                    'id', 'created', 'changed', 'published', 'authored' => 'id',
+                    default => '',
+                };
+
+                if ('' !== $field) {
+                    \usort($result, static function (array $a, array $b) use ($field, $isDesc): int {
+                        $valA = $a[$field] ?? '';
+                        $valB = $b[$field] ?? '';
+                        $cmp = ('id' === $field && \is_numeric($valA) && \is_numeric($valB))
+                            ? ((int) $valA <=> (int) $valB)
+                            : \strnatcasecmp(\is_scalar($valA) ? (string) $valA : '', \is_scalar($valB) ? (string) $valB : '');
+
+                        return $isDesc ? -$cmp : $cmp;
+                    });
+                }
+            }
+
             return $result;
         } catch (\Throwable) {
             return [];
@@ -186,6 +212,9 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
      */
     private function normalizeMedia(Media $media): array
     {
+        $mediaId = (string) $media->getId();
+        $this->referenceStore?->add($mediaId, MediaInterface::RESOURCE_KEY);
+
         /** @var string|null $title */
         $title = $media->getTitle();
         /** @var string|null $description */
@@ -214,7 +243,7 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
         ];
 
         return [
-            'id' => (string) $media->getId(),
+            'id' => $mediaId,
             'title' => $title ?? $name,
             'headline' => $title ?? $name,
             'name' => $name,

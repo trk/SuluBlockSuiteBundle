@@ -16,6 +16,8 @@ use Twig\Environment;
 
 final class PageLayoutProvider implements PageLayoutProviderInterface
 {
+    private const MAX_RENDER_DEPTH = 10;
+
     /**
      * @var array<string, array<string, mixed>|null>
      */
@@ -25,6 +27,13 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
      * @var list<string>
      */
     private array $layoutsDirectories;
+
+    private int $renderDepth = 0;
+
+    /**
+     * @var array<string, bool>
+     */
+    private array $activeLayouts = [];
 
     /**
      * @param string|array<array-key, string> $layoutsDirectory
@@ -73,24 +82,13 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
                 foreach ($snippets as $snippet) {
                     $uuid = $snippet->getUuid();
                     if ($uuid === $trimId) {
-                        $matched = $this->extractSnippetData($snippet);
+                        $matched = $this->extractSnippetData($snippet, null, $resolvedLocale);
                         if (null !== $matched) {
                             return $this->cache[$cacheKey] = $matched;
                         }
                     }
 
-                    /** @var iterable<SnippetDimensionContentInterface> $dimensionContents */
-                    $dimensionContents = $snippet->getDimensionContents();
-                    $targetContent = null;
-                    foreach ($dimensionContents as $content) {
-                        if ('page_layout' === $content->getTemplateKey()) {
-                            if (DimensionContentInterface::STAGE_LIVE === $content->getStage()) {
-                                $targetContent = $content;
-                                break;
-                            }
-                            $targetContent ??= $content;
-                        }
-                    }
+                    $targetContent = $this->findLiveDimensionContent($snippet, 'page_layout', $resolvedLocale);
 
                     if (null !== $targetContent) {
                         /** @var array<string, mixed> $templateData */
@@ -109,7 +107,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
                             || $titleNorm === $normalizedId
                             || $titleSlug === $sluggedId
                         ) {
-                            $matched = $this->extractSnippetData($snippet, $targetContent);
+                            $matched = $this->extractSnippetData($snippet, $targetContent, $resolvedLocale);
                             if (null !== $matched) {
                                 return $this->cache[$cacheKey] = $matched;
                             }
@@ -144,7 +142,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
 
     public function renderLayout(string|array|null $layout, array $context = [], ?string $locale = null): string
     {
-        if (null === $layout || '' === $layout) {
+        if (null === $layout || '' === $layout || $this->renderDepth >= self::MAX_RENDER_DEPTH) {
             return '';
         }
 
@@ -177,35 +175,62 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
             return '';
         }
 
-        $innerContent = isset($layoutData['content']) && \is_array($layoutData['content']) ? $layoutData['content'] : [];
-        /** @var mixed $rawBlocks */
-        $rawBlocks = $layoutData['blocks'] ?? ($innerContent['blocks'] ?? []);
-        /** @var list<array<string, mixed>> $blocks */
-        $blocks = \is_array($rawBlocks) ? \array_values($rawBlocks) : [];
-        foreach ($blocks as &$blockItem) {
-            if (isset($blockItem['type']) && 'reusable' === $blockItem['type'] && isset($blockItem['snippet']) && \is_string($blockItem['snippet'])) {
-                $reusableData = $this->getReusableBlock($blockItem['snippet'], $resolvedLocale);
-                if (null !== $reusableData) {
-                    $blockItem['snippet'] = $reusableData;
+        $layoutKey = null;
+        if (\is_string($layout)) {
+            $layoutKey = \strtolower(\trim($layout));
+        } elseif (isset($layoutData['uuid']) && \is_string($layoutData['uuid']) && '' !== $layoutData['uuid']) {
+            $layoutKey = $layoutData['uuid'];
+        } elseif (isset($layoutData['id']) && \is_string($layoutData['id']) && '' !== $layoutData['id']) {
+            $layoutKey = $layoutData['id'];
+        } elseif (isset($layoutData['key']) && \is_string($layoutData['key']) && '' !== $layoutData['key']) {
+            $layoutKey = \strtolower(\trim($layoutData['key']));
+        }
+
+        if (null !== $layoutKey && isset($this->activeLayouts[$layoutKey])) {
+            return '';
+        }
+
+        ++$this->renderDepth;
+        if (null !== $layoutKey) {
+            $this->activeLayouts[$layoutKey] = true;
+        }
+
+        try {
+            $innerContent = isset($layoutData['content']) && \is_array($layoutData['content']) ? $layoutData['content'] : [];
+            /** @var mixed $rawBlocks */
+            $rawBlocks = $layoutData['blocks'] ?? ($innerContent['blocks'] ?? []);
+            /** @var list<array<string, mixed>> $blocks */
+            $blocks = \is_array($rawBlocks) ? \array_values($rawBlocks) : [];
+            foreach ($blocks as &$blockItem) {
+                if (isset($blockItem['type']) && 'reusable' === $blockItem['type'] && isset($blockItem['snippet']) && \is_string($blockItem['snippet'])) {
+                    $reusableData = $this->getReusableBlock($blockItem['snippet'], $resolvedLocale);
+                    if (null !== $reusableData) {
+                        $blockItem['snippet'] = $reusableData;
+                    }
                 }
             }
-        }
-        unset($blockItem);
-        $layoutData['blocks'] = $blocks;
+            unset($blockItem);
+            $layoutData['blocks'] = $blocks;
 
-        $template = 'snippets/page_layout.html.twig';
-        if (!$this->twig->getLoader()->exists($template)) {
-            $template = '@SuluBlockSuite/snippets/page_layout.html.twig';
-        }
+            $template = 'snippets/page_layout.html.twig';
+            if (!$this->twig->getLoader()->exists($template)) {
+                $template = '@SuluBlockSuite/snippets/page_layout.html.twig';
+            }
 
-        return $this->twig->render(
-            $template,
-            \array_merge($context, [
-                'content' => $layoutData,
-                'layout' => $layoutData,
-                'blocks' => $blocks,
-            ]),
-        );
+            return $this->twig->render(
+                $template,
+                \array_merge($context, [
+                    'content' => $layoutData,
+                    'layout' => $layoutData,
+                    'blocks' => $blocks,
+                ]),
+            );
+        } finally {
+            --$this->renderDepth;
+            if (null !== $layoutKey) {
+                unset($this->activeLayouts[$layoutKey]);
+            }
+        }
     }
 
     public function getReusableBlock(string $identifier, ?string $locale = null): ?array
@@ -232,25 +257,22 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
                 [SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => []],
             );
 
-            /** @var iterable<SnippetDimensionContentInterface> $dimensionContents */
-            $dimensionContents = $snippet->getDimensionContents();
-            foreach ($dimensionContents as $content) {
-                if ('reusable_block' === $content->getTemplateKey()) {
-                    /** @var array<string, mixed> $templateData */
-                    $templateData = $content->getTemplateData();
-                    $title = $content->getTitle();
+            $content = $this->findLiveDimensionContent($snippet, 'reusable_block', $resolvedLocale);
+            if (null !== $content) {
+                /** @var array<string, mixed> $templateData */
+                $templateData = $content->getTemplateData();
+                $title = $content->getTitle();
 
-                    $this->referenceStore?->add($snippet->getUuid(), SnippetInterface::RESOURCE_KEY);
+                $this->referenceStore?->add($snippet->getUuid(), SnippetInterface::RESOURCE_KEY);
 
-                    return $this->cache[$cacheKey] = [
-                        'id' => $snippet->getUuid(),
-                        'uuid' => $snippet->getUuid(),
-                        'title' => $title ?? $snippet->getUuid(),
-                        'blocks' => isset($templateData['blocks']) && \is_array($templateData['blocks'])
-                            ? $templateData['blocks']
-                            : [],
-                    ];
-                }
+                return $this->cache[$cacheKey] = [
+                    'id' => $snippet->getUuid(),
+                    'uuid' => $snippet->getUuid(),
+                    'title' => $title ?? $snippet->getUuid(),
+                    'blocks' => isset($templateData['blocks']) && \is_array($templateData['blocks'])
+                        ? $templateData['blocks']
+                        : [],
+                ];
             }
         } catch (\Throwable) {
             // Graceful fallback
@@ -262,22 +284,16 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
     /**
      * @return array<string, mixed>|null
      */
-    private function extractSnippetData(SnippetInterface $snippet, ?SnippetDimensionContentInterface $dimensionContent = null): ?array
-    {
-        $targetContent = $dimensionContent;
-        if (null === $targetContent) {
-            /** @var iterable<SnippetDimensionContentInterface> $dimensionContents */
-            $dimensionContents = $snippet->getDimensionContents();
-            foreach ($dimensionContents as $content) {
-                if ('page_layout' === $content->getTemplateKey()) {
-                    if (DimensionContentInterface::STAGE_LIVE === $content->getStage()) {
-                        $targetContent = $content;
-                        break;
-                    }
-                    $targetContent ??= $content;
-                }
-            }
-        }
+    private function extractSnippetData(
+        SnippetInterface $snippet,
+        ?SnippetDimensionContentInterface $dimensionContent = null,
+        ?string $locale = null,
+    ): ?array {
+        $targetContent = $dimensionContent ?? $this->findLiveDimensionContent(
+            $snippet,
+            'page_layout',
+            $this->resolveLocale($locale),
+        );
 
         if (null === $targetContent) {
             return null;
@@ -297,6 +313,30 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
             : [];
 
         return $templateData;
+    }
+
+    private function findLiveDimensionContent(
+        SnippetInterface $snippet,
+        string $templateKey,
+        string $locale,
+    ): ?SnippetDimensionContentInterface {
+        /** @var iterable<SnippetDimensionContentInterface> $dimensionContents */
+        $dimensionContents = $snippet->getDimensionContents();
+        foreach ($dimensionContents as $content) {
+            if ($templateKey !== $content->getTemplateKey()) {
+                continue;
+            }
+            $contentLocale = $content->getLocale();
+            if (null !== $contentLocale && '' !== $contentLocale && $contentLocale !== $locale) {
+                continue;
+            }
+            $stage = $content->getStage();
+            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
+                return $content;
+            }
+        }
+
+        return null;
     }
 
     private function resolveLocale(?string $locale): string

@@ -7,6 +7,7 @@ namespace Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider;
 use Sulu\Bundle\CategoryBundle\Api\Category;
 use Sulu\Bundle\CategoryBundle\Category\CategoryManagerInterface;
 use Sulu\Bundle\CategoryBundle\Entity\CategoryInterface;
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 
@@ -18,6 +19,7 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
     public function __construct(
         private readonly ?CategoryManagerInterface $categoryManager = null,
         private readonly ?RequestStack $requestStack = null,
+        private readonly ?ReferenceStoreInterface $referenceStore = null,
     ) {
     }
 
@@ -179,6 +181,30 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
                 $result[] = $this->normalizeCategory($apiCategory);
             }
 
+            $sortBy = isset($query['sort_by']) && \is_string($query['sort_by']) ? \trim($query['sort_by']) : '';
+            if ('' !== $sortBy && \count($result) > 1) {
+                $rawOrder = $query['sort_order'] ?? 'asc';
+                $isDesc = \is_string($rawOrder) && 'desc' === \strtolower(\trim($rawOrder));
+                $field = match ($sortBy) {
+                    'title', 'name' => 'title',
+                    'key' => 'key',
+                    'id', 'created', 'changed', 'published', 'authored' => 'id',
+                    default => '',
+                };
+
+                if ('' !== $field) {
+                    \usort($result, static function (array $a, array $b) use ($field, $isDesc): int {
+                        $valA = $a[$field] ?? '';
+                        $valB = $b[$field] ?? '';
+                        $cmp = ('id' === $field && \is_numeric($valA) && \is_numeric($valB))
+                            ? ((int) $valA <=> (int) $valB)
+                            : \strnatcasecmp(\is_scalar($valA) ? (string) $valA : '', \is_scalar($valB) ? (string) $valB : '');
+
+                        return $isDesc ? -$cmp : $cmp;
+                    });
+                }
+            }
+
             $offset = isset($query['offset']) && \is_numeric($query['offset']) && (int) $query['offset'] > 0
                 ? (int) $query['offset']
                 : 0;
@@ -201,6 +227,9 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
      */
     private function normalizeCategory(Category $category): array
     {
+        $categoryId = (string) $category->getId();
+        $this->referenceStore?->add($categoryId, CategoryInterface::RESOURCE_KEY);
+
         /** @var string|null $name */
         $name = $category->getName();
         $key = (string) $category->getKey();
@@ -220,7 +249,7 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
         }
 
         return [
-            'id' => (string) $category->getId(),
+            'id' => $categoryId,
             'key' => $key,
             'name' => $title,
             'title' => $title,

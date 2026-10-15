@@ -112,6 +112,9 @@ services:
             $pageRepository: '@?sulu_page.page_repository'
             $contentResolver: '@?sulu_content.content_resolver'
             $requestStack: '@?request_stack'
+            $referenceStore: '@?sulu_http_cache.reference_store'
+            $contentAggregator: '@?sulu_content.content_aggregator'
+            $requestAnalyzer: '@?sulu_core.webspace.request_analyzer'
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluPageSourceProvider:
         arguments:
@@ -123,18 +126,22 @@ services:
             $articleRepository: '@?sulu_article.article_repository'
             $contentResolver: '@?sulu_content.content_resolver'
             $requestStack: '@?request_stack'
+            $referenceStore: '@?sulu_http_cache.reference_store'
+            $contentAggregator: '@?sulu_content.content_aggregator'
         tags: ['sulu_block_suite.dynamic_source_provider']
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluCategorySourceProvider:
         arguments:
             $categoryManager: '@?sulu_category.category_manager'
             $requestStack: '@?request_stack'
+            $referenceStore: '@?sulu_http_cache.reference_store'
         tags: ['sulu_block_suite.dynamic_source_provider']
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluMediaCollectionSourceProvider:
         arguments:
             $mediaManager: '@?sulu_media.media_manager'
             $requestStack: '@?request_stack'
+            $referenceStore: '@?sulu_http_cache.reference_store'
         tags: ['sulu_block_suite.dynamic_source_provider']
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface:

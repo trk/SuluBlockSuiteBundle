@@ -1232,4 +1232,50 @@ final class DynamicContentHydratorTest extends TestCase
             self::assertSame('/solutions/card-page', $hydrated['link']);
         }
     }
+
+    public function testExtractValueWithStripHtmlIgnoresNonScalarValueAndUsesFallback(): void
+    {
+        $hydrator = new DynamicContentHydrator();
+
+        $source = [
+            'summary' => ['nested' => 'array_value'],
+            'title' => '<strong>Clean Scalar Title</strong>',
+        ];
+
+        $extracted = $hydrator->extractValue($source, 'summary:plain|title:plain');
+        self::assertSame('Clean Scalar Title', $extracted);
+    }
+
+    public function testPageChildrenIgnoresCategoryParentIdWhenPageIdSet(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $sourceResolver->expects(self::once())
+            ->method('resolveQuery')
+            ->with(self::callback(static function (array $query): bool {
+                return ($query['parent_id'] ?? null) === 'target-page-uuid';
+            }), null)
+            ->willReturn([
+                ['title' => 'Child Page 1', 'url' => '/child-1'],
+            ]);
+
+        $pageProvider = new \Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluPageSourceProvider($sourceResolver);
+        $hydrator = new DynamicContentHydrator($sourceResolver, [$pageProvider]);
+
+        $block = [
+            'type' => 'card',
+            'title' => '',
+            'props' => [
+                'dynamic_source' => 'page_children',
+                'dynamic_page_id' => 'target-page-uuid',
+                'dynamic_parent_id' => 42, // leftover from sulu_categories
+                'dynamic_mapping' => [
+                    ['type' => 'field_map', 'target_field' => 'title', 'source_field' => 'title'],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+        self::assertCount(1, $result);
+        self::assertSame('Child Page 1', $result[0]['title']);
+    }
 }

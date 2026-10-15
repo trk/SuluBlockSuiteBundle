@@ -219,4 +219,56 @@ final class PageLayoutProviderTest extends TestCase
             }
         }
     }
+
+    public function testRenderLayoutStopsOnSelfReferencingCycle(): void
+    {
+        /** @var array{provider: ?PageLayoutProvider} $box */
+        $box = ['provider' => null];
+        $twig = $this->createStub(Environment::class);
+        $loader = $this->createStub(LoaderInterface::class);
+        $loader->method('exists')->willReturn(true);
+        $twig->method('getLoader')->willReturn($loader);
+
+        $renderCalls = 0;
+        $twig->method('render')->willReturnCallback(static function () use (&$box, &$renderCalls): string {
+            ++$renderCalls;
+            if (null !== $box['provider']) {
+                return 'OUTER[' . $box['provider']->renderLayout(['id' => 'cycle-layout', 'blocks' => []]) . ']';
+            }
+
+            return '';
+        });
+
+        $provider = new PageLayoutProvider(null, $twig);
+        $box['provider'] = $provider;
+        $result = $provider->renderLayout(['id' => 'cycle-layout', 'blocks' => []]);
+
+        self::assertSame('OUTER[]', $result);
+        self::assertSame(1, $renderCalls);
+    }
+
+    public function testGetLayoutSkipsDraftOnlySnippet(): void
+    {
+        $snippet = $this->createStub(SnippetInterface::class);
+        $snippet->method('getUuid')->willReturn('draft-layout-uuid');
+
+        $draftContent = $this->createStub(SnippetDimensionContentInterface::class);
+        $draftContent->method('getTemplateKey')->willReturn('page_layout');
+        $draftContent->method('getLocale')->willReturn('en');
+        $draftContent->method('getStage')->willReturn('draft');
+        $draftContent->method('getTitle')->willReturn('Draft Layout');
+        $draftContent->method('getTemplateData')->willReturn([
+            'key' => 'draft_only',
+            'blocks' => [['type' => 'headline', 'title' => 'Draft']],
+        ]);
+
+        $snippet->method('getDimensionContents')->willReturn(new ArrayCollection([$draftContent]));
+
+        $repo = $this->createStub(SnippetRepositoryInterface::class);
+        $repo->method('findBy')->willReturn([$snippet]);
+
+        $provider = new PageLayoutProvider($repo);
+        self::assertNull($provider->getLayout('draft_only', 'en'));
+        self::assertNull($provider->getLayout('draft-layout-uuid', 'en'));
+    }
 }

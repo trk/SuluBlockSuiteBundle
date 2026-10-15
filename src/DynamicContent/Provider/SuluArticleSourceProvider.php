@@ -7,6 +7,8 @@ namespace Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider;
 use Sulu\Article\Domain\Model\ArticleDimensionContentInterface;
 use Sulu\Article\Domain\Model\ArticleInterface;
 use Sulu\Article\Domain\Repository\ArticleRepositoryInterface;
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
 use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -22,6 +24,8 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
         private readonly ?ArticleRepositoryInterface $articleRepository = null,
         private readonly ?ContentResolverInterface $contentResolver = null,
         private readonly ?RequestStack $requestStack = null,
+        private readonly ?ReferenceStoreInterface $referenceStore = null,
+        private readonly ?ContentAggregatorInterface $contentAggregator = null,
     ) {
     }
 
@@ -320,6 +324,10 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             return null;
         }
 
+        if ('' !== $article->getUuid()) {
+            $this->referenceStore?->add($article->getUuid(), ArticleInterface::RESOURCE_KEY);
+        }
+
         if (null !== $this->contentResolver) {
             try {
                 $resolved = $this->contentResolver->resolve($dimensionContent);
@@ -433,10 +441,37 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
 
     private function extractDimensionContent(ArticleInterface $article, string $locale): ?ArticleDimensionContentInterface
     {
+        $isPreview = $this->isPreviewContext();
+
+        if (null !== $this->contentAggregator) {
+            try {
+                /** @var ArticleDimensionContentInterface $aggregated */
+                $aggregated = $this->contentAggregator->aggregate($article, [
+                    'locale' => $locale,
+                    'stage' => DimensionContentInterface::STAGE_LIVE,
+                ]);
+
+                return $aggregated;
+            } catch (\Throwable) {
+                if ($isPreview) {
+                    try {
+                        /** @var ArticleDimensionContentInterface $aggregatedDraft */
+                        $aggregatedDraft = $this->contentAggregator->aggregate($article, [
+                            'locale' => $locale,
+                            'stage' => DimensionContentInterface::STAGE_DRAFT,
+                        ]);
+
+                        return $aggregatedDraft;
+                    } catch (\Throwable) {
+                        // Fallback to direct dimension iteration
+                    }
+                }
+            }
+        }
+
         /** @var iterable<ArticleDimensionContentInterface> $dimensionContents */
         $dimensionContents = $article->getDimensionContents();
 
-        $isPreview = $this->isPreviewContext();
         $draftFallback = null;
         foreach ($dimensionContents as $content) {
             if ($content->getLocale() === $locale) {

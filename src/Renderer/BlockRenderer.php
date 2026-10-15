@@ -13,6 +13,8 @@ use Twig\Environment;
  */
 final class BlockRenderer
 {
+    private const MAX_RENDER_DEPTH = 16;
+
     /**
      * @var list<string>
      */
@@ -24,6 +26,13 @@ final class BlockRenderer
      * @var array<string, string|null>
      */
     private array $templateCache = [];
+
+    private int $renderDepth = 0;
+
+    /**
+     * @var array<string, bool>
+     */
+    private array $activeReusableSnippets = [];
 
     /**
      * @param list<string> $templateNamespaces
@@ -90,7 +99,7 @@ final class BlockRenderer
      */
     public function renderBlock(array $block, array $context = []): string
     {
-        if (null === $this->twig) {
+        if (null === $this->twig || $this->renderDepth >= self::MAX_RENDER_DEPTH) {
             return '';
         }
 
@@ -109,25 +118,55 @@ final class BlockRenderer
             return '';
         }
 
-        $html = $this->twig->render($template, \array_merge($context, [
-            'block' => $block,
-        ]));
+        $reusableSnippetId = null;
+        if ('reusable' === $type && isset($block['snippet'])) {
+            $snippet = $block['snippet'];
+            if (\is_string($snippet) && '' !== \trim($snippet)) {
+                $reusableSnippetId = \trim($snippet);
+            } elseif (\is_array($snippet)) {
+                $innerSnippet = isset($snippet['content']) && \is_array($snippet['content']) ? $snippet['content'] : [];
+                $candidateId = $snippet['uuid'] ?? ($snippet['id'] ?? ($innerSnippet['uuid'] ?? ($innerSnippet['id'] ?? null)));
+                if (\is_string($candidateId) && '' !== \trim($candidateId)) {
+                    $reusableSnippetId = \trim($candidateId);
+                }
+            }
 
-        if ('' === \trim($html)) {
+            if (null !== $reusableSnippetId && isset($this->activeReusableSnippets[$reusableSnippetId])) {
+                return '';
+            }
+        }
+
+        ++$this->renderDepth;
+        if (null !== $reusableSnippetId) {
+            $this->activeReusableSnippets[$reusableSnippetId] = true;
+        }
+
+        try {
+            $html = $this->twig->render($template, \array_merge($context, [
+                'block' => $block,
+            ]));
+
+            if ('' === \trim($html)) {
+                return $html;
+            }
+
+            if (isset($block['_attributes']) && \is_array($block['_attributes']) && [] !== $block['_attributes']) {
+                /** @var array<string, string|bool> $attrs */
+                $attrs = $block['_attributes'];
+                $html = $this->injectRootAttributes($html, $attrs);
+            }
+
+            if (isset($block['_scoped_css']) && \is_string($block['_scoped_css']) && '' !== \trim($block['_scoped_css'])) {
+                $html = '<style>' . $block['_scoped_css'] . '</style>' . $html;
+            }
+
             return $html;
+        } finally {
+            --$this->renderDepth;
+            if (null !== $reusableSnippetId) {
+                unset($this->activeReusableSnippets[$reusableSnippetId]);
+            }
         }
-
-        if (isset($block['_attributes']) && \is_array($block['_attributes']) && [] !== $block['_attributes']) {
-            /** @var array<string, string|bool> $attrs */
-            $attrs = $block['_attributes'];
-            $html = $this->injectRootAttributes($html, $attrs);
-        }
-
-        if (isset($block['_scoped_css']) && \is_string($block['_scoped_css']) && '' !== \trim($block['_scoped_css'])) {
-            $html = '<style>' . $block['_scoped_css'] . '</style>' . $html;
-        }
-
-        return $html;
     }
 
     /**

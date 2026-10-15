@@ -188,4 +188,59 @@ final class BlockSuiteMetadataResolverTest extends TestCase
             ],
         ], $propsContent['dynamic_mapping']);
     }
+
+    public function testResolveItemsDelegatesPropsFieldsToPropertyResolvers(): void
+    {
+        $mediaResolver = new class implements \Sulu\Content\Application\PropertyResolver\Resolver\PropertyResolverInterface {
+            public function resolve(mixed $data, string $locale, array $params = []): \Sulu\Content\Application\ContentResolver\Value\ContentView
+            {
+                if (\is_array($data) && isset($data['id']) && \is_scalar($data['id'])) {
+                    $idStr = (string) $data['id'];
+
+                    return \Sulu\Content\Application\ContentResolver\Value\ContentView::create(
+                        ['id' => $data['id'], 'url' => '/media/' . $idStr . '/bg.jpg'],
+                        ['id' => $data['id']],
+                    );
+                }
+
+                return \Sulu\Content\Application\ContentResolver\Value\ContentView::create($data, []);
+            }
+
+            public static function getType(): string
+            {
+                return 'single_media_selection';
+            }
+        };
+
+        $defaultResolver = new DefaultPropertyResolver();
+        $propertyResolverProvider = $this->createStub(PropertyResolverProviderInterface::class);
+        $propertyResolverProvider->method('getPropertyResolver')
+            ->willReturnCallback(static fn (string $type) => 'single_media_selection' === $type ? $mediaResolver : $defaultResolver);
+
+        $resolver = new BlockSuiteMetadataResolver($propertyResolverProvider);
+
+        $tabsSection = new SectionMetadata('__tabs');
+        $settingsSection = new SectionMetadata('settings');
+        $bgImageField = new FieldMetadata('props/bg_image');
+        $bgImageField->setType('single_media_selection');
+        $settingsSection->addItem($bgImageField);
+        $tabsSection->addItem($settingsSection);
+
+        $resolved = $resolver->resolveItems(
+            ['__tabs' => $tabsSection],
+            [
+                'props' => [
+                    'bg_image' => ['id' => 42],
+                ],
+            ],
+            'en',
+        );
+
+        $this->assertArrayHasKey('props', $resolved);
+        $propsContent = $resolved['props']->getContent();
+        $this->assertIsArray($propsContent);
+        $this->assertSame(['id' => 42, 'url' => '/media/42/bg.jpg'], $propsContent['bg_image'] ?? null);
+        $propsView = $resolved['props']->getView();
+        $this->assertSame(['id' => 42], $propsView['bg_image'] ?? null);
+    }
 }
