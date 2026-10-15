@@ -50,6 +50,8 @@ export default class PresetSelectionBlockPreviewTransformer implements BlockPrev
         let dynamicSource = null;
         let visibility = null;
 
+        let dynamicMappingSummary = null;
+
         if (typeof value === 'string') {
             presetId = value.trim() !== '' ? value.trim() : null;
         } else if (typeof value === 'object') {
@@ -61,6 +63,21 @@ export default class PresetSelectionBlockPreviewTransformer implements BlockPrev
             }
             if (typeof value.dynamic_source === 'string' && value.dynamic_source.trim() !== '' && value.dynamic_source !== 'none') {
                 dynamicSource = value.dynamic_source.trim();
+                if (Array.isArray(value.dynamic_mapping) && value.dynamic_mapping.length > 0) {
+                    const pairs = [];
+                    value.dynamic_mapping.forEach((m) => {
+                        if (m && typeof m === 'object' && typeof m.target_field === 'string' && typeof m.source_field === 'string') {
+                            const tf = m.target_field.trim();
+                            const sf = m.source_field.trim();
+                            if (tf !== '' && sf !== '') {
+                                pairs.push(`${tf} \u2190 ${sf}`);
+                            }
+                        }
+                    });
+                    if (pairs.length > 0) {
+                        dynamicMappingSummary = pairs.join(', ');
+                    }
+                }
             }
             if (typeof value.visibility === 'string' && value.visibility.trim() !== '' && value.visibility !== 'visible') {
                 visibility = value.visibility.trim();
@@ -91,10 +108,13 @@ export default class PresetSelectionBlockPreviewTransformer implements BlockPrev
         if (dynamicSource) {
             const rawDynamic = translate('sulu_block_suite.preview_dynamic');
             const dynamicLabel = rawDynamic && rawDynamic !== 'sulu_block_suite.preview_dynamic' ? rawDynamic : 'Dynamic';
+            const badgeText = dynamicMappingSummary
+                ? `${dynamicLabel}: ${dynamicSource} (${dynamicMappingSummary})`
+                : `${dynamicLabel}: ${dynamicSource}`;
             badges.push(
-                <span className={styles.dynamicBadge} key="dynamic" title={`${dynamicLabel}: ${dynamicSource}`}>
+                <span className={styles.dynamicBadge} key="dynamic" title={badgeText}>
                     <Icon name="su-sync" />
-                    <span>{dynamicLabel}: {dynamicSource}</span>
+                    <span>{badgeText}</span>
                 </span>
             );
         }

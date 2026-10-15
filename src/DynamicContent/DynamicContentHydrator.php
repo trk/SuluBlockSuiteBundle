@@ -256,6 +256,11 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
      */
     private function buildDynamicConfigFromFlatProps(array $props): array
     {
+        $props = $this->unwrapContentViews($props);
+        if (!\is_array($props)) {
+            $props = [];
+        }
+
         $sourceType = isset($props['dynamic_source']) && \is_string($props['dynamic_source'])
             ? \trim($props['dynamic_source'])
             : 'none';
@@ -290,7 +295,11 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             }
         }
 
-        $conditionEnabled = (bool) ($props['dynamic_condition_enabled'] ?? true);
+        $rawConditionEnabled = $props['dynamic_condition_enabled'] ?? null;
+        $conditionEnabled = true === $rawConditionEnabled
+            || 1 === $rawConditionEnabled
+            || 'true' === $rawConditionEnabled
+            || '1' === $rawConditionEnabled;
         $conditionField = isset($props['dynamic_condition_field']) && \is_string($props['dynamic_condition_field'])
             ? \trim($props['dynamic_condition_field'])
             : '';
@@ -336,6 +345,24 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         ];
     }
 
+    private function unwrapContentViews(mixed $value): mixed
+    {
+        if (\is_object($value) && \method_exists($value, 'getContent')) {
+            return $this->unwrapContentViews($value->getContent());
+        }
+
+        if (\is_array($value)) {
+            $unwrapped = [];
+            foreach ($value as $k => $v) {
+                $unwrapped[$k] = $this->unwrapContentViews($v);
+            }
+
+            return $unwrapped;
+        }
+
+        return $value;
+    }
+
     /**
      * @param array<string, mixed> $block
      * @param array<string, mixed> $pageData
@@ -346,6 +373,18 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
     private function applyMapping(array $block, array $pageData, array $mapping): array
     {
         $hydrated = $block;
+
+        if ([] === $mapping) {
+            $autoCandidates = ['title', 'headline', 'subtitle', 'summary', 'description', 'content', 'image', 'link', 'url', 'badge', 'date', 'author'];
+            foreach ($autoCandidates as $candidate) {
+                if (\array_key_exists($candidate, $block) && isset($pageData[$candidate]) && $this->isValuePresent($pageData[$candidate])) {
+                    $mapping[$candidate] = $candidate;
+                }
+            }
+            if ([] === $mapping && isset($pageData['title']) && $this->isValuePresent($pageData['title'])) {
+                $mapping['title'] = 'title';
+            }
+        }
 
         foreach ($mapping as $targetField => $sourcePath) {
             if ('' === $targetField || '' === $sourcePath) {

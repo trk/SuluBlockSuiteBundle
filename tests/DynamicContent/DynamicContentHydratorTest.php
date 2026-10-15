@@ -969,4 +969,61 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertSame('Laser Cutter Pro L200', $items[1]['title']);
         self::assertSame('LSR-L200', $items[1]['badge']);
     }
+
+    public function testFlatPropsDynamicMappingUnwrapsContentViewsAndAutoMapsWhenEmpty(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $sourceResolver->expects(self::exactly(2))
+            ->method('resolvePage')
+            ->willReturn([
+                'title' => 'Dynamic Current Page Headline',
+                'subtitle' => 'Dynamic Subtitle',
+            ]);
+
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $wrappedEntry = new class {
+            /**
+             * @return array<string, mixed>
+             */
+            public function getContent(): array
+            {
+                return [
+                    'type' => 'field_map',
+                    'target_field' => 'title',
+                    'source_field' => 'title',
+                ];
+            }
+        };
+
+        $headlineWithWrappedMapping = [
+            'type' => 'headline',
+            'title' => '',
+            'subtitle' => '',
+            'props' => [
+                'dynamic_source' => 'current_page',
+                'dynamic_mapping' => [$wrappedEntry],
+                'dynamic_condition_field' => 'non_existent_field',
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($headlineWithWrappedMapping, ['title' => 'Dynamic Current Page Headline']);
+        self::assertCount(1, $result);
+        self::assertSame('Dynamic Current Page Headline', $result[0]['title']);
+
+        $headlineWithoutExplicitMapping = [
+            'type' => 'headline',
+            'title' => '',
+            'subtitle' => '',
+            'props' => [
+                'dynamic_source' => 'current_page',
+                'dynamic_mapping' => [],
+            ],
+        ];
+
+        $autoResult = $hydrator->hydrateBlock($headlineWithoutExplicitMapping, ['title' => 'Dynamic Current Page Headline']);
+        self::assertCount(1, $autoResult);
+        self::assertSame('Dynamic Current Page Headline', $autoResult[0]['title']);
+        self::assertSame('Dynamic Subtitle', $autoResult[0]['subtitle']);
+    }
 }

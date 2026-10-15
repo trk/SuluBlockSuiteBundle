@@ -36,33 +36,35 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
         $flatItems = $this->flattenSectionItems($items);
         $hydratedData = $this->applyFieldDefaults($flatItems, $data);
 
-        $resolved = parent::resolveItems($flatItems, $hydratedData, $locale);
+        $contentItems = [];
+        $propsItems = [];
+        foreach ($flatItems as $name => $field) {
+            if (\str_starts_with($name, 'props/')) {
+                $propsItems[$name] = $field;
+            } else {
+                $contentItems[$name] = $field;
+            }
+        }
 
-        // Preserve any extra keys inside $hydratedData['props'] (e.g. from presets or custom programmatic props)
-        if (isset($hydratedData['props']) && \is_array($hydratedData['props'])) {
-            $existingPropsView = $resolved['props'] ?? null;
-            $resolvedPropsContent = [];
-            $resolvedPropsViewData = [];
+        $resolved = parent::resolveItems($contentItems, $hydratedData, $locale);
 
-            if ($existingPropsView instanceof ContentView) {
-                $content = $existingPropsView->getContent();
-                if (\is_array($content)) {
-                    $resolvedPropsContent = $content;
+        if ([] !== $propsItems || (isset($hydratedData['props']) && \is_array($hydratedData['props']))) {
+            /** @var array<string, mixed> $mergedPropsContent */
+            $mergedPropsContent = isset($hydratedData['props']) && \is_array($hydratedData['props'])
+                ? $this->unwrapContentViews($hydratedData['props'])
+                : [];
+
+            foreach ($propsItems as $propPath => $propField) {
+                $subPath = \substr($propPath, 6);
+                if ('' === $subPath) {
+                    continue;
                 }
-                $resolvedPropsViewData = $existingPropsView->getView();
+
+                $val = $this->unwrapContentViews($this->readValueByPath($hydratedData, $propPath));
+                $this->writeValueByPath($mergedPropsContent, $subPath, $val);
             }
 
-            $mergedPropsContent = \array_replace($hydratedData['props'], $resolvedPropsContent);
-            foreach ($hydratedData['props'] as $propKey => $propVal) {
-                if (
-                    !\array_key_exists($propKey, $resolvedPropsContent)
-                    || (null === $resolvedPropsContent[$propKey] && null !== $propVal)
-                ) {
-                    $mergedPropsContent[$propKey] = $propVal;
-                }
-            }
-
-            $resolved['props'] = ContentView::create($mergedPropsContent, $resolvedPropsViewData);
+            $resolved['props'] = ContentView::create($mergedPropsContent, []);
         }
 
         return $resolved;
@@ -91,6 +93,12 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
                 } else {
                     $name = '' !== $item->getName() ? $item->getName() : (string) $key;
                 }
+
+                // Skip synthetic collapsed-preview 'props' marker field
+                if ('props' === $name && 'preset_selection' === $item->getType() && 'false' === $item->getVisibleCondition()) {
+                    continue;
+                }
+
                 $flat[$name] = $item;
             }
         }
@@ -109,6 +117,31 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
         foreach ($flatItems as $name => $field) {
             $currentValue = $this->readValueByPath($data, $name);
             if (null !== $currentValue) {
+                if ('block' === $field->getType() && \is_array($currentValue) && [] !== $currentValue) {
+                    $types = $field->getTypes();
+                    if ([] !== $types) {
+                        $defaultTypeKey = $field->getDefaultType();
+                        $updatedEntries = [];
+                        foreach ($currentValue as $idx => $entry) {
+                            if (\is_array($entry)) {
+                                $entryType = isset($entry['type']) && \is_string($entry['type']) && '' !== $entry['type']
+                                    ? $entry['type']
+                                    : $defaultTypeKey;
+                                $typeForm = (null !== $entryType && isset($types[$entryType]))
+                                    ? $types[$entryType]
+                                    : \reset($types);
+                                $nestedFlat = $this->flattenSectionItems($typeForm->getItems());
+                                $entry = $this->applyFieldDefaults($nestedFlat, $entry);
+                                if (null !== $entryType && !isset($entry['type'])) {
+                                    $entry['type'] = $entryType;
+                                }
+                            }
+                            $updatedEntries[$idx] = $entry;
+                        }
+                        $this->writeValueByPath($data, $name, $updatedEntries);
+                    }
+                }
+
                 continue;
             }
 
@@ -126,6 +159,24 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
         }
 
         return $data;
+    }
+
+    private function unwrapContentViews(mixed $value): mixed
+    {
+        if ($value instanceof ContentView) {
+            return $this->unwrapContentViews($value->getContent());
+        }
+
+        if (\is_array($value)) {
+            $unwrapped = [];
+            foreach ($value as $k => $v) {
+                $unwrapped[$k] = $this->unwrapContentViews($v);
+            }
+
+            return $unwrapped;
+        }
+
+        return $value;
     }
 
     private function normalizeDefaultValue(string $fieldType, mixed $rawValue): mixed

@@ -343,6 +343,9 @@
                         <title lang="en">Enable Display Condition</title>
                         <title lang="tr">Gösterim Koşulunu Etkinleştir</title>
                     </meta>
+                    <params>
+                        <param name="default_value" value="false"/>
+                    </params>
                 </property>
 
                 <property name="dynamic_condition_field" type="single_select" colspan="4" mandatory="false"

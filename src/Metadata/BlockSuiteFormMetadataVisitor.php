@@ -372,6 +372,12 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
             if ($item instanceof FieldMetadata) {
                 $rawName = $item->getName();
+                if ('props' === $rawName && 'preset_selection' === $this->getFieldType($item) && 'false' === $item->getVisibleCondition()) {
+                    $clonedSection->addItem($this->cloneFieldMetadata($item, 'props'));
+
+                    continue;
+                }
+
                 $namespacedName = ('' === $prefix || \str_starts_with($rawName, $prefix))
                     ? $rawName
                     : $prefix . $rawName;
@@ -462,7 +468,30 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         }
 
         foreach ($source->getTypes() as $typeForm) {
-            $cloned->addType(clone $typeForm);
+            $cloned->addType($this->cloneFormMetadata($typeForm));
+        }
+
+        return $cloned;
+    }
+
+    private function cloneFormMetadata(FormMetadata $source): FormMetadata
+    {
+        $cloned = new FormMetadata();
+        $cloned->setKey($source->getKey());
+        $cloned->setTitles($source->getTitles());
+
+        $clonedTags = [];
+        foreach ($source->getTags() as $tag) {
+            $clonedTags[] = clone $tag;
+        }
+        $cloned->setTags($clonedTags);
+
+        foreach ($source->getItems() as $item) {
+            if ($item instanceof SectionMetadata) {
+                $cloned->addItem($this->cloneSectionDeep($item));
+            } elseif ($item instanceof FieldMetadata) {
+                $cloned->addItem($this->cloneFieldMetadata($item, $item->getName()));
+            }
         }
 
         return $cloned;
@@ -786,7 +815,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                     $targetCollection->setValue($targetOpts);
                     $targetSelect->addOption($targetCollection);
 
-                    if (isset($targetFields[0]) && null === $targetSelect->findOption('default_value')) {
+                    if (isset($targetFields[0])) {
                         $defaultTarget = new OptionMetadata();
                         $defaultTarget->setName('default_value');
                         $defaultTarget->setValue($targetFields[0]['name']);
@@ -810,7 +839,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                     $sourceCollection->setValue($sourceOpts);
                     $sourceSelect->addOption($sourceCollection);
 
-                    if (isset($sourceFields[0]) && null === $sourceSelect->findOption('default_value')) {
+                    if (isset($sourceFields[0])) {
                         $defaultSource = new OptionMetadata();
                         $defaultSource->setName('default_value');
                         $defaultSource->setValue($sourceFields[0]['name']);
@@ -851,12 +880,47 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $typeOption->setValue($blockKey);
         $presetField->addOption($typeOption);
 
+        $presetsJson = null;
         if (null !== $this->presetProvider) {
             $presets = $this->presetProvider->getPresets($blockKey);
+            $presetsJson = (string) \json_encode($presets);
             $presetsJsonOption = new OptionMetadata();
             $presetsJsonOption->setName('presets_json');
-            $presetsJsonOption->setValue((string) \json_encode($presets));
+            $presetsJsonOption->setValue($presetsJson);
             $presetField->addOption($presetsJsonOption);
+        }
+
+        // Add a hidden 'props' preview field so Sulu's FieldBlocks (which looks up value[schemaKey] directly)
+        // invokes PresetSelectionBlockPreviewTransformer with the block's `value.props` object when collapsed.
+        if (!isset($advancedSection->getItems()['props'])) {
+            $propsPreviewField = new FieldMetadata('props');
+            $propsPreviewField->setType('preset_selection');
+            $propsPreviewField->setVisibleCondition('false');
+            $propsPreviewField->setRequired(false);
+            $propsPreviewField->setMultilingual(false);
+
+            $previewTag = new TagMetadata();
+            $previewTag->setName('sulu.block_preview');
+            $previewTag->setPriority(4096);
+            $propsPreviewField->addTag($previewTag);
+
+            $skipMapperTag = new TagMetadata();
+            $skipMapperTag->setName('sulu_content.skip_template_data_mapper');
+            $propsPreviewField->addTag($skipMapperTag);
+
+            $previewTypeOption = new OptionMetadata();
+            $previewTypeOption->setName('component_type');
+            $previewTypeOption->setValue($blockKey);
+            $propsPreviewField->addOption($previewTypeOption);
+
+            if (null !== $presetsJson) {
+                $previewPresetsOption = new OptionMetadata();
+                $previewPresetsOption->setName('presets_json');
+                $previewPresetsOption->setValue($presetsJson);
+                $propsPreviewField->addOption($previewPresetsOption);
+            }
+
+            $advancedSection->addItem($propsPreviewField);
         }
     }
 

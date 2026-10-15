@@ -110,4 +110,82 @@ final class BlockSuiteMetadataResolverTest extends TestCase
         $this->assertSame('Enterprise Solutions', $resolved['nav.title']->getContent());
         $this->assertSame('/solutions', $resolved['nav.url']->getContent());
     }
+
+    public function testResolveItemsPreservesDynamicMappingPlainArraysAndAppliesNestedDefaults(): void
+    {
+        $propertyResolverProvider = $this->createStub(PropertyResolverProviderInterface::class);
+        $propertyResolverProvider->method('getPropertyResolver')->willReturn(new DefaultPropertyResolver());
+
+        $resolver = new BlockSuiteMetadataResolver($propertyResolverProvider);
+
+        $tabsSection = new SectionMetadata('__tabs');
+
+        $contentSection = new SectionMetadata('content');
+        $titleField = new FieldMetadata('title');
+        $titleField->setType('text_line');
+        $contentSection->addItem($titleField);
+
+        $dynamicSection = new SectionMetadata('dynamic_content');
+        $sourceField = new FieldMetadata('props/dynamic_source');
+        $sourceField->setType('single_select');
+        $dynamicSection->addItem($sourceField);
+
+        $mappingBlock = new FieldMetadata('props/dynamic_mapping');
+        $mappingBlock->setType('block');
+        $mappingBlock->setDefaultType('field_map');
+
+        $fieldMapForm = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata();
+        $fieldMapForm->setKey('field_map');
+
+        $targetField = new FieldMetadata('target_field');
+        $targetField->setType('single_select');
+        $targetDefault = new OptionMetadata();
+        $targetDefault->setName('default_value');
+        $targetDefault->setValue('title');
+        $targetField->addOption($targetDefault);
+        $fieldMapForm->addItem($targetField);
+
+        $srcField = new FieldMetadata('source_field');
+        $srcField->setType('single_select');
+        $srcDefault = new OptionMetadata();
+        $srcDefault->setName('default_value');
+        $srcDefault->setValue('title');
+        $srcField->addOption($srcDefault);
+        $fieldMapForm->addItem($srcField);
+
+        $mappingBlock->addType($fieldMapForm);
+        $dynamicSection->addItem($mappingBlock);
+
+        $tabsSection->addItem($contentSection);
+        $tabsSection->addItem($dynamicSection);
+
+        $resolved = $resolver->resolveItems(
+            ['__tabs' => $tabsSection],
+            [
+                'title' => '',
+                'props' => [
+                    'dynamic_source' => 'current_page',
+                    'dynamic_mapping' => [
+                        [
+                            'type' => 'field_map',
+                        ],
+                    ],
+                ],
+            ],
+            'en',
+        );
+
+        $this->assertArrayHasKey('props', $resolved);
+        $propsContent = $resolved['props']->getContent();
+        $this->assertIsArray($propsContent);
+        $this->assertSame('current_page', $propsContent['dynamic_source'] ?? null);
+        $this->assertIsArray($propsContent['dynamic_mapping'] ?? null);
+        $this->assertSame([
+            [
+                'type' => 'field_map',
+                'target_field' => 'title',
+                'source_field' => 'title',
+            ],
+        ], $propsContent['dynamic_mapping']);
+    }
 }

@@ -223,4 +223,57 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
             $this->assertSame(['content', 'general', 'advanced'], $tabKeys);
         }
     }
+
+    public function testDynamicMappingFieldMapOptionsAreIsolatedPerBlock(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor();
+
+        $accordionForm = new FormMetadata();
+        $accordionForm->setKey('accordion');
+        $accContent = new SectionMetadata('content');
+        $accItems = new FieldMetadata('items');
+        $accItems->setType('block');
+        $accItemType = new FormMetadata();
+        $accItemType->setKey('accordion_item');
+        $accItemHeading = new FieldMetadata('accordion_heading');
+        $accItemHeading->setType('text_line');
+        $accItemType->addItem($accItemHeading);
+        $accItems->addType($accItemType);
+        $accContent->addItem($accItems);
+        $accordionForm->addItem($accContent);
+
+        $headlineForm = new FormMetadata();
+        $headlineForm->setKey('headline');
+        $hlContent = new SectionMetadata('content');
+        $hlTitle = new FieldMetadata('title');
+        $hlTitle->setType('text_line');
+        $hlContent->addItem($hlTitle);
+        $headlineForm->addItem($hlContent);
+
+        $typedForm = new TypedFormMetadata();
+        $typedForm->addForm('accordion', $accordionForm);
+        $typedForm->addForm('headline', $headlineForm);
+
+        $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
+
+        /** @var SectionMetadata $accTabs */
+        $accTabs = $accordionForm->getItems()['__tabs'];
+        /** @var SectionMetadata $accDyn */
+        $accDyn = $accTabs->getItems()['dynamic_content'];
+        /** @var FieldMetadata $accMapping */
+        $accMapping = $accDyn->getItems()['props/dynamic_mapping'];
+        $accTarget = $accMapping->getTypes()['field_map']->getItems()['target_field'];
+        $this->assertInstanceOf(FieldMetadata::class, $accTarget);
+        $this->assertSame('accordion_heading', $accTarget->findOption('default_value')?->getValue());
+
+        /** @var SectionMetadata $hlTabs */
+        $hlTabs = $headlineForm->getItems()['__tabs'];
+        /** @var SectionMetadata $hlDyn */
+        $hlDyn = $hlTabs->getItems()['dynamic_content'];
+        /** @var FieldMetadata $hlMapping */
+        $hlMapping = $hlDyn->getItems()['props/dynamic_mapping'];
+        $hlTarget = $hlMapping->getTypes()['field_map']->getItems()['target_field'];
+        $this->assertInstanceOf(FieldMetadata::class, $hlTarget);
+        $this->assertSame('title', $hlTarget->findOption('default_value')?->getValue());
+    }
 }
