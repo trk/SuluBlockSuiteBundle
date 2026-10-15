@@ -207,24 +207,40 @@
                                 <meta>
                                     <title lang="en">Published Date</title>
                                     <title lang="tr">Yayın Tarihi</title>
+                                    <title lang="de">Veröffentlichungsdatum</title>
+                                    <title lang="ru">Дата публикации</title>
+                                    <title lang="es">Fecha de Publicación</title>
+                                    <title lang="fr">Date de Publication</title>
                                 </meta>
                             </param>
                             <param name="created">
                                 <meta>
                                     <title lang="en">Created Date</title>
                                     <title lang="tr">Oluşturulma Tarihi</title>
+                                    <title lang="de">Erstellungsdatum</title>
+                                    <title lang="ru">Дата создания</title>
+                                    <title lang="es">Fecha de Creación</title>
+                                    <title lang="fr">Date de Création</title>
                                 </meta>
                             </param>
                             <param name="changed">
                                 <meta>
                                     <title lang="en">Modified Date</title>
                                     <title lang="tr">Güncellenme Tarihi</title>
+                                    <title lang="de">Änderungsdatum</title>
+                                    <title lang="ru">Дата изменения</title>
+                                    <title lang="es">Fecha de Modificación</title>
+                                    <title lang="fr">Date de Modification</title>
                                 </meta>
                             </param>
                             <param name="title">
                                 <meta>
                                     <title lang="en">Title</title>
                                     <title lang="tr">Başlık</title>
+                                    <title lang="de">Titel</title>
+                                    <title lang="ru">Заголовок</title>
+                                    <title lang="es">Título</title>
+                                    <title lang="fr">Titre</title>
                                 </meta>
                             </param>
                         </param>
@@ -248,12 +264,20 @@
                                 <meta>
                                     <title lang="en">Descending</title>
                                     <title lang="tr">Azalan (DESC)</title>
+                                    <title lang="de">Absteigend (DESC)</title>
+                                    <title lang="ru">По убыванию (DESC)</title>
+                                    <title lang="es">Descendente (DESC)</title>
+                                    <title lang="fr">Décroissant (DESC)</title>
                                 </meta>
                             </param>
                             <param name="asc">
                                 <meta>
                                     <title lang="en">Ascending</title>
                                     <title lang="tr">Artan (ASC)</title>
+                                    <title lang="de">Aufsteigend (ASC)</title>
+                                    <title lang="ru">По возрастанию (ASC)</title>
+                                    <title lang="es">Ascendente (ASC)</title>
+                                    <title lang="fr">Croissant (ASC)</title>
                                 </meta>
                             </param>
                         </param>
@@ -265,6 +289,10 @@
                     <meta>
                         <title lang="en">Template Filter (comma-separated)</title>
                         <title lang="tr">Şablon Filtresi (virgülle ayrılmış)</title>
+                        <title lang="de">Template-Filter (kommagetrennt)</title>
+                        <title lang="ru">Фильтр шаблонов (через запятую)</title>
+                        <title lang="es">Filtro de Plantilla (separado por comas)</title>
+                        <title lang="fr">Filtre de Modèle (séparé par des virgules)</title>
                     </meta>
                 </property>
 
@@ -273,6 +301,10 @@
                     <meta>
                         <title lang="en">Tag Filter</title>
                         <title lang="tr">Etiket Filtresi</title>
+                        <title lang="de">Tag-Filter</title>
+                        <title lang="ru">Фильтр по тегам</title>
+                        <title lang="es">Filtro de Etiquetas</title>
+                        <title lang="fr">Filtre d'Étiquettes</title>
                     </meta>
                 </property>
 
@@ -281,6 +313,10 @@
                     <meta>
                         <title lang="en">Category Filter</title>
                         <title lang="tr">Kategori Filtresi</title>
+                        <title lang="de">Kategorie-Filter</title>
+                        <title lang="ru">Фильтр по категориям</title>
+                        <title lang="es">Filtro de Categorías</title>
+                        <title lang="fr">Filtre de Catégories</title>
                     </meta>
                 </property>
 
@@ -289,6 +325,10 @@
                     <meta>
                         <title lang="en">Exclude Current Page</title>
                         <title lang="tr">Mevcut Sayfayı Hariç Tut</title>
+                        <title lang="de">Aktuelle Seite ausschließen</title>
+                        <title lang="ru">Исключить текущую страницу</title>
+                        <title lang="es">Excluir Página Actual</title>
+                        <title lang="fr">Exclure la Page Actuelle</title>
                     </meta>
                     <params>
                         <param name="default_value" value="true"/>
@@ -310,12 +350,20 @@
                             <meta>
                                 <title lang="en">Field Map</title>
                                 <title lang="tr">Alan Eşleşmesi</title>
+                                <title lang="de">Feldzuordnung</title>
+                                <title lang="ru">Сопоставление поля</title>
+                                <title lang="es">Mapeo de Campo</title>
+                                <title lang="fr">Mappage de Champ</title>
                             </meta>
                             <properties>
                                 <property name="target_field" type="single_select" colspan="6" mandatory="true">
                                     <meta>
                                         <title lang="en">Target Block Field</title>
                                         <title lang="tr">Hedef Blok Alanı</title>
+                                        <title lang="de">Ziel-Blockfeld</title>
+                                        <title lang="ru">Целевое поле блока</title>
+                                        <title lang="es">Campo del Bloque Destino</title>
+                                        <title lang="fr">Champ du Bloc Cible</title>
                                     </meta>
                                     <tag name="sulu.block_preview" priority="200"/>
                                     <params>
@@ -326,6 +374,10 @@
                                     <meta>
                                         <title lang="en">Source Field</title>
                                         <title lang="tr">Kaynak Alanı</title>
+                                        <title lang="de">Quellfeld</title>
+                                        <title lang="ru">Поле источника</title>
+                                        <title lang="es">Campo de Origen</title>
+                                        <title lang="fr">Champ Source</title>
                                     </meta>
                                     <tag name="sulu.block_preview" priority="100"/>
                                     <params>
@@ -348,6 +400,10 @@
                         <title lang="fr">Masquer si vide</title>
                         <info_text lang="en">Do not render this block when the source is missing or none of the mapped fields has a value. Otherwise the static block content is used as fallback.</info_text>
                         <info_text lang="tr">Kaynak bulunamazsa veya eşlenen alanların hiçbirinde değer yoksa bu blok gösterilmez. Aksi halde statik blok içeriği yedek olarak kullanılır.</info_text>
+                        <info_text lang="de">Diesen Block ausblenden, wenn die Quelle fehlt oder keines der zugeordneten Felder einen Wert hat. Andernfalls wird der statische Blockinhalt als Fallback verwendet.</info_text>
+                        <info_text lang="ru">Не отображать этот блок, если источник отсутствует или ни одно из сопоставленных полей не содержит значения. Иначе используется статическое содержимое блока.</info_text>
+                        <info_text lang="es">No mostrar este bloque cuando falte el origen o ninguno de los campos mapeados tenga valor. De lo contrario, se usa el contenido estático como respaldo.</info_text>
+                        <info_text lang="fr">Ne pas afficher ce bloc lorsque la source est absente ou qu'aucun des champs mappés n'a de valeur. Sinon, le contenu statique du bloc est utilisé en repli.</info_text>
                     </meta>
                     <params>
                         <param name="default_value" value="false"/>
@@ -359,6 +415,10 @@
                     <meta>
                         <title lang="en">Enable Display Condition</title>
                         <title lang="tr">Gösterim Koşulunu Etkinleştir</title>
+                        <title lang="de">Anzeigebedingung aktivieren</title>
+                        <title lang="ru">Включить условие отображения</title>
+                        <title lang="es">Habilitar Condición de Visualización</title>
+                        <title lang="fr">Activer la Condition d'Affichage</title>
                     </meta>
                     <params>
                         <param name="default_value" value="false"/>
@@ -370,6 +430,10 @@
                     <meta>
                         <title lang="en">Condition Field</title>
                         <title lang="tr">Koşul Alanı</title>
+                        <title lang="de">Bedingungsfeld</title>
+                        <title lang="ru">Поле условия</title>
+                        <title lang="es">Campo de Condición</title>
+                        <title lang="fr">Champ de Condition</title>
                     </meta>
                     <params>
                         <param name="default_value" value="title"/>
@@ -382,6 +446,10 @@
                     <meta>
                         <title lang="en">Condition Operator</title>
                         <title lang="tr">Koşul Operatörü</title>
+                        <title lang="de">Bedingungsoperator</title>
+                        <title lang="ru">Оператор условия</title>
+                        <title lang="es">Operador de Condición</title>
+                        <title lang="fr">Opérateur de Condition</title>
                     </meta>
                     <params>
                         <param name="default_value" value="not_empty"/>
@@ -390,78 +458,130 @@
                                 <meta>
                                     <title lang="en">Is Not Empty</title>
                                     <title lang="tr">Boş Değil</title>
+                                    <title lang="de">Ist nicht leer</title>
+                                    <title lang="ru">Не пусто</title>
+                                    <title lang="es">No Está Vacío</title>
+                                    <title lang="fr">N'est Pas Vide</title>
                                 </meta>
                             </param>
                             <param name="is_empty">
                                 <meta>
                                     <title lang="en">Is Empty</title>
                                     <title lang="tr">Boş</title>
+                                    <title lang="de">Ist leer</title>
+                                    <title lang="ru">Пусто</title>
+                                    <title lang="es">Está Vacío</title>
+                                    <title lang="fr">Est Vide</title>
                                 </meta>
                             </param>
                             <param name="equals">
                                 <meta>
                                     <title lang="en">Equals</title>
                                     <title lang="tr">Eşittir</title>
+                                    <title lang="de">Gleich</title>
+                                    <title lang="ru">Равно</title>
+                                    <title lang="es">Igual a</title>
+                                    <title lang="fr">Égal à</title>
                                 </meta>
                             </param>
                             <param name="not_equals">
                                 <meta>
                                     <title lang="en">Does Not Equal</title>
                                     <title lang="tr">Eşit Değildir</title>
+                                    <title lang="de">Ungleich</title>
+                                    <title lang="ru">Не равно</title>
+                                    <title lang="es">No Es Igual a</title>
+                                    <title lang="fr">Différent de</title>
                                 </meta>
                             </param>
                             <param name="contains">
                                 <meta>
                                     <title lang="en">Contains</title>
                                     <title lang="tr">İçerir</title>
+                                    <title lang="de">Enthält</title>
+                                    <title lang="ru">Содержит</title>
+                                    <title lang="es">Contiene</title>
+                                    <title lang="fr">Contient</title>
                                 </meta>
                             </param>
                             <param name="not_contains">
                                 <meta>
                                     <title lang="en">Does Not Contain</title>
                                     <title lang="tr">İçermez</title>
+                                    <title lang="de">Enthält nicht</title>
+                                    <title lang="ru">Не содержит</title>
+                                    <title lang="es">No Contiene</title>
+                                    <title lang="fr">Ne Contient Pas</title>
                                 </meta>
                             </param>
                             <param name="starts_with">
                                 <meta>
                                     <title lang="en">Starts With</title>
                                     <title lang="tr">İle Başlar</title>
+                                    <title lang="de">Beginnt mit</title>
+                                    <title lang="ru">Начинается с</title>
+                                    <title lang="es">Empieza con</title>
+                                    <title lang="fr">Commence par</title>
                                 </meta>
                             </param>
                             <param name="ends_with">
                                 <meta>
                                     <title lang="en">Ends With</title>
                                     <title lang="tr">İle Biter</title>
+                                    <title lang="de">Endet mit</title>
+                                    <title lang="ru">Заканчивается на</title>
+                                    <title lang="es">Termina con</title>
+                                    <title lang="fr">Se Termine par</title>
                                 </meta>
                             </param>
                             <param name="in">
                                 <meta>
                                     <title lang="en">In List</title>
                                     <title lang="tr">Listede Var</title>
+                                    <title lang="de">In Liste</title>
+                                    <title lang="ru">В списке</title>
+                                    <title lang="es">En la Lista</title>
+                                    <title lang="fr">Dans la Liste</title>
                                 </meta>
                             </param>
                             <param name="gt">
                                 <meta>
                                     <title lang="en">Greater Than</title>
                                     <title lang="tr">Büyüktür</title>
+                                    <title lang="de">Größer als</title>
+                                    <title lang="ru">Больше чем</title>
+                                    <title lang="es">Mayor que</title>
+                                    <title lang="fr">Supérieur à</title>
                                 </meta>
                             </param>
                             <param name="gte">
                                 <meta>
                                     <title lang="en">Greater Than or Equal</title>
                                     <title lang="tr">Büyük veya Eşittir</title>
+                                    <title lang="de">Größer oder gleich</title>
+                                    <title lang="ru">Больше или равно</title>
+                                    <title lang="es">Mayor o Igual que</title>
+                                    <title lang="fr">Supérieur ou Égal à</title>
                                 </meta>
                             </param>
                             <param name="lt">
                                 <meta>
                                     <title lang="en">Less Than</title>
                                     <title lang="tr">Küçüktür</title>
+                                    <title lang="de">Kleiner als</title>
+                                    <title lang="ru">Меньше чем</title>
+                                    <title lang="es">Menor que</title>
+                                    <title lang="fr">Inférieur à</title>
                                 </meta>
                             </param>
                             <param name="lte">
                                 <meta>
                                     <title lang="en">Less Than or Equal</title>
                                     <title lang="tr">Küçük veya Eşittir</title>
+                                    <title lang="de">Kleiner oder gleich</title>
+                                    <title lang="ru">Меньше или равно</title>
+                                    <title lang="es">Menor o Igual que</title>
+                                    <title lang="fr">Inférieur ou Égal à</title>
                                 </meta>
                             </param>
                         </param>
@@ -473,6 +593,10 @@
                     <meta>
                         <title lang="en">Expected Value</title>
                         <title lang="tr">Beklenen Değer</title>
+                        <title lang="de">Erwarteter Wert</title>
+                        <title lang="ru">Ожидаемое значение</title>
+                        <title lang="es">Valor Esperado</title>
+                        <title lang="fr">Valeur Attendue</title>
                     </meta>
                 </property>
             </properties>
