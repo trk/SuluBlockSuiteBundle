@@ -11,6 +11,7 @@
         <title lang="es">Espacio de Contenido de Página</title>
         <title lang="fr">Emplacement de Contenu de Page</title>
     </meta>
+    <tag name="sulu_block_suite.tabs" exclude="dynamic_content"/>
     <properties>
         <property name="slot_info" type="text_line">
             <meta>

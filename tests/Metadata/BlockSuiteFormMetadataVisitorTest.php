@@ -164,4 +164,61 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $this->assertArrayHasKey('button_style', $resolvedSubSettings->getItems());
         $this->assertArrayNotHasKey('props/button_style', $resolvedSubSettings->getItems());
     }
+
+    public function testNonDynamicBlocksAutomaticallyOmitDynamicContentTab(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor();
+        $nonDynamicKeys = [
+            'reusable',
+            'main_content',
+            'spacer',
+            'section',
+            'row',
+            'row_item',
+            'column',
+            'column_item',
+            'divider',
+            'icon',
+            'html',
+            'code',
+            'breadcrumbs',
+            'page_header',
+            'scroll_to',
+            'countdown',
+            'social',
+            'popover',
+            'map',
+        ];
+
+        $typedForm = new TypedFormMetadata();
+        foreach ($nonDynamicKeys as $key) {
+            $blockForm = new FormMetadata();
+            $blockForm->setKey($key);
+
+            $contentSection = new SectionMetadata('content');
+            $contentSection->setLabel('Content', 'en');
+            $field = new FieldMetadata('sample');
+            $field->setType('text_line');
+            $contentSection->addItem($field);
+            $blockForm->addItem($contentSection);
+
+            $typedForm->addForm($key, $blockForm);
+        }
+
+        $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
+
+        foreach ($nonDynamicKeys as $key) {
+            $blockForm = $typedForm->getForms()[$key];
+            /** @var SectionMetadata $tabsSection */
+            $tabsSection = $blockForm->getItems()['__tabs'];
+            $tabKeys = \array_keys($tabsSection->getItems());
+
+            $this->assertNotContains(
+                'dynamic_content',
+                $tabKeys,
+                \sprintf('Block "%s" must not expose the dynamic_content tab.', $key),
+            );
+            $this->assertSame(['content', 'general', 'advanced'], $tabKeys);
+        }
+    }
 }

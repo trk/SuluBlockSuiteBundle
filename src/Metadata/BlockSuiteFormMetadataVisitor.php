@@ -40,10 +40,23 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     private const NON_DYNAMIC_BLOCKS = [
         'reusable' => true,
         'main_content' => true,
-        'divider' => true,
         'spacer' => true,
+        'section' => true,
+        'row' => true,
         'row_item' => true,
+        'column' => true,
         'column_item' => true,
+        'divider' => true,
+        'icon' => true,
+        'html' => true,
+        'code' => true,
+        'breadcrumbs' => true,
+        'page_header' => true,
+        'scroll_to' => true,
+        'countdown' => true,
+        'social' => true,
+        'popover' => true,
+        'map' => true,
     ];
 
     private const EXCLUDED_TARGET_FIELDS = [

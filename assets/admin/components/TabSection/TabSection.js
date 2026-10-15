@@ -274,7 +274,7 @@ export default class TabSection extends React.Component<Props> {
                                 key={tab.key}
                                 role="tabpanel"
                             >
-                                <Grid className={gridStyles.grid}>
+                                <Grid>
                                     {React.Children.map(tab.children, (fieldChild) => {
                                         if (!fieldChild) {
                                             return null;
