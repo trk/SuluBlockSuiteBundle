@@ -1,5 +1,6 @@
 // @flow
 import React from 'react';
+import {isArrayLike} from 'mobx';
 import Icon from 'sulu-admin-bundle/components/Icon';
 import {translate} from 'sulu-admin-bundle/utils';
 import type {Node} from 'react';
@@ -8,17 +9,18 @@ import styles from './blockPreviewTransformers.scss';
 
 export default class BlockCollectionBlockPreviewTransformer implements BlockPreviewTransformer {
     transform(value: *, schema?: Object): Node {
-        if (!Array.isArray(value) || value.length === 0) {
+        if (!isArrayLike(value) || value.length === 0) {
             return null;
         }
 
-        const count = value.length;
+        const items = Array.from(value);
+        const count = items.length;
         const unitLabel = translate('sulu_block_suite.preview_child_blocks') || 'sub-blocks';
         const fieldLabel = schema && typeof schema.label === 'string' && schema.label.trim() !== ''
             ? schema.label.trim()
             : '';
 
-        const childTitles = value
+        const childTitles = items
             .map((item) => {
                 if (!item || typeof item !== 'object') {
                     return null;

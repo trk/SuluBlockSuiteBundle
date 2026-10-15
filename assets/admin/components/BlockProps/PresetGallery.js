@@ -138,7 +138,7 @@ export default class PresetGallery extends React.Component<Props> {
 
     @computed get filteredPresets(): Array<PresetItem> {
         const {presets} = this.props;
-        const list = Array.isArray(presets) ? presets : [];
+        const list = presets ? (Array.isArray(presets) ? presets : Array.from(presets)) : [];
         if (!this.searchTerm.trim()) {
             return list;
         }

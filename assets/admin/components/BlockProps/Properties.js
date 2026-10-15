@@ -1,6 +1,6 @@
 // @flow
 import React from 'react';
-import {action, observable, toJS} from 'mobx';
+import {action, isArrayLike, observable, toJS} from 'mobx';
 import {observer} from 'mobx-react';
 import {
     Button,
@@ -34,7 +34,7 @@ class Properties extends React.Component<Props> {
     @observable.ref schema: ?Object = null;
     @observable schemaLoading: boolean = false;
     @observable activeTabIndex: number = 0;
-    @observable draftValues: Object = {};
+    @observable.ref draftValues: Object = {};
 
     constructor(props: Props) {
         super(props);

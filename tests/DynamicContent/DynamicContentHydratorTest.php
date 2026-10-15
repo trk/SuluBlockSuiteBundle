@@ -846,4 +846,115 @@ final class DynamicContentHydratorTest extends TestCase
             @\rmdir($tempDir);
         }
     }
+
+    public function testDualModeCustomProductSourceProviderSingleAndCollectionHydration(): void
+    {
+        $productProvider = new class extends \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider {
+            public function getKey(): string
+            {
+                return 'products';
+            }
+
+            public function getLabel(string $locale = 'en'): string
+            {
+                return 'Product Collection';
+            }
+
+            public function getSingleKey(): string
+            {
+                return 'single_product';
+            }
+
+            public function getSingleLabel(string $locale = 'en'): string
+            {
+                return 'Single Product Selection';
+            }
+
+            public function getSourceFields(string $locale = 'en'): array
+            {
+                return [
+                    ['name' => 'title', 'label' => 'Product Name', 'type' => 'string'],
+                    ['name' => 'sku', 'label' => 'SKU', 'type' => 'string'],
+                    ['name' => 'price', 'label' => 'Price', 'type' => 'string'],
+                ];
+            }
+
+            public function resolveSingle(array $config, string|object|array|null $contextPage = null, ?string $locale = null): ?array
+            {
+                $productId = $config['product_id'] ?? null;
+                if (42 === $productId || '42' === $productId) {
+                    return [
+                        'title' => 'Industrial CNC Router X500',
+                        'sku' => 'CNC-X500',
+                        'price' => '$14,500',
+                    ];
+                }
+
+                return null;
+            }
+
+            public function resolveCollection(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
+            {
+                return [
+                    ['title' => 'Industrial CNC Router X500', 'sku' => 'CNC-X500', 'price' => '$14,500'],
+                    ['title' => 'Laser Cutter Pro L200', 'sku' => 'LSR-L200', 'price' => '$8,900'],
+                ];
+            }
+        };
+
+        $hydrator = new DynamicContentHydrator(null, [$productProvider]);
+
+        // 1. Single product mode on a single block (card)
+        $singleCard = [
+            'type' => 'card',
+            'title' => 'Static Product',
+            'badge' => 'STATIC',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'single_product',
+                    'product_id' => 42,
+                    'mapping' => [
+                        'title' => 'title',
+                        'badge' => 'sku',
+                        'subtitle' => 'price',
+                    ],
+                ],
+            ],
+        ];
+
+        $singleResult = $hydrator->hydrateBlock($singleCard);
+        self::assertCount(1, $singleResult);
+        self::assertSame('Industrial CNC Router X500', $singleResult[0]['title']);
+        self::assertSame('CNC-X500', $singleResult[0]['badge']);
+        self::assertSame('$14,500', $singleResult[0]['subtitle']);
+
+        // 2. Product collection mode on a multiple block (grid)
+        $gridBlock = [
+            'type' => 'grid',
+            'items' => [],
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'products',
+                    'product_ids' => [42, 43],
+                    'mapping' => [
+                        'title' => 'title',
+                        'badge' => 'sku',
+                    ],
+                ],
+            ],
+        ];
+
+        $collectionResult = $hydrator->hydrateBlock($gridBlock);
+        self::assertCount(1, $collectionResult);
+        self::assertIsArray($collectionResult[0]['items']);
+        /** @var list<array<string, mixed>> $items */
+        $items = $collectionResult[0]['items'];
+        self::assertCount(2, $items);
+        self::assertSame('Industrial CNC Router X500', $items[0]['title']);
+        self::assertSame('CNC-X500', $items[0]['badge']);
+        self::assertSame('Laser Cutter Pro L200', $items[1]['title']);
+        self::assertSame('LSR-L200', $items[1]['badge']);
+    }
 }

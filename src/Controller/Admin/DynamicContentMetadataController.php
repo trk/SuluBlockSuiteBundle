@@ -9,27 +9,23 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceRegistry;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
 
 final class DynamicContentMetadataController extends AbstractController
 {
-    /**
-     * @var array<string, DynamicContentSourceProviderInterface>
-     */
-    private array $customProviders = [];
+    private readonly DynamicContentSourceRegistry $registry;
 
     /**
      * @param iterable<DynamicContentSourceProviderInterface> $customProviders
      */
     public function __construct(
-        private readonly ?PageSourceResolverInterface $sourceResolver = null,
+        ?PageSourceResolverInterface $sourceResolver = null,
         private readonly ?BlockTargetFieldMetadataResolver $targetFieldResolver = null,
         iterable $customProviders = [],
     ) {
-        foreach ($customProviders as $provider) {
-            $this->customProviders[$provider->getKey()] = $provider;
-        }
+        $this->registry = new DynamicContentSourceRegistry($customProviders, $sourceResolver);
     }
 
     #[Route('/admin/api/block-suite/dynamic/source-fields', name: 'sulu_block_suite_dynamic_source_fields', methods: ['GET'])]
@@ -43,30 +39,9 @@ final class DynamicContentMetadataController extends AbstractController
     {
         $locale = $request->query->getString('locale', $request->getLocale());
 
-        /** @var list<array{key: string, label: string, multi_item: bool}> $sources */
-        $sources = [
-            ['key' => 'none', 'label' => 'None (Static Manual Content)', 'multi_item' => false],
-            ['key' => 'current_page', 'label' => 'Current Page', 'multi_item' => false],
-            ['key' => 'parent_page', 'label' => 'Parent Page', 'multi_item' => false],
-            ['key' => 'specific_page', 'label' => 'Single Page Selection', 'multi_item' => false],
-            ['key' => 'single_article', 'label' => 'Single Article Selection', 'multi_item' => false],
-            ['key' => 'single_category', 'label' => 'Single Category Selection', 'multi_item' => false],
-            ['key' => 'single_media', 'label' => 'Single Media Selection', 'multi_item' => false],
-            ['key' => 'page_selection', 'label' => 'Page Selection (Multiple)', 'multi_item' => true],
-            ['key' => 'page_children', 'label' => 'Child Pages', 'multi_item' => true],
-            ['key' => 'sibling_pages', 'label' => 'Sibling Pages', 'multi_item' => true],
-            ['key' => 'custom_query', 'label' => 'Smart Content Query (Pages)', 'multi_item' => true],
-        ];
-
-        foreach ($this->customProviders as $provider) {
-            $sources[] = [
-                'key' => $provider->getKey(),
-                'label' => $provider->getLabel($locale),
-                'multi_item' => $provider->isMultiItem(),
-            ];
-        }
-
-        return new JsonResponse($sources);
+        return new JsonResponse([
+            'sources' => $this->registry->getSourceDescriptors($locale),
+        ]);
     }
 
     #[Route('/admin/api/block-suite/dynamic/target-fields/{blockType}', name: 'sulu_block_suite_dynamic_target_fields', methods: ['GET'])]
@@ -87,64 +62,11 @@ final class DynamicContentMetadataController extends AbstractController
     {
         $locale = $request->query->getString('locale', $request->getLocale());
         $sourceType = $request->query->getString('source_type', '');
+        /** @var array<string, mixed> $context */
+        $context = $request->query->all();
 
-        $providerKeyMap = [
-            'single_article' => 'sulu_articles',
-            'single_category' => 'sulu_categories',
-            'single_media' => 'sulu_media_collection',
-        ];
-        $mappedSourceType = $providerKeyMap[$sourceType] ?? $sourceType;
-
-        if ('' !== $mappedSourceType && isset($this->customProviders[$mappedSourceType])) {
-            return new JsonResponse($this->customProviders[$mappedSourceType]->getSourceFields($locale));
-        }
-
-        /** @var list<array{name: string, label: string, type: string}> $fields */
-        $fields = [
-            ['name' => 'title', 'label' => 'Title', 'type' => 'string'],
-            ['name' => 'headline', 'label' => 'Headline', 'type' => 'string'],
-            ['name' => 'subtitle', 'label' => 'Subtitle', 'type' => 'string'],
-            ['name' => 'summary', 'label' => 'Summary / Excerpt', 'type' => 'text'],
-            ['name' => 'description', 'label' => 'Description', 'type' => 'text'],
-            ['name' => 'image', 'label' => 'Image (Media)', 'type' => 'media'],
-            ['name' => 'url', 'label' => 'Page URL', 'type' => 'link'],
-            ['name' => 'link', 'label' => 'Page Link', 'type' => 'link'],
-            ['name' => 'badge', 'label' => 'Primary Tag / Badge', 'type' => 'string'],
-            ['name' => 'tags', 'label' => 'Tags', 'type' => 'array'],
-            ['name' => 'template', 'label' => 'Template Key', 'type' => 'string'],
-            ['name' => 'date', 'label' => 'Publish Date', 'type' => 'date'],
-            ['name' => 'author', 'label' => 'Author', 'type' => 'string'],
-        ];
-
-        $pageId = $request->query->get('page_id');
-        if (\is_string($pageId) && '' !== \trim($pageId) && null !== $this->sourceResolver) {
-            $pageData = $this->sourceResolver->resolvePage(\trim($pageId), $locale);
-
-            if (null !== $pageData) {
-                $existingNames = \array_column($fields, 'name');
-                foreach ($pageData as $key => $value) {
-                    if (\in_array($key, $existingNames, true) || \str_starts_with($key, '_') || 'id' === $key || 'uuid' === $key) {
-                        continue;
-                    }
-
-                    $type = 'string';
-                    if (\is_array($value) && isset($value['id'])) {
-                        $type = 'media';
-                    } elseif (\is_array($value)) {
-                        $type = 'array';
-                    } elseif (\is_bool($value)) {
-                        $type = 'boolean';
-                    }
-
-                    $fields[] = [
-                        'name' => $key,
-                        'label' => \ucwords(\str_replace(['_', '-'], ' ', $key)),
-                        'type' => $type,
-                    ];
-                }
-            }
-        }
-
-        return new JsonResponse($fields);
+        return new JsonResponse([
+            'fields' => $this->registry->getSourceFields($sourceType, $locale, $context),
+        ]);
     }
 }

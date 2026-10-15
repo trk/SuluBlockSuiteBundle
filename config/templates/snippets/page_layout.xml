@@ -49,12 +49,12 @@
         <title lang="ru">&#x41A;&#x43B;&#x44E;&#x447; &#x43C;&#x430;&#x43A;&#x435;&#x442;&#x430;</title>
         <title lang="es">Clave del Dise&#xF1;o</title>
         <title lang="fr">Cl&#xE9; de la Mise en Page</title>
-        <info_text lang="en">Unique identifier used for auto-resolving matching page layouts (e.g. 'default', 'homepage', 'blog'). If not specified, title is used.</info_text>
-        <info_text lang="tr">Sayfa &#x15F;ablonuyla otomatik e&#x15F;le&#x15F;me i&#xE7;in benzersiz anahtar (&#xF6;rn. 'default', 'homepage', 'blog'). Belirtilmezse ba&#x15F;l&#x131;k kullan&#x131;l&#x131;r.</info_text>
-        <info_text lang="de">Eindeutiger Bezeichner f&#xFC;r die automatische Zuordnung (z. B. 'default', 'homepage'). Falls leer, wird der Titel verwendet.</info_text>
-        <info_text lang="ru">&#x423;&#x43D;&#x438;&#x43A;&#x430;&#x43B;&#x44C;&#x43D;&#x44B;&#x439; &#x438;&#x434;&#x435;&#x43D;&#x442;&#x438;&#x444;&#x438;&#x43A;&#x430;&#x442;&#x43E;&#x440; &#x434;&#x43B;&#x44F; &#x441;&#x43E;&#x43F;&#x43E;&#x441;&#x442;&#x430;&#x432;&#x43B;&#x435;&#x43D;&#x438;&#x44F; (&#x43D;&#x430;&#x43F;&#x440;&#x438;&#x43C;&#x435;&#x440;, 'default', 'homepage'). &#x415;&#x441;&#x43B;&#x438; &#x43F;&#x443;&#x441;&#x442;&#x43E;, &#x438;&#x441;&#x43F;&#x43E;&#x43B;&#x44C;&#x437;&#x443;&#x435;&#x442;&#x441;&#x44F; &#x43D;&#x430;&#x437;&#x432;&#x430;&#x43D;&#x438;&#x435;.</info_text>
-        <info_text lang="es">Identificador &#xFA;nico utilizado en Twig (ej. 'default', 'homepage'). Si no se especifica, se utiliza el t&#xED;tulo.</info_text>
-        <info_text lang="fr">Identifiant unique utilis&#xE9; dans Twig (ex. 'default', 'homepage'). Si non sp&#xE9;cifi&#xE9;, le titre est utilis&#xE9;.</info_text>
+        <info_text lang="en">Unique identifier used for auto-resolving matching page layouts. If not specified, title is used.</info_text>
+        <info_text lang="tr">Sayfa şablonuyla otomatik eşleşme için benzersiz anahtar. Belirtilmezse başlık kullanılır.</info_text>
+        <info_text lang="de">Eindeutiger Bezeichner für die automatische Zuordnung. Falls leer, wird der Titel verwendet.</info_text>
+        <info_text lang="ru">Уникальный идентификатор для сопоставления. Если пусто, используется название.</info_text>
+        <info_text lang="es">Identificador único utilizado en Twig. Si no se especifica, se utiliza el título.</info_text>
+        <info_text lang="fr">Identifiant unique utilisé dans Twig. Si non spécifié, le titre est utilisé.</info_text>
       </meta>
     </property>
     <property name="description" type="text_area">

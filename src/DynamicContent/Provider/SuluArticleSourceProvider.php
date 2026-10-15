@@ -10,12 +10,12 @@ use Sulu\Article\Domain\Repository\ArticleRepositoryInterface;
 use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 
 /**
- * Built-in Dynamic Content source provider for Sulu 3 Articles.
+ * Built-in Dynamic Content source provider for Sulu 3 Articles (Single & Collection).
  */
-final class SuluArticleSourceProvider implements DynamicContentSourceProviderInterface
+final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvider
 {
     public function __construct(
         private readonly ?ArticleRepositoryInterface $articleRepository = null,
@@ -32,18 +32,61 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
     public function getLabel(string $locale = 'en'): string
     {
         return match (\strtolower(\substr($locale, 0, 2))) {
-            'tr' => 'Sulu Makaleleri (Articles)',
-            'de' => 'Sulu-Artikel (Articles)',
-            'ru' => 'Статьи Sulu (Articles)',
-            'es' => 'Artículos de Sulu (Articles)',
-            'fr' => 'Articles Sulu (Articles)',
-            default => 'Sulu Articles',
+            'tr' => 'Makaleler',
+            'de' => 'Artikel',
+            'ru' => 'Статьи',
+            'es' => 'Artículos',
+            'fr' => 'Articles',
+            default => 'Articles',
         };
     }
 
-    public function isMultiItem(): bool
+    public function getSingleKey(): string
     {
-        return true;
+        return 'single_article';
+    }
+
+    public function getSingleLabel(string $locale = 'en'): string
+    {
+        return match (\strtolower(\substr($locale, 0, 2))) {
+            'tr' => 'Tekil Makale Seçimi',
+            'de' => 'Einzelne Artikelauswahl',
+            'ru' => 'Выбор одной статьи',
+            'es' => 'Selección de artículo único',
+            'fr' => 'Sélection d’article unique',
+            default => 'Single Article Selection',
+        };
+    }
+
+    public function getSingleConfigFields(string $locale = 'en'): array
+    {
+        return [
+            $this->createSelectionField(
+                name: 'article_id',
+                type: 'single_article_selection',
+                label: 'sulu_block_suite.dynamic_single_article',
+                description: 'sulu_block_suite.dynamic_single_article_desc',
+                required: true,
+                colSpan: 12,
+                triggerSourceFieldsReload: true,
+            ),
+        ];
+    }
+
+    public function getConfigFields(string $locale = 'en'): array
+    {
+        return [
+            $this->createSelectionField(
+                name: 'article_ids',
+                type: 'article_selection',
+                label: 'sulu_block_suite.dynamic_article_selection',
+                description: 'sulu_block_suite.dynamic_article_selection_desc',
+                required: false,
+                colSpan: 12,
+            ),
+            ...$this->createPaginationAndSortFields(10),
+            ...$this->createTaxonomyFilterFields(includeTemplateFilter: true, includeTags: true, includeCategories: true),
+        ];
     }
 
     public function getSourceFields(string $locale = 'en'): array
@@ -51,15 +94,50 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
         return [
             ['name' => 'title', 'label' => 'Title', 'type' => 'text_line'],
             ['name' => 'headline', 'label' => 'Headline', 'type' => 'text_line'],
-            ['name' => 'summary', 'label' => 'Summary / Excerpt Description', 'type' => 'text_area'],
+            ['name' => 'summary', 'label' => 'Summary', 'type' => 'text_area'],
             ['name' => 'description', 'label' => 'Description', 'type' => 'text_editor'],
-            ['name' => 'image', 'label' => 'Image / Excerpt Image', 'type' => 'single_media_selection'],
+            ['name' => 'image', 'label' => 'Image', 'type' => 'single_media_selection'],
             ['name' => 'url', 'label' => 'URL', 'type' => 'url'],
             ['name' => 'link', 'label' => 'Link', 'type' => 'link'],
-            ['name' => 'authored', 'label' => 'Authored Date (ISO)', 'type' => 'datetime'],
-            ['name' => 'badge', 'label' => 'First Tag / Badge', 'type' => 'text_line'],
+            ['name' => 'authored', 'label' => 'Authored Date', 'type' => 'datetime'],
+            ['name' => 'badge', 'label' => 'Badge', 'type' => 'text_line'],
             ['name' => 'template', 'label' => 'Template Key', 'type' => 'text_line'],
         ];
+    }
+
+    public function resolveSourceFields(string $locale = 'en', array $context = []): array
+    {
+        $fields = $this->getSourceFields($locale);
+
+        $articleId = $context['article_id'] ?? ($context['id'] ?? ($context['uuid'] ?? null));
+        if (\is_string($articleId) && '' !== \trim($articleId) && null !== $this->articleRepository) {
+            $articleData = $this->resolveSingle(['article_id' => \trim($articleId)], null, $locale);
+            if (null !== $articleData) {
+                $existingNames = \array_column($fields, 'name');
+                foreach ($articleData as $key => $value) {
+                    if (\in_array($key, $existingNames, true) || \str_starts_with($key, '_') || 'id' === $key || 'uuid' === $key) {
+                        continue;
+                    }
+
+                    $type = 'text_line';
+                    if (\is_array($value) && isset($value['id'])) {
+                        $type = 'single_media_selection';
+                    } elseif (\is_array($value)) {
+                        $type = 'array';
+                    } elseif (\is_bool($value)) {
+                        $type = 'boolean';
+                    }
+
+                    $fields[] = [
+                        'name' => $key,
+                        'label' => \ucwords(\str_replace(['_', '-'], ' ', $key)),
+                        'type' => $type,
+                    ];
+                }
+            }
+        }
+
+        return $fields;
     }
 
     public function resolveSingle(array $config, string|object|array|null $contextPage = null, ?string $locale = null): ?array
@@ -68,14 +146,14 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
             return null;
         }
 
-        $uuid = $config['uuid'] ?? ($config['id'] ?? ($config['page_id'] ?? null));
+        $uuid = $config['article_id'] ?? ($config['uuid'] ?? ($config['id'] ?? ($config['page_id'] ?? null)));
         if (!\is_string($uuid) || '' === \trim($uuid)) {
             $collection = $this->resolveCollection(\array_merge($config, ['limit' => 1]), $contextPage, $locale);
 
             return $collection[0] ?? null;
         }
 
-        $resolvedLocale = $this->resolveLocale($locale);
+        $resolvedLocale = $this->resolveLocale($locale, $this->requestStack);
 
         try {
             $article = $this->articleRepository->findOneBy(
@@ -108,7 +186,7 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
             return [];
         }
 
-        $resolvedLocale = $this->resolveLocale($locale);
+        $resolvedLocale = $this->resolveLocale($locale, $this->requestStack);
         $query = isset($config['query']) && \is_array($config['query'])
             ? \array_merge($config, $config['query'])
             : $config;
@@ -119,7 +197,7 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
             'stage' => DimensionContentInterface::STAGE_LIVE,
         ];
 
-        $uuids = $this->normalizeStringList($query['uuids'] ?? ($query['ids'] ?? ($query['article_ids'] ?? null)));
+        $uuids = $this->normalizeStringList($query['article_ids'] ?? ($query['uuids'] ?? ($query['ids'] ?? null)));
         if ([] !== $uuids) {
             $filters['uuids'] = $uuids;
         }
@@ -360,74 +438,5 @@ final class SuluArticleSourceProvider implements DynamicContentSourceProviderInt
         }
 
         return null;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function normalizeStringList(mixed $raw): array
-    {
-        if (\is_string($raw)) {
-            return \array_values(\array_filter(
-                \array_map('trim', \explode(',', $raw)),
-                static fn (string $v): bool => '' !== $v,
-            ));
-        }
-
-        if (\is_array($raw)) {
-            $list = [];
-            foreach ($raw as $item) {
-                if (\is_string($item) && '' !== \trim($item)) {
-                    $list[] = \trim($item);
-                }
-            }
-
-            return $list;
-        }
-
-        return [];
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function normalizeIntList(mixed $raw): array
-    {
-        if (\is_int($raw)) {
-            return [$raw];
-        }
-
-        if (\is_string($raw)) {
-            $raw = \explode(',', $raw);
-        }
-
-        if (\is_array($raw)) {
-            $list = [];
-            foreach ($raw as $item) {
-                if (\is_numeric($item)) {
-                    $list[] = (int) $item;
-                }
-            }
-
-            return $list;
-        }
-
-        return [];
-    }
-
-    private function resolveLocale(?string $locale): string
-    {
-        if (null !== $locale && '' !== \trim($locale)) {
-            return \trim($locale);
-        }
-
-        if (null !== $this->requestStack) {
-            $request = $this->requestStack->getCurrentRequest();
-            if (null !== $request && '' !== $request->getLocale()) {
-                return $request->getLocale();
-            }
-        }
-
-        return 'en';
     }
 }

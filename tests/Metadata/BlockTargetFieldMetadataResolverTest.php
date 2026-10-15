@@ -75,8 +75,8 @@ final class BlockTargetFieldMetadataResolverTest extends TestCase
         $fields = $resolver->resolveTargetFields('card', 'en');
 
         $this->assertSame([
-            ['name' => 'title', 'label' => 'Card Title (title)', 'type' => 'string'],
-            ['name' => 'image', 'label' => 'Featured Image (image)', 'type' => 'media'],
+            ['name' => 'title', 'label' => 'Card Title', 'type' => 'string'],
+            ['name' => 'image', 'label' => 'Featured Image', 'type' => 'media'],
         ], $fields);
     }
 
@@ -103,8 +103,8 @@ YAML
         $fields = $resolver->resolveTargetFields('custom_widget', 'en');
 
         $this->assertSame([
-            ['name' => 'headline', 'label' => 'Custom Headline (headline)', 'type' => 'string'],
-            ['name' => 'cta_url', 'label' => 'CTA URL (cta_url)', 'type' => 'link'],
+            ['name' => 'headline', 'label' => 'Custom Headline', 'type' => 'string'],
+            ['name' => 'cta_url', 'label' => 'CTA URL', 'type' => 'link'],
         ], $fields);
     }
 
@@ -150,8 +150,8 @@ YAML
         $this->assertTrue($metadata['multiple']);
         $this->assertSame('accordion_item', $metadata['default_item_type']);
         $this->assertSame([
-            ['name' => 'title', 'label' => 'Question Title (title)', 'type' => 'string'],
-            ['name' => 'content', 'label' => 'Answer Body (content)', 'type' => 'text'],
+            ['name' => 'title', 'label' => 'Question Title', 'type' => 'string'],
+            ['name' => 'content', 'label' => 'Answer Body', 'type' => 'text'],
         ], $metadata['fields']);
     }
 

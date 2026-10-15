@@ -20,12 +20,12 @@
                 <title lang="ru">Название предустановки</title>
                 <title lang="es">Título del Ajuste</title>
                 <title lang="fr">Titre du Préréglage</title>
-                <info_text lang="en">Name of this preset (e.g. Hero Primary Button, Dark Highlight Card)</info_text>
-                <info_text lang="tr">Bu hazır şablonun adı (ör. Hero Birincil Buton, Koyu Vurgulu Kart)</info_text>
-                <info_text lang="de">Name der Vorlage (z. B. Hero Primärer Button, Dunkel Hervorgehobene Karte)</info_text>
-                <info_text lang="ru">Название предустановки (например, Основная кнопка Hero, Темная карточка)</info_text>
-                <info_text lang="es">Nombre del ajuste (ej. Botón Principal Hero, Tarjeta Oscura Destacada)</info_text>
-                <info_text lang="fr">Nom du préréglage (ex. Bouton Principal Hero, Carte Sombre Mise en Avant)</info_text>
+                <info_text lang="en">Name of this preset</info_text>
+                <info_text lang="tr">Bu hazır şablonun adı</info_text>
+                <info_text lang="de">Name der Vorlage</info_text>
+                <info_text lang="ru">Название предустановки</info_text>
+                <info_text lang="es">Nombre del ajuste</info_text>
+                <info_text lang="fr">Nom du préréglage</info_text>
             </meta>
             <params>
                 <param name="headline" value="true"/>

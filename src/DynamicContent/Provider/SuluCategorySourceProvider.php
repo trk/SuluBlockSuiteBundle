@@ -8,12 +8,12 @@ use Sulu\Bundle\CategoryBundle\Api\Category;
 use Sulu\Bundle\CategoryBundle\Category\CategoryManagerInterface;
 use Sulu\Bundle\CategoryBundle\Entity\CategoryInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 
 /**
- * Built-in Dynamic Content source provider for Sulu Categories.
+ * Built-in Dynamic Content source provider for Sulu Categories (Single & Collection).
  */
-final class SuluCategorySourceProvider implements DynamicContentSourceProviderInterface
+final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvider
 {
     public function __construct(
         private readonly ?CategoryManagerInterface $categoryManager = null,
@@ -29,30 +29,79 @@ final class SuluCategorySourceProvider implements DynamicContentSourceProviderIn
     public function getLabel(string $locale = 'en'): string
     {
         return match (\strtolower(\substr($locale, 0, 2))) {
-            'tr' => 'Sulu Kategorileri (Categories)',
-            'de' => 'Sulu-Kategorien (Categories)',
-            'ru' => 'Категории Sulu (Categories)',
-            'es' => 'Categorías de Sulu (Categories)',
-            'fr' => 'Catégories Sulu (Categories)',
-            default => 'Sulu Categories',
+            'tr' => 'Kategoriler',
+            'de' => 'Kategorien',
+            'ru' => 'Категории',
+            'es' => 'Categorías',
+            'fr' => 'Catégories',
+            default => 'Categories',
         };
     }
 
-    public function isMultiItem(): bool
+    public function getSingleKey(): string
     {
-        return true;
+        return 'single_category';
+    }
+
+    public function getSingleLabel(string $locale = 'en'): string
+    {
+        return match (\strtolower(\substr($locale, 0, 2))) {
+            'tr' => 'Tekil Kategori Seçimi',
+            'de' => 'Einzelne Kategorieauswahl',
+            'ru' => 'Выбор одной категории',
+            'es' => 'Selección de categoría única',
+            'fr' => 'Sélection de catégorie unique',
+            default => 'Single Category Selection',
+        };
+    }
+
+    public function getSingleConfigFields(string $locale = 'en'): array
+    {
+        return [
+            $this->createSelectionField(
+                name: 'category_id',
+                type: 'single_category_selection',
+                label: 'sulu_block_suite.dynamic_single_category',
+                description: 'sulu_block_suite.dynamic_single_category_desc',
+                required: true,
+                colSpan: 12,
+            ),
+        ];
+    }
+
+    public function getConfigFields(string $locale = 'en'): array
+    {
+        return [
+            $this->createSelectionField(
+                name: 'category_ids',
+                type: 'category_selection',
+                label: 'sulu_block_suite.dynamic_category_selection',
+                description: 'sulu_block_suite.dynamic_category_selection_desc',
+                required: false,
+                colSpan: 6,
+            ),
+            $this->createSelectionField(
+                name: 'parent_id',
+                type: 'single_category_selection',
+                label: 'sulu_block_suite.dynamic_parent_category',
+                description: 'sulu_block_suite.dynamic_parent_category_desc',
+                required: false,
+                colSpan: 6,
+            ),
+            ...$this->createPaginationAndSortFields(50),
+        ];
     }
 
     public function getSourceFields(string $locale = 'en'): array
     {
         return [
-            ['name' => 'title', 'label' => 'Category Name / Title', 'type' => 'text_line'],
-            ['name' => 'headline', 'label' => 'Category Name (Headline)', 'type' => 'text_line'],
+            ['name' => 'title', 'label' => 'Category Name', 'type' => 'text_line'],
+            ['name' => 'headline', 'label' => 'Headline', 'type' => 'text_line'],
             ['name' => 'description', 'label' => 'Category Description', 'type' => 'text_area'],
-            ['name' => 'summary', 'label' => 'Category Description (Summary)', 'type' => 'text_area'],
+            ['name' => 'summary', 'label' => 'Summary', 'type' => 'text_area'],
             ['name' => 'key', 'label' => 'Category Key', 'type' => 'text_line'],
-            ['name' => 'badge', 'label' => 'Category Key (Badge)', 'type' => 'text_line'],
-            ['name' => 'image', 'label' => 'Category Media / Image', 'type' => 'single_media_selection'],
+            ['name' => 'badge', 'label' => 'Badge', 'type' => 'text_line'],
+            ['name' => 'image', 'label' => 'Category Media', 'type' => 'single_media_selection'],
         ];
     }
 
@@ -62,12 +111,13 @@ final class SuluCategorySourceProvider implements DynamicContentSourceProviderIn
             return null;
         }
 
-        $resolvedLocale = $this->resolveLocale($locale);
+        $resolvedLocale = $this->resolveLocale($locale, $this->requestStack);
+        $rawCategoryId = $config['category_id'] ?? ($config['id'] ?? ($config['page_id'] ?? null));
 
         try {
             $entity = null;
-            if (isset($config['category_id']) && \is_numeric($config['category_id'])) {
-                $entity = $this->categoryManager->findById((int) $config['category_id']);
+            if (\is_numeric($rawCategoryId)) {
+                $entity = $this->categoryManager->findById((int) $rawCategoryId);
             } elseif (isset($config['category_key']) && \is_string($config['category_key']) && '' !== \trim($config['category_key'])) {
                 $entity = $this->categoryManager->findByKey(\trim($config['category_key']));
             } else {
@@ -90,7 +140,7 @@ final class SuluCategorySourceProvider implements DynamicContentSourceProviderIn
             return [];
         }
 
-        $resolvedLocale = $this->resolveLocale($locale);
+        $resolvedLocale = $this->resolveLocale($locale, $this->requestStack);
         $query = isset($config['query']) && \is_array($config['query'])
             ? \array_merge($config, $config['query'])
             : $config;
@@ -105,21 +155,10 @@ final class SuluCategorySourceProvider implements DynamicContentSourceProviderIn
                 $parentKey = $parentKey[0] ?? null;
             }
 
-            $categoryIds = $query['category_ids'] ?? null;
-            if (\is_string($categoryIds) && '' !== \trim($categoryIds)) {
-                $categoryIds = \explode(',', $categoryIds);
-            }
-            if (\is_array($categoryIds) && [] !== $categoryIds) {
-                $intIds = [];
-                foreach ($categoryIds as $id) {
-                    if (\is_numeric($id)) {
-                        $intIds[] = (int) $id;
-                    }
-                }
-                if ([] !== $intIds) {
-                    /** @var list<CategoryInterface> $entities */
-                    $entities = \array_values($this->categoryManager->findByIds($intIds));
-                }
+            $intIds = $this->normalizeIntList($query['category_ids'] ?? ($query['ids'] ?? null));
+            if ([] !== $intIds) {
+                /** @var list<CategoryInterface> $entities */
+                $entities = \array_values($this->categoryManager->findByIds($intIds));
             } elseif (\is_numeric($parentId) && (int) $parentId > 0) {
                 /** @var list<CategoryInterface> $entities */
                 $entities = \array_values($this->categoryManager->findChildrenByParentId((int) $parentId));
@@ -192,21 +231,5 @@ final class SuluCategorySourceProvider implements DynamicContentSourceProviderIn
             'meta' => $key,
             'image' => $firstImage,
         ];
-    }
-
-    private function resolveLocale(?string $locale): string
-    {
-        if (null !== $locale && '' !== \trim($locale)) {
-            return \trim($locale);
-        }
-
-        if (null !== $this->requestStack) {
-            $request = $this->requestStack->getCurrentRequest();
-            if (null !== $request && '' !== $request->getLocale()) {
-                return $request->getLocale();
-            }
-        }
-
-        return 'en';
     }
 }

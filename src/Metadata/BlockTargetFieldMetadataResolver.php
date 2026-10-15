@@ -238,11 +238,7 @@ final class BlockTargetFieldMetadataResolver
 
     private function formatFieldLabel(string $label, string $name): string
     {
-        if (\str_contains(\strtolower($label), '(' . \strtolower($name) . ')')) {
-            return $label;
-        }
-
-        return \sprintf('%s (%s)', $label, $name);
+        return '' !== \trim($label) ? \trim($label) : $name;
     }
 
     private function mapSuluFieldType(string $suluType): string
@@ -266,11 +262,11 @@ final class BlockTargetFieldMetadataResolver
     private function getDefaultFallbackFields(): array
     {
         return [
-            ['name' => 'title', 'label' => 'Title (title)', 'type' => 'string'],
-            ['name' => 'content', 'label' => 'Content (content)', 'type' => 'text'],
-            ['name' => 'image', 'label' => 'Image (image)', 'type' => 'media'],
-            ['name' => 'link', 'label' => 'Link (link)', 'type' => 'link'],
-            ['name' => 'icon', 'label' => 'Icon (icon)', 'type' => 'icon'],
+            ['name' => 'title', 'label' => 'Title', 'type' => 'string'],
+            ['name' => 'content', 'label' => 'Content', 'type' => 'text'],
+            ['name' => 'image', 'label' => 'Image', 'type' => 'media'],
+            ['name' => 'link', 'label' => 'Link', 'type' => 'link'],
+            ['name' => 'icon', 'label' => 'Icon', 'type' => 'icon'],
         ];
     }
 }

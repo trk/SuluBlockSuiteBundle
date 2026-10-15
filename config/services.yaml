@@ -111,6 +111,11 @@ services:
             $contentResolver: '@?sulu_content.content_resolver'
             $requestStack: '@?request_stack'
 
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluPageSourceProvider:
+        arguments:
+            $sourceResolver: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface'
+        tags: ['sulu_block_suite.dynamic_source_provider']
+
     Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluArticleSourceProvider:
         arguments:
             $articleRepository: '@?sulu_article.article_repository'

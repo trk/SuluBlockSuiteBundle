@@ -8,22 +8,17 @@ use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
 
 final class DynamicContentHydrator implements DynamicContentHydratorInterface
 {
-    /**
-     * @var array<string, DynamicContentSourceProviderInterface>
-     */
-    private array $customProviders = [];
+    private readonly DynamicContentSourceRegistry $registry;
 
     /**
      * @param iterable<DynamicContentSourceProviderInterface> $customProviders
      */
     public function __construct(
-        private readonly ?PageSourceResolverInterface $sourceResolver = null,
+        ?PageSourceResolverInterface $sourceResolver = null,
         iterable $customProviders = [],
         private readonly ?BlockTargetFieldMetadataResolver $targetFieldResolver = null,
     ) {
-        foreach ($customProviders as $provider) {
-            $this->customProviders[$provider->getKey()] = $provider;
-        }
+        $this->registry = new DynamicContentSourceRegistry($customProviders, $sourceResolver);
     }
 
     /**
@@ -31,7 +26,12 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
      */
     public function getCustomProviders(): array
     {
-        return $this->customProviders;
+        return $this->registry->getProviders();
+    }
+
+    public function getRegistry(): DynamicContentSourceRegistry
+    {
+        return $this->registry;
     }
 
     public function hydrateBlock(array $block, string|object|array|null $contextPage = null): array
@@ -58,161 +58,28 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             ? $dynamicConfig['condition']
             : null;
 
-        // 1. Custom registered source provider (or single-item alias mapped to a provider)
-        $singleProviderAliases = [
-            'single_article' => 'sulu_articles',
-            'single_category' => 'sulu_categories',
-            'single_media' => 'sulu_media_collection',
-        ];
-
-        $providerKey = $singleProviderAliases[$sourceType] ?? $sourceType;
-        $forceSingle = isset($singleProviderAliases[$sourceType]);
-
-        if (isset($this->customProviders[$providerKey])) {
-            $provider = $this->customProviders[$providerKey];
-            if (!$forceSingle && $provider->isMultiItem()) {
-                $items = $provider->resolveCollection($dynamicConfig, $contextPage);
-
-                return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
-            }
-
-            $itemData = $provider->resolveSingle($dynamicConfig, $contextPage);
-            if (null === $itemData) {
-                return [$block];
-            }
-
-            if (null !== $condition && !$this->evaluateCondition($itemData, $condition)) {
-                return [];
-            }
-
-            return [$this->applyMapping($block, $itemData, $mapping)];
-        }
-
-        if (null === $this->sourceResolver) {
+        $entry = $this->registry->getEntry($sourceType);
+        if (null === $entry) {
             return [$block];
         }
 
-        // 2. Selected pages (page_selection)
-        if ('page_selection' === $sourceType) {
-            $rawIds = $dynamicConfig['page_ids'] ?? ($dynamicConfig['uuids'] ?? ($dynamicConfig['ids'] ?? null));
-            $queryOptions = $this->extractQueryOptions($dynamicConfig);
-            $queryOptions['uuids'] = $rawIds;
-            if (isset($dynamicConfig['limit']) && \is_numeric($dynamicConfig['limit'])) {
-                $queryOptions['limit'] = (int) $dynamicConfig['limit'];
-            }
-            $items = $this->sourceResolver->resolveQuery($queryOptions);
+        $provider = $entry['provider'];
+        if ($entry['multi_item']) {
+            $items = $provider->resolveCollection($dynamicConfig, $contextPage);
 
             return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
         }
 
-        // 3. Child pages (page_children)
-        if ('page_children' === $sourceType) {
-            $rawParentId = $this->resolveTargetOrContext(
-                $dynamicConfig['parent_id'] ?? ($dynamicConfig['page_id'] ?? null),
-                $contextPage,
-            );
-            if (!\is_string($rawParentId) && !\is_object($rawParentId) && !\is_array($rawParentId)) {
-                $rawParentId = [];
-            }
-            /** @var string|object|array<mixed, mixed> $parentId */
-            $parentId = $rawParentId;
-            $limit = isset($dynamicConfig['limit']) && \is_numeric($dynamicConfig['limit'])
-                ? (int) $dynamicConfig['limit']
-                : 50;
-
-            $queryOptions = $this->extractQueryOptions($dynamicConfig);
-            if ([] !== $queryOptions) {
-                $items = $this->sourceResolver->resolveQuery(\array_merge($queryOptions, [
-                    'parent_id' => $parentId,
-                    'limit' => $limit,
-                ]));
-            } else {
-                $items = $this->sourceResolver->resolveChildren($parentId, null, $limit);
-            }
-
-            return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
-        }
-
-        // 4. Sibling pages (sibling_pages)
-        if ('sibling_pages' === $sourceType) {
-            $targetPage = $this->resolveTargetOrContext($contextPage, $dynamicConfig['page_id'] ?? null);
-            $limit = isset($dynamicConfig['limit']) && \is_numeric($dynamicConfig['limit'])
-                ? (int) $dynamicConfig['limit']
-                : 50;
-            $excludeCurrent = !isset($dynamicConfig['exclude_current']) || (bool) $dynamicConfig['exclude_current'];
-            $queryOptions = $this->extractQueryOptions($dynamicConfig);
-
-            $items = $this->sourceResolver->resolveSiblings($targetPage, null, $limit, $excludeCurrent, $queryOptions);
-
-            return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
-        }
-
-        // 5. Custom query / Smart Content (custom_query)
-        if ('custom_query' === $sourceType) {
-            /** @var array<string, mixed> $query */
-            $query = isset($dynamicConfig['query']) && \is_array($dynamicConfig['query'])
-                ? $dynamicConfig['query']
-                : [];
-            $extraOptions = $this->extractQueryOptions($dynamicConfig);
-            if ([] !== $extraOptions) {
-                $query = \array_merge($extraOptions, $query);
-            }
-            if (isset($dynamicConfig['limit']) && \is_numeric($dynamicConfig['limit']) && !isset($query['limit'])) {
-                $query['limit'] = (int) $dynamicConfig['limit'];
-            }
-            $items = $this->sourceResolver->resolveQuery($query);
-
-            return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig);
-        }
-
-        // 6. Parent page (parent_page)
-        if ('parent_page' === $sourceType) {
-            $targetPage = $this->resolveTargetOrContext($contextPage, $dynamicConfig['page_id'] ?? null);
-
-            $pageData = $this->sourceResolver->resolveParent($targetPage);
-
-            if (null === $pageData) {
-                return [$block];
-            }
-
-            if (null !== $condition && !$this->evaluateCondition($pageData, $condition)) {
-                return [];
-            }
-
-            return [$this->applyMapping($block, $pageData, $mapping)];
-        }
-
-        // 7. Single-page source (specific_page or current_page)
-        /** @var mixed $rawTargetPage */
-        $rawTargetPage = 'current_page' === $sourceType
-            ? $contextPage
-            : ($dynamicConfig['page_id'] ?? null);
-
-        if (\is_string($rawTargetPage) && '' === \trim($rawTargetPage)) {
-            $rawTargetPage = null;
-        }
-
-        if (!\is_string($rawTargetPage) && !\is_object($rawTargetPage) && !\is_array($rawTargetPage)) {
-            if ('current_page' === $sourceType) {
-                $rawTargetPage = [];
-            } else {
-                return [$block];
-            }
-        }
-        /** @var string|object|array<mixed, mixed> $targetPage */
-        $targetPage = $rawTargetPage;
-
-        $pageData = $this->sourceResolver->resolvePage($targetPage);
-        if (null === $pageData) {
-            // Graceful fallback to static block
+        $itemData = $provider->resolveSingle($dynamicConfig, $contextPage);
+        if (null === $itemData) {
             return [$block];
         }
 
-        if (null !== $condition && !$this->evaluateCondition($pageData, $condition)) {
-            return []; // Omitted by condition
+        if (null !== $condition && !$this->evaluateCondition($itemData, $condition)) {
+            return [];
         }
 
-        return [$this->applyMapping($block, $pageData, $mapping)];
+        return [$this->applyMapping($block, $itemData, $mapping)];
     }
 
     public function hydrateBlocks(iterable $blocks, string|object|array|null $contextPage = null): array
@@ -226,74 +93,6 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         }
 
         return $hydrated;
-    }
-
-    /**
-     * @return string|object|array<mixed, mixed>|null
-     */
-    private function resolveTargetOrContext(
-        mixed $configuredTarget,
-        mixed $fallbackTarget,
-    ): string|object|array|null {
-        if (\is_string($configuredTarget) && '' !== \trim($configuredTarget)) {
-            return \trim($configuredTarget);
-        }
-
-        if (\is_object($configuredTarget) || (\is_array($configuredTarget) && [] !== $configuredTarget)) {
-            return $configuredTarget;
-        }
-
-        if (\is_string($fallbackTarget) && '' !== \trim($fallbackTarget)) {
-            return \trim($fallbackTarget);
-        }
-
-        if (\is_object($fallbackTarget) || \is_array($fallbackTarget)) {
-            return $fallbackTarget;
-        }
-
-        return null;
-    }
-
-    /**
-     * @param array<string, mixed> $dynamicConfig
-     *
-     * @return array<string, mixed>
-     */
-    private function extractQueryOptions(array $dynamicConfig): array
-    {
-        $options = [];
-        $allowedKeys = [
-            'sort_by',
-            'sort_order',
-            'offset',
-            'template',
-            'templates',
-            'template_keys',
-            'tag',
-            'tags',
-            'tag_names',
-            'tag_ids',
-            'category',
-            'categories',
-            'category_keys',
-            'category_ids',
-            'webspace_key',
-            'descendant_of_id',
-            'exclude_id',
-            'exclude_ids',
-            'uuids',
-            'ids',
-            'page_ids',
-            'article_ids',
-        ];
-
-        foreach ($allowedKeys as $key) {
-            if (isset($dynamicConfig[$key]) && '' !== $dynamicConfig[$key] && [] !== $dynamicConfig[$key]) {
-                $options[$key] = $dynamicConfig[$key];
-            }
-        }
-
-        return $options;
     }
 
     /**

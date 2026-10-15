@@ -1,5 +1,6 @@
 // @flow
 import React from 'react';
+import {isArrayLike} from 'mobx';
 import {observer} from 'mobx-react';
 import {
     Checkbox,
@@ -14,19 +15,24 @@ import {fieldRegistry} from 'sulu-admin-bundle/containers/Form';
 import {translate} from 'sulu-admin-bundle/utils';
 import SuluNativeField from './SuluNativeField';
 
-type FieldOption = {
+export type FieldOption = {
     label: string,
     value: string,
 };
 
-type FieldSchema = {
+export type FieldSchema = {
     col_span?: number,
     default?: any,
+    description?: string,
     icon_set?: string,
     label: string,
+    max?: number,
+    min?: number,
     name: string,
     options?: Array<FieldOption>,
     placeholder?: string,
+    required?: boolean,
+    trigger_source_fields_reload?: boolean,
     type: string,
 };
 
@@ -35,6 +41,7 @@ type Props = {
     defaultOptionLabel?: string,
     field: FieldSchema,
     onChange: (name: string, value: any) => void,
+    skin?: 'light' | 'dark',
     value: any,
 };
 
@@ -69,20 +76,34 @@ class FieldRenderer extends React.Component<Props> {
     }
 
     render() {
-        const {contentLocale, defaultOptionLabel = 'Default', field, value} = this.props;
+        const {contentLocale, defaultOptionLabel = 'Default', field, skin, value} = this.props;
         const colSpan = typeof field.col_span === 'number' ? field.col_span : 6;
         const label = translate(field.label) || field.label;
-        const placeholder = field.placeholder ? (translate(field.placeholder) || field.placeholder) : undefined;
+        const description = field.description
+            ? (translate(field.description) || field.description)
+            : undefined;
+        const placeholder = field.placeholder
+            ? (translate(field.placeholder) || field.placeholder)
+            : undefined;
+        const required = Boolean(field.required);
+        const effectiveValue = value !== undefined ? value : field.default;
 
         if (this.isNativeSelectionField(field.type)) {
             return (
-                <Form.Field colSpan={colSpan} key={field.name} label={label}>
+                <Form.Field
+                    colSpan={colSpan}
+                    description={description}
+                    key={field.name}
+                    label={label}
+                    required={required}
+                    skin={skin}
+                >
                     <SuluNativeField
                         fieldType={field.type}
                         iconSet={field.icon_set || 'default'}
                         locale={contentLocale}
                         onChange={this.handleChange}
-                        value={value}
+                        value={effectiveValue}
                     />
                 </Form.Field>
             );
@@ -91,15 +112,26 @@ class FieldRenderer extends React.Component<Props> {
         switch (field.type) {
             case 'select':
             case 'single_select': {
-                const options = field.options
-                    ? (Array.isArray(field.options) ? field.options : Array.from(field.options))
+                const options = field.options && isArrayLike(field.options)
+                    ? Array.from(field.options)
                     : [];
-                const currentValue = value !== undefined && value !== null ? String(value) : '';
+                const currentValue = effectiveValue !== undefined && effectiveValue !== null
+                    ? String(effectiveValue)
+                    : '';
 
                 return (
-                    <Form.Field colSpan={colSpan} key={field.name} label={label}>
+                    <Form.Field
+                        colSpan={colSpan}
+                        description={description}
+                        key={field.name}
+                        label={label}
+                        required={required}
+                        skin={skin}
+                    >
                         <SingleSelect onChange={this.handleChange} value={currentValue}>
-                            <SingleSelect.Option value="">{defaultOptionLabel}</SingleSelect.Option>
+                            {!required && (
+                                <SingleSelect.Option value="">{defaultOptionLabel}</SingleSelect.Option>
+                            )}
                             {options.map((opt) => (
                                 <SingleSelect.Option key={opt.value} value={opt.value}>
                                     {translate(opt.label) || opt.label}
@@ -113,10 +145,10 @@ class FieldRenderer extends React.Component<Props> {
             case 'checkbox':
             case 'bool':
             case 'toggle': {
-                const currentValue = Boolean(value);
+                const currentValue = Boolean(effectiveValue);
 
                 return (
-                    <Form.Field colSpan={colSpan} key={field.name}>
+                    <Form.Field colSpan={colSpan} description={description} key={field.name}>
                         <Checkbox checked={currentValue} onChange={this.handleChange}>
                             {label}
                         </Checkbox>
@@ -126,17 +158,23 @@ class FieldRenderer extends React.Component<Props> {
 
             case 'color':
             case 'color_picker': {
-                const currentValue = value || '';
+                const currentValue = effectiveValue || '';
 
                 return (
-                    <Form.Field colSpan={colSpan} key={field.name} label={label}>
+                    <Form.Field
+                        colSpan={colSpan}
+                        description={description}
+                        key={field.name}
+                        label={label}
+                        required={required}
+                    >
                         <ColorPicker onChange={(v) => this.handleChange(v || '')} value={currentValue} />
                     </Form.Field>
                 );
             }
 
             case 'number': {
-                const rawVal = value;
+                const rawVal = effectiveValue;
                 const currentValue = typeof rawVal === 'number'
                     ? rawVal
                     : (rawVal !== undefined && rawVal !== null && rawVal !== '' && !isNaN(Number(rawVal))
@@ -144,9 +182,17 @@ class FieldRenderer extends React.Component<Props> {
                         : undefined);
 
                 return (
-                    <Form.Field colSpan={colSpan} key={field.name} label={label}>
+                    <Form.Field
+                        colSpan={colSpan}
+                        description={description}
+                        key={field.name}
+                        label={label}
+                        required={required}
+                    >
                         <NumberField
                             alignment="left"
+                            max={field.max}
+                            min={field.min}
                             onChange={this.handleChange}
                             placeholder={placeholder}
                             value={currentValue}
@@ -156,10 +202,16 @@ class FieldRenderer extends React.Component<Props> {
             }
 
             case 'textarea': {
-                const currentValue = value || '';
+                const currentValue = effectiveValue || '';
 
                 return (
-                    <Form.Field colSpan={colSpan} key={field.name} label={label}>
+                    <Form.Field
+                        colSpan={colSpan}
+                        description={description}
+                        key={field.name}
+                        label={label}
+                        required={required}
+                    >
                         <TextArea
                             onChange={(v) => this.handleChange(v || '')}
                             placeholder={placeholder}
@@ -173,10 +225,18 @@ class FieldRenderer extends React.Component<Props> {
             case 'text':
             case 'input':
             default: {
-                const currentValue = value !== undefined && value !== null ? String(value) : '';
+                const currentValue = effectiveValue !== undefined && effectiveValue !== null
+                    ? String(effectiveValue)
+                    : '';
 
                 return (
-                    <Form.Field colSpan={colSpan} key={field.name} label={label}>
+                    <Form.Field
+                        colSpan={colSpan}
+                        description={description}
+                        key={field.name}
+                        label={label}
+                        required={required}
+                    >
                         <Input
                             onChange={this.handleChange}
                             placeholder={placeholder}

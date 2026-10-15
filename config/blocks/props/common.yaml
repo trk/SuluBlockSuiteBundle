@@ -12,37 +12,37 @@ tabs:
         type: select
         label:
           en: 'Margin Top'
-          tr: 'Üst Boşluk (Margin Top)'
+          tr: 'Üst Boşluk'
           de: 'Abstand Oben'
           ru: 'Отступ сверху'
           es: 'Margen Superior'
           fr: 'Marge Supérieure'
         col_span: 6
         options:
-          - { value: none, label: { en: 'None (0)', tr: 'Yok (0)', de: 'Keine (0)', ru: 'Нет (0)', es: 'Ninguno (0)', fr: 'Aucun (0)' } }
-          - { value: xs, label: { en: 'Extra Small (XS)', tr: 'Çok Küçük (XS)', de: 'Extra Klein (XS)', ru: 'Очень малый (XS)', es: 'Extra Pequeño (XS)', fr: 'Très Petit (XS)' } }
-          - { value: sm, label: { en: 'Small (SM)', tr: 'Küçük (SM)', de: 'Klein (SM)', ru: 'Малый (SM)', es: 'Pequeño (SM)', fr: 'Petit (SM)' } }
-          - { value: md, label: { en: 'Medium (MD)', tr: 'Orta (MD)', de: 'Mittel (MD)', ru: 'Средний (MD)', es: 'Mediano (MD)', fr: 'Moyen (MD)' } }
-          - { value: lg, label: { en: 'Large (LG)', tr: 'Büyük (LG)', de: 'Groß (LG)', ru: 'Большой (LG)', es: 'Grande (LG)', fr: 'Grand (LG)' } }
-          - { value: xl, label: { en: 'Extra Large (XL)', tr: 'Çok Büyük (XL)', de: 'Extra Groß (XL)', ru: 'Очень большой (XL)', es: 'Extra Grande (XL)', fr: 'Très Grand (XL)' } }
+          - { value: none, label: { en: 'None', tr: 'Yok', de: 'Keine', ru: 'Нет', es: 'Ninguno', fr: 'Aucun' } }
+          - { value: xs, label: { en: 'Extra Small', tr: 'Çok Küçük', de: 'Extra Klein', ru: 'Очень малый', es: 'Extra Pequeño', fr: 'Très Petit' } }
+          - { value: sm, label: { en: 'Small', tr: 'Küçük', de: 'Klein', ru: 'Малый', es: 'Pequeño', fr: 'Petit' } }
+          - { value: md, label: { en: 'Medium', tr: 'Orta', de: 'Mittel', ru: 'Средний', es: 'Mediano', fr: 'Moyen' } }
+          - { value: lg, label: { en: 'Large', tr: 'Büyük', de: 'Groß', ru: 'Большой', es: 'Grande', fr: 'Grand' } }
+          - { value: xl, label: { en: 'Extra Large', tr: 'Çok Büyük', de: 'Extra Groß', ru: 'Очень большой', es: 'Extra Grande', fr: 'Très Grand' } }
           - { value: auto, label: { en: Auto, tr: Otomatik, de: Auto, ru: Авто, es: Auto, fr: Auto } }
       margin_bottom:
         type: select
         label:
           en: 'Margin Bottom'
-          tr: 'Alt Boşluk (Margin Bottom)'
+          tr: 'Alt Boşluk'
           de: 'Abstand Unten'
           ru: 'Отступ снизу'
           es: 'Margen Inferior'
           fr: 'Marge Inférieure'
         col_span: 6
         options:
-          - { value: none, label: { en: 'None (0)', tr: 'Yok (0)', de: 'Keine (0)', ru: 'Нет (0)', es: 'Ninguno (0)', fr: 'Aucun (0)' } }
-          - { value: xs, label: { en: 'Extra Small (XS)', tr: 'Çok Küçük (XS)', de: 'Extra Klein (XS)', ru: 'Очень малый (XS)', es: 'Extra Pequeño (XS)', fr: 'Très Petit (XS)' } }
-          - { value: sm, label: { en: 'Small (SM)', tr: 'Küçük (SM)', de: 'Klein (SM)', ru: 'Малый (SM)', es: 'Pequeño (SM)', fr: 'Petit (SM)' } }
-          - { value: md, label: { en: 'Medium (MD)', tr: 'Orta (MD)', de: 'Mittel (MD)', ru: 'Средний (MD)', es: 'Mediano (MD)', fr: 'Moyen (MD)' } }
-          - { value: lg, label: { en: 'Large (LG)', tr: 'Büyük (LG)', de: 'Groß (LG)', ru: 'Большой (LG)', es: 'Grande (LG)', fr: 'Grand (LG)' } }
-          - { value: xl, label: { en: 'Extra Large (XL)', tr: 'Çok Büyük (XL)', de: 'Extra Groß (XL)', ru: 'Очень большой (XL)', es: 'Extra Grande (XL)', fr: 'Très Grand (XL)' } }
+          - { value: none, label: { en: 'None', tr: 'Yok', de: 'Keine', ru: 'Нет', es: 'Ninguno', fr: 'Aucun' } }
+          - { value: xs, label: { en: 'Extra Small', tr: 'Çok Küçük', de: 'Extra Klein', ru: 'Очень малый', es: 'Extra Pequeño', fr: 'Très Petit' } }
+          - { value: sm, label: { en: 'Small', tr: 'Küçük', de: 'Klein', ru: 'Малый', es: 'Pequeño', fr: 'Petit' } }
+          - { value: md, label: { en: 'Medium', tr: 'Orta', de: 'Mittel', ru: 'Средний', es: 'Mediano', fr: 'Moyen' } }
+          - { value: lg, label: { en: 'Large', tr: 'Büyük', de: 'Groß', ru: 'Большой', es: 'Grande', fr: 'Grand' } }
+          - { value: xl, label: { en: 'Extra Large', tr: 'Çok Büyük', de: 'Extra Groß', ru: 'Очень большой', es: 'Extra Grande', fr: 'Très Grand' } }
           - { value: auto, label: { en: Auto, tr: Otomatik, de: Auto, ru: Авто, es: Auto, fr: Auto } }
       text_align:
         type: select
@@ -63,16 +63,16 @@ tabs:
         type: select
         label:
           en: Position
-          tr: 'Konum (Position)'
+          tr: 'Konum'
           de: Position
           ru: Позиция
           es: Posición
           fr: Position
         col_span: 6
         options:
-          - { value: static, label: { en: 'Static (Default)', tr: 'Statik (Varsayılan)', de: Statisch, ru: Статическая, es: Estático, fr: Statique } }
-          - { value: relative, label: { en: Relative, tr: 'Göreceli (Relative)', de: Relativ, ru: Относительная, es: Relativo, fr: Relative } }
-          - { value: sticky, label: { en: 'Sticky (Top)', tr: 'Yapışkan (Sticky)', de: 'Sticky (Oben)', ru: 'Липкая (Sticky)', es: 'Fijo al desplazarse (Sticky)', fr: 'Collant (Sticky)' } }
+          - { value: static, label: { en: 'Static', tr: 'Statik', de: Statisch, ru: Статическая, es: Estático, fr: Statique } }
+          - { value: relative, label: { en: Relative, tr: 'Göreceli', de: Relativ, ru: Относительная, es: Relativo, fr: Relative } }
+          - { value: sticky, label: { en: 'Sticky', tr: 'Yapışkan', de: 'Sticky', ru: 'Липкая', es: 'Fijo al desplazarse', fr: 'Collant' } }
       max_width:
         type: select
         label:
@@ -85,11 +85,11 @@ tabs:
         col_span: 6
         options:
           - { value: none, label: { en: None, tr: Sınırsız, de: Keine, ru: 'Без ограничений', es: Ninguno, fr: Aucun } }
-          - { value: small, label: { en: 'Small (sm)', tr: 'Küçük (sm)', de: 'Klein (sm)', ru: 'Малая (sm)', es: 'Pequeño (sm)', fr: 'Petit (sm)' } }
-          - { value: medium, label: { en: 'Medium (md)', tr: 'Orta (md)', de: 'Mittel (md)', ru: 'Средняя (md)', es: 'Mediano (md)', fr: 'Moyen (md)' } }
-          - { value: large, label: { en: 'Large (lg)', tr: 'Büyük (lg)', de: 'Groß (lg)', ru: 'Большая (lg)', es: 'Grande (lg)', fr: 'Grand (lg)' } }
-          - { value: xlarge, label: { en: 'Extra Large (xl)', tr: 'Çok Büyük (xl)', de: 'Extra Groß (xl)', ru: 'Очень большая (xl)', es: 'Extra Grande (xl)', fr: 'Très Grand (xl)' } }
-          - { value: 2xlarge, label: { en: '2X Large (2xl)', tr: 'Ekstra Büyük (2xl)', de: '2X Groß (2xl)', ru: '2X Большая (2xl)', es: '2X Grande (2xl)', fr: '2X Grand (2xl)' } }
+          - { value: small, label: { en: 'Small', tr: 'Küçük', de: 'Klein', ru: 'Малая', es: 'Pequeño', fr: 'Petit' } }
+          - { value: medium, label: { en: 'Medium', tr: 'Orta', de: 'Mittel', ru: 'Средняя', es: 'Mediano', fr: 'Moyen' } }
+          - { value: large, label: { en: 'Large', tr: 'Büyük', de: 'Groß', ru: 'Большая', es: 'Grande', fr: 'Grand' } }
+          - { value: xlarge, label: { en: 'Extra Large', tr: 'Çok Büyük', de: 'Extra Groß', ru: 'Очень большая', es: 'Extra Grande', fr: 'Très Grand' } }
+          - { value: 2xlarge, label: { en: '2X Large', tr: 'Ekstra Büyük', de: '2X Groß', ru: '2X Большая', es: '2X Grande', fr: '2X Grand' } }
       block_align:
         type: select
         label:
@@ -116,10 +116,10 @@ tabs:
         col_span: 6
         options:
           - { value: none, label: { en: None, tr: Yok, de: Keine, ru: Нет, es: Ninguna, fr: Aucune } }
-          - { value: fade, label: { en: 'Fade In', tr: 'Belirme (Fade In)', de: Einblenden, ru: 'Плавное появление', es: 'Aparecer (Fade)', fr: 'Fondu (Fade)' } }
+          - { value: fade, label: { en: 'Fade In', tr: 'Belirme', de: Einblenden, ru: 'Плавное появление', es: 'Aparecer', fr: 'Fondu' } }
           - { value: slide-up, label: { en: 'Slide Up', tr: 'Aşağıdan Yukarı', de: 'Nach oben gleiten', ru: 'Снизу вверх', es: 'Deslizar hacia arriba', fr: 'Glisser vers le haut' } }
           - { value: slide-down, label: { en: 'Slide Down', tr: 'Yukarıdan Aşağı', de: 'Nach unten gleiten', ru: 'Сверху вниз', es: 'Deslizar hacia abajo', fr: 'Glisser vers le bas' } }
-          - { value: zoom-in, label: { en: 'Zoom In', tr: 'Yakınlaşarak (Zoom In)', de: Heranzoomen, ru: 'Увеличение (Zoom)', es: 'Acercar (Zoom)', fr: 'Zoom avant' } }
+          - { value: zoom-in, label: { en: 'Zoom In', tr: 'Yakınlaşarak', de: Heranzoomen, ru: 'Увеличение', es: 'Acercar', fr: 'Zoom avant' } }
       visibility:
         type: select
         label:
@@ -132,8 +132,8 @@ tabs:
         col_span: 6
         options:
           - { value: all, label: { en: 'Always Visible', tr: 'Her Zaman Görünür', de: 'Immer sichtbar', ru: 'Всегда видимо', es: 'Siempre visible', fr: 'Toujours visible' } }
-          - { value: hidden_sm, label: { en: 'Hidden on Mobile (< sm)', tr: 'Mobilde Gizle (< sm)', de: 'Auf Mobilgeräten ausblenden', ru: 'Скрыть на мобильных', es: 'Oculto en móvil', fr: 'Masqué sur mobile' } }
-          - { value: hidden_md, label: { en: 'Hidden on Tablet & Below (< md)', tr: 'Tablet ve Altında Gizle (< md)', de: 'Bis Tablet ausblenden', ru: 'Скрыть на планшетах', es: 'Oculto en tablet', fr: 'Masqué sur tablette' } }
+          - { value: hidden_sm, label: { en: 'Hidden on Mobile', tr: 'Mobilde Gizle', de: 'Auf Mobilgeräten ausblenden', ru: 'Скрыть на мобильных', es: 'Oculto en móvil', fr: 'Masqué sur mobile' } }
+          - { value: hidden_md, label: { en: 'Hidden on Tablet & Below', tr: 'Tablet ve Altında Gizle', de: 'Bis Tablet ausblenden', ru: 'Скрыть на планшетах', es: 'Oculto en tablet', fr: 'Masqué sur tablette' } }
           - { value: visible_sm, label: { en: 'Mobile Only', tr: 'Sadece Mobil', de: 'Nur Mobil', ru: 'Только мобильные', es: 'Solo móvil', fr: 'Mobile uniquement' } }
   advanced:
     title:
@@ -148,7 +148,7 @@ tabs:
         type: text
         label:
           en: Name
-          tr: 'Öğe Adı (Name)'
+          tr: 'Öğe Adı'
           de: Name
           ru: Название
           es: Nombre
@@ -165,7 +165,7 @@ tabs:
         type: text
         label:
           en: 'HTML Element ID'
-          tr: 'HTML Eleman Kimliği (ID)'
+          tr: 'HTML Eleman Kimliği'
           de: 'HTML-Element-ID'
           ru: 'ID HTML-элемента'
           es: 'ID del Elemento HTML'
@@ -182,7 +182,7 @@ tabs:
         type: text
         label:
           en: 'Custom CSS Classes'
-          tr: 'Özel CSS Sınıfları (Class)'
+          tr: 'Özel CSS Sınıfları'
           de: 'Benutzerdefinierte CSS-Klassen'
           ru: 'Пользовательские CSS-классы'
           es: 'Clases CSS Personalizadas'
@@ -199,18 +199,18 @@ tabs:
         type: textarea
         label:
           en: Attributes
-          tr: 'Öznitelikler (Attributes)'
+          tr: 'Öznitelikler'
           de: Attribute
           ru: Атрибуты
           es: Atributos
           fr: Attributs
         placeholder:
-          en: "e.g. data-aos=fade-up\naria-label=\"Banner\" (one per line)"
-          tr: "örn. data-aos=fade-up\naria-label=\"Açıklama\" (her satıra bir adet)"
-          de: "z.B. data-aos=fade-up\naria-label=\"Banner\" (eins pro Zeile)"
-          ru: "напр. data-aos=fade-up\naria-label=\"Баннер\" (по одному на строку)"
-          es: "ej. data-aos=fade-up\naria-label=\"Banner\" (uno por línea)"
-          fr: "ex. data-aos=fade-up\naria-label=\"Bannière\" (un par ligne)"
+          en:"e.g. data-aos=fade-up\naria-label=\"Banner\""
+          tr:"örn. data-aos=fade-up\naria-label=\"Açıklama\""
+          de:"z.B. data-aos=fade-up\naria-label=\"Banner\""
+          ru:"напр. data-aos=fade-up\naria-label=\"Баннер\""
+          es:"ej. data-aos=fade-up\naria-label=\"Banner\""
+          fr:"ex. data-aos=fade-up\naria-label=\"Bannière\""
         col_span: 12
       css:
         type: textarea

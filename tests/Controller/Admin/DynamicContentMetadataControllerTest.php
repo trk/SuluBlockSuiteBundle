@@ -25,8 +25,9 @@ class DynamicContentMetadataControllerTest extends TestCase
         $response = $controller->sourceFields($request);
 
         $this->assertSame(200, $response->getStatusCode());
-        /** @var list<array{name: string, label: string, type: string}> $data */
-        $data = \json_decode((string) $response->getContent(), true);
+        /** @var array{fields: list<array{name: string, label: string, type: string}>} $payload */
+        $payload = \json_decode((string) $response->getContent(), true);
+        $data = $payload['fields'];
 
         $names = \array_column($data, 'name');
 
@@ -59,8 +60,9 @@ class DynamicContentMetadataControllerTest extends TestCase
         $response = $controller->sourceFields($request);
 
         $this->assertSame(200, $response->getStatusCode());
-        /** @var list<array{name: string, label: string, type: string}> $data */
-        $data = \json_decode((string) $response->getContent(), true);
+        /** @var array{fields: list<array{name: string, label: string, type: string}>} $payload */
+        $payload = \json_decode((string) $response->getContent(), true);
+        $data = $payload['fields'];
 
         $names = \array_column($data, 'name');
         $this->assertContains('custom_tagline', $names);
@@ -115,7 +117,7 @@ class DynamicContentMetadataControllerTest extends TestCase
         $this->assertNull($data['default_item_type']);
         $this->assertCount(2, $data['fields']);
         $this->assertSame('title', $data['fields'][0]['name']);
-        $this->assertSame('Card Title (title)', $data['fields'][0]['label']);
+        $this->assertSame('Card Title', $data['fields'][0]['label']);
         $this->assertSame('media', $data['fields'][1]['name']);
     }
 
@@ -127,8 +129,9 @@ class DynamicContentMetadataControllerTest extends TestCase
         $response = $controller->sources($request);
 
         $this->assertSame(200, $response->getStatusCode());
-        /** @var list<array{key: string, label: string, multi_item: bool}> $sources */
-        $sources = \json_decode((string) $response->getContent(), true);
+        /** @var array{sources: list<array{key: string, label: string, multi_item: bool, config_fields: list<array{name: string, type: string}>}>} $payload */
+        $payload = \json_decode((string) $response->getContent(), true);
+        $sources = $payload['sources'];
 
         $byKey = \array_column($sources, null, 'key');
         $this->assertArrayHasKey('current_page', $byKey);
@@ -145,6 +148,90 @@ class DynamicContentMetadataControllerTest extends TestCase
 
         $this->assertArrayHasKey('page_selection', $byKey);
         $this->assertTrue($byKey['page_selection']['multi_item']);
+        $this->assertNotEmpty($byKey['page_selection']['config_fields']);
+        $this->assertSame('page_selection', $byKey['page_selection']['config_fields'][0]['type']);
+    }
+
+    public function testCustomSingleAndCollectionProductProviderExposesConfigFieldsAndSourceFields(): void
+    {
+        $productProvider = new class extends \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider {
+            public function getKey(): string
+            {
+                return 'products';
+            }
+
+            public function getLabel(string $locale = 'en'): string
+            {
+                return 'Product Collection';
+            }
+
+            public function getSingleKey(): string
+            {
+                return 'single_product';
+            }
+
+            public function getSingleLabel(string $locale = 'en'): string
+            {
+                return 'Single Product Selection';
+            }
+
+            public function getSingleConfigFields(string $locale = 'en'): array
+            {
+                return [
+                    $this->createSelectionField('product_id', 'single_product_selection', 'Product', 'Select a product.', true),
+                ];
+            }
+
+            public function getConfigFields(string $locale = 'en'): array
+            {
+                return [
+                    $this->createSelectionField('product_ids', 'product_selection', 'Products', 'Select multiple products.'),
+                    ...$this->createPaginationAndSortFields(12),
+                    ...$this->createTaxonomyFilterFields(includeTemplateFilter: false, includeTags: true, includeCategories: true),
+                ];
+            }
+
+            public function getSourceFields(string $locale = 'en'): array
+            {
+                return [
+                    ['name' => 'title', 'label' => 'Product Name', 'type' => 'string'],
+                    ['name' => 'sku', 'label' => 'SKU', 'type' => 'string'],
+                    ['name' => 'price', 'label' => 'Price', 'type' => 'string'],
+                ];
+            }
+        };
+
+        $controller = new DynamicContentMetadataController(null, null, [$productProvider]);
+        $sourcesResponse = $controller->sources(new Request(['locale' => 'en']));
+
+        /** @var array{sources: list<array{key: string, label: string, multi_item: bool, config_fields: list<array{name: string, type: string, required?: bool}>}>} $sourcesPayload */
+        $sourcesPayload = \json_decode((string) $sourcesResponse->getContent(), true);
+        $sources = $sourcesPayload['sources'];
+        $byKey = \array_column($sources, null, 'key');
+
+        $this->assertArrayHasKey('single_product', $byKey);
+        $this->assertFalse($byKey['single_product']['multi_item']);
+        $this->assertCount(1, $byKey['single_product']['config_fields']);
+        $this->assertSame('product_id', $byKey['single_product']['config_fields'][0]['name']);
+        $this->assertSame('single_product_selection', $byKey['single_product']['config_fields'][0]['type']);
+        $this->assertTrue($byKey['single_product']['config_fields'][0]['required'] ?? false);
+
+        $this->assertArrayHasKey('products', $byKey);
+        $this->assertTrue($byKey['products']['multi_item']);
+        $collectionFieldTypes = \array_column($byKey['products']['config_fields'], 'type', 'name');
+        $this->assertSame('product_selection', $collectionFieldTypes['product_ids'] ?? null);
+        $this->assertSame('tag_selection', $collectionFieldTypes['tag_ids'] ?? null);
+        $this->assertSame('category_selection', $collectionFieldTypes['category_ids'] ?? null);
+        $this->assertSame('number', $collectionFieldTypes['limit'] ?? null);
+
+        $singleFieldsResponse = $controller->sourceFields(new Request(['source_type' => 'single_product', 'locale' => 'en']));
+        /** @var array{fields: list<array{name: string, label: string, type: string}>} $singleFieldsPayload */
+        $singleFieldsPayload = \json_decode((string) $singleFieldsResponse->getContent(), true);
+        $this->assertSame(['title', 'sku', 'price'], \array_column($singleFieldsPayload['fields'], 'name'));
+
+        $collectionFieldsResponse = $controller->sourceFields(new Request(['source_type' => 'products', 'locale' => 'en']));
+        /** @var array{fields: list<array{name: string, label: string, type: string}>} $collectionFieldsPayload */
+        $collectionFieldsPayload = \json_decode((string) $collectionFieldsResponse->getContent(), true);
+        $this->assertSame(['title', 'sku', 'price'], \array_column($collectionFieldsPayload['fields'], 'name'));
     }
 }
-

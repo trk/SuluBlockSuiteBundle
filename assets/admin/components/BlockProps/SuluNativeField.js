@@ -1,6 +1,6 @@
 // @flow
 import React, {Fragment} from 'react';
-import {action, computed, observable, reaction, toJS} from 'mobx';
+import {action, computed, isArrayLike, observable, reaction, toJS} from 'mobx';
 import {observer} from 'mobx-react';
 import equals from 'fast-deep-equal';
 import SingleItemSelection from 'sulu-admin-bundle/components/SingleItemSelection';
@@ -20,6 +20,8 @@ import MultiMediaSelection from 'sulu-media-bundle/containers/MultiMediaSelectio
 import TeaserSelection from 'sulu-page-bundle/containers/TeaserSelection';
 import ContactAccountSelection from 'sulu-contact-bundle/containers/ContactAccountSelection';
 import type {IObservableValue} from 'mobx/lib/mobx';
+
+const EMPTY_OPTIONS = {};
 
 type Props = {
     disabled?: boolean,
@@ -70,7 +72,7 @@ class SuluNativeField extends React.Component<Props> {
 
         if (this.multiAutoCompleteStore) {
             const idProp = this.multiAutoCompleteIdProperty;
-            const currentVal = Array.isArray(this.props.value) ? toJS(this.props.value) : [];
+            const currentVal = isArrayLike(this.props.value) ? Array.from(toJS(this.props.value)) : [];
             const loadedVal = this.multiAutoCompleteStore.items.map((item) => item[idProp]);
             if (!equals(currentVal, loadedVal)) {
                 this.multiAutoCompleteStore.loadItems(currentVal);
@@ -103,6 +105,23 @@ class SuluNativeField extends React.Component<Props> {
         return null;
     }
 
+    @computed get isSingleFieldType(): boolean {
+        const {fieldType} = this.props;
+        if (fieldType.startsWith('single_')) {
+            return true;
+        }
+        const opts = this.fieldOptions;
+        if (opts && opts.types) {
+            if (opts.types.single_select) {
+                return true;
+            }
+            if (opts.types.list_overlay && opts.types.list_overlay.empty_text && !opts.types.list_overlay.label) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @computed get multiAutoCompleteIdProperty(): string {
         const opts = this.fieldOptions;
         if (opts && opts.types && opts.types.auto_complete && opts.types.auto_complete.id_property) {
@@ -112,7 +131,7 @@ class SuluNativeField extends React.Component<Props> {
     }
 
     setupStores() {
-        const {fieldType, value} = this.props;
+        const { value} = this.props;
         const opts = this.fieldOptions;
         if (!opts || !opts.resource_key) {
             return;
@@ -123,8 +142,7 @@ class SuluNativeField extends React.Component<Props> {
             return;
         }
 
-        const isSingle = fieldType.startsWith('single_');
-        if (isSingle) {
+        if (this.isSingleFieldType) {
             this.singleAutoCompleteStore = new SingleSelectionStore(
                 opts.resource_key,
                 value || undefined,
@@ -146,8 +164,8 @@ class SuluNativeField extends React.Component<Props> {
             const autoCompleteOpts = opts.types.auto_complete;
             const idProp = autoCompleteOpts.id_property || 'id';
             const filterParam = autoCompleteOpts.filter_parameter || 'ids';
-            const initialIds = Array.isArray(value)
-                ? value
+            const initialIds = isArrayLike(value)
+                ? Array.from(toJS(value))
                 : (typeof value === 'string' && value.trim() !== ''
                     ? value.split(',').map((s) => s.trim()).filter(Boolean)
                     : []);
@@ -166,7 +184,8 @@ class SuluNativeField extends React.Component<Props> {
                     if (!this.multiAutoCompleteStore || this.multiAutoCompleteStore.loading) {
                         return;
                     }
-                    if (!equals(toJS(this.props.value) || [], toJS(selectedIds))) {
+                    const currentVal = isArrayLike(this.props.value) ? Array.from(toJS(this.props.value)) : [];
+                    if (!equals(currentVal, toJS(selectedIds))) {
                         this.props.onChange(selectedIds);
                     }
                 }
@@ -192,11 +211,11 @@ class SuluNativeField extends React.Component<Props> {
     };
 
     render() {
-        const {disabled = false, fieldType, iconSet = 'default', onChange, options = {}, value} = this.props;
+        const {disabled = false, fieldType, iconSet = 'default', onChange, options = EMPTY_OPTIONS, value} = this.props;
 
         if (fieldType === 'single_media_selection') {
             const mediaValue = (value && typeof value === 'object' && 'id' in value)
-                ? value
+                ? toJS(value)
                 : {id: typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value)) ? Number(value) : undefined};
 
             return (
@@ -210,23 +229,23 @@ class SuluNativeField extends React.Component<Props> {
         }
 
         if (fieldType === 'media_selection') {
-            const ids = Array.isArray(value)
-                ? value
-                : (value && typeof value === 'object' && Array.isArray(value.ids) ? value.ids : []);
+            const ids = isArrayLike(value)
+                ? Array.from(toJS(value))
+                : (value && typeof value === 'object' && isArrayLike(value.ids) ? Array.from(toJS(value.ids)) : []);
 
             return (
                 <MultiMediaSelection
                     disabled={disabled}
                     locale={this.localeBox}
-                    onChange={(nextVal) => onChange(nextVal && Array.isArray(nextVal.ids) ? nextVal.ids : [])}
+                    onChange={(nextVal) => onChange(nextVal && isArrayLike(nextVal.ids) ? Array.from(nextVal.ids) : [])}
                     value={{ids}}
                 />
             );
         }
 
         if (fieldType === 'teaser_selection') {
-            const teaserVal = (value && typeof value === 'object' && Array.isArray(value.items))
-                ? value
+            const teaserVal = (value && typeof value === 'object' && isArrayLike(value.items))
+                ? toJS(value)
                 : {presentAs: undefined, items: []};
 
             return (
@@ -240,7 +259,7 @@ class SuluNativeField extends React.Component<Props> {
         }
 
         if (fieldType === 'contact_account_selection') {
-            const contactAccountVal = Array.isArray(value) ? toJS(value) : [];
+            const contactAccountVal = isArrayLike(value) ? Array.from(toJS(value)) : [];
 
             return (
                 <ContactAccountSelection
@@ -292,17 +311,21 @@ class SuluNativeField extends React.Component<Props> {
         }
 
         const resourceKey = opts.resource_key;
-        const isSingle = fieldType.startsWith('single_');
+        const isSingle = this.isSingleFieldType;
         const types = opts.types || {};
 
         if (isSingle) {
             if (opts.default_type === 'auto_complete' && types.auto_complete && this.singleAutoCompleteStore) {
+                const searchProperties = isArrayLike(types.auto_complete.search_properties)
+                    ? Array.from(types.auto_complete.search_properties)
+                    : [];
+
                 return (
                     <SingleAutoComplete
                         disabled={disabled}
                         displayProperty={types.auto_complete.display_property}
                         options={options}
-                        searchProperties={types.auto_complete.search_properties || []}
+                        searchProperties={searchProperties}
                         selectionStore={this.singleAutoCompleteStore}
                     />
                 );
@@ -325,21 +348,23 @@ class SuluNativeField extends React.Component<Props> {
 
             const overlayOpts = types.list_overlay;
             if (overlayOpts) {
-                let normalizedSingleVal = value !== '' && value !== null && value !== undefined ? value : undefined;
-                if (
-                    typeof normalizedSingleVal === 'string' &&
-                    /^\d+$/.test(normalizedSingleVal) &&
-                    (resourceKey === 'categories' || resourceKey === 'collections' || resourceKey === 'contacts' || resourceKey === 'accounts')
-                ) {
+                let normalizedSingleVal = value !== '' && value !== null && value !== undefined ? toJS(value) : undefined;
+                if (typeof normalizedSingleVal === 'string' && /^\d+$/.test(normalizedSingleVal)) {
                     normalizedSingleVal = Number(normalizedSingleVal);
                 }
+                const displayProperties = isArrayLike(overlayOpts.display_properties)
+                    ? Array.from(overlayOpts.display_properties)
+                    : ['title'];
+                const detailOptions = overlayOpts.detail_options && typeof overlayOpts.detail_options === 'object'
+                    ? {...toJS(overlayOpts.detail_options)}
+                    : EMPTY_OPTIONS;
 
                 return (
                     <SingleSelection
                         adapter={overlayOpts.adapter}
-                        detailOptions={overlayOpts.detail_options || {}}
+                        detailOptions={detailOptions}
                         disabled={disabled}
-                        displayProperties={overlayOpts.display_properties || ['title']}
+                        displayProperties={displayProperties}
                         emptyText={translate(overlayOpts.empty_text || '')}
                         icon={overlayOpts.icon || 'su-plus'}
                         listKey={overlayOpts.list_key || resourceKey}
@@ -354,6 +379,10 @@ class SuluNativeField extends React.Component<Props> {
             }
         } else {
             if (opts.default_type === 'auto_complete' && types.auto_complete && this.multiAutoCompleteStore) {
+                const searchProperties = isArrayLike(types.auto_complete.search_properties)
+                    ? Array.from(types.auto_complete.search_properties)
+                    : [];
+
                 return (
                     <MultiAutoComplete
                         allowAdd={Boolean(types.auto_complete.allow_add)}
@@ -361,7 +390,7 @@ class SuluNativeField extends React.Component<Props> {
                         displayProperty={types.auto_complete.display_property}
                         idProperty={types.auto_complete.id_property || 'id'}
                         options={options}
-                        searchProperties={types.auto_complete.search_properties || []}
+                        searchProperties={searchProperties}
                         selectionStore={this.multiAutoCompleteStore}
                     />
                 );
@@ -369,20 +398,23 @@ class SuluNativeField extends React.Component<Props> {
 
             const overlayOpts = types.list_overlay || types.list;
             if (overlayOpts) {
-                const rawArray = Array.isArray(value)
-                    ? value
+                const rawArray = isArrayLike(value)
+                    ? Array.from(toJS(value))
                     : (typeof value === 'string' && value.trim() !== ''
                         ? value.split(',').map((s) => s.trim()).filter(Boolean)
                         : []);
-                const normalizedArray = (resourceKey === 'categories' || resourceKey === 'collections' || resourceKey === 'contacts' || resourceKey === 'accounts')
-                    ? rawArray.map((item) => (typeof item === 'string' && /^\d+$/.test(item) ? Number(item) : item))
-                    : rawArray;
+                const normalizedArray = rawArray.map((item) =>
+                    typeof item === 'string' && /^\d+$/.test(item) ? Number(item) : item
+                );
+                const displayProperties = isArrayLike(overlayOpts.display_properties)
+                    ? Array.from(overlayOpts.display_properties)
+                    : ['title', 'name'];
 
                 return (
                     <MultiSelection
                         adapter={overlayOpts.adapter}
                         disabled={disabled}
-                        displayProperties={overlayOpts.display_properties || ['title', 'name']}
+                        displayProperties={displayProperties}
                         icon={overlayOpts.icon || 'su-plus'}
                         label={translate(overlayOpts.label || '', {count: normalizedArray.length})}
                         listKey={overlayOpts.list_key || resourceKey}
