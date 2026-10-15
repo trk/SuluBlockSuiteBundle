@@ -73,12 +73,12 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
      *
      * @return array<string, FieldMetadata>
      */
-    private function flattenSectionItems(array $items): array
+    private function flattenSectionItems(array $items, bool $inSection = false): array
     {
         $flat = [];
         foreach ($items as $key => $item) {
             if ($item instanceof SectionMetadata) {
-                foreach ($this->flattenSectionItems($item->getItems()) as $subKey => $subItem) {
+                foreach ($this->flattenSectionItems($item->getItems(), true) as $subKey => $subItem) {
                     $flat[$subKey] = $subItem;
                 }
 
@@ -86,7 +86,11 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
             }
 
             if ($item instanceof FieldMetadata) {
-                $name = '' !== $item->getName() ? $item->getName() : (string) $key;
+                if (!$inSection && \is_string($key) && '' !== $key) {
+                    $name = $key;
+                } else {
+                    $name = '' !== $item->getName() ? $item->getName() : (string) $key;
+                }
                 $flat[$name] = $item;
             }
         }

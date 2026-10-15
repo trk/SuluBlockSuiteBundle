@@ -30,6 +30,10 @@
             </meta>
             <params>
                 <param name="templateKeys" value="reusable_block"/>
+                <param name="properties" type="collection">
+                    <param name="title" value="title"/>
+                    <param name="blocks" value="blocks"/>
+                </param>
             </params>
         </property>
     </properties>

@@ -679,7 +679,7 @@ final class DynamicContentHydratorTest extends TestCase
 
             public function getLabel(string $locale = 'en'): string
             {
-                return $locale === 'tr' ? 'Ürünler' : 'Products';
+                return 'tr' === $locale ? 'Ürünler' : 'Products';
             }
 
             public function isMultiItem(): bool

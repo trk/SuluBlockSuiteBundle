@@ -227,4 +227,3 @@ YAML;
         $this->assertSame('Masonry Lightbox', $presets[0]['title']);
     }
 }
-

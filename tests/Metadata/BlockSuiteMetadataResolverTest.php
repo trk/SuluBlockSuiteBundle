@@ -79,4 +79,35 @@ final class BlockSuiteMetadataResolverTest extends TestCase
         $this->assertSame('hero-1', $propsContent['anchor_id'] ?? null);
         $this->assertSame('keep-me', $propsContent['extra_preset_prop'] ?? null);
     }
+
+    public function testResolveItemsPreservesAliasedPropertyKeysForNavigation(): void
+    {
+        $propertyResolverProvider = $this->createStub(PropertyResolverProviderInterface::class);
+        $propertyResolverProvider->method('getPropertyResolver')->willReturn(new DefaultPropertyResolver());
+
+        $resolver = new BlockSuiteMetadataResolver($propertyResolverProvider);
+
+        $titleField = new FieldMetadata('title');
+        $titleField->setType('text_line');
+
+        $urlField = new FieldMetadata('url');
+        $urlField->setType('route');
+
+        $resolved = $resolver->resolveItems(
+            [
+                'nav.title' => $titleField,
+                'nav.url' => $urlField,
+            ],
+            [
+                'nav.title' => 'Enterprise Solutions',
+                'nav.url' => '/solutions',
+            ],
+            'en',
+        );
+
+        $this->assertArrayHasKey('nav.title', $resolved);
+        $this->assertArrayHasKey('nav.url', $resolved);
+        $this->assertSame('Enterprise Solutions', $resolved['nav.title']->getContent());
+        $this->assertSame('/solutions', $resolved['nav.url']->getContent());
+    }
 }

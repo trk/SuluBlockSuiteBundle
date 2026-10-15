@@ -118,4 +118,3 @@ final class DefaultAttributesTransformerTest extends TestCase
         $this->assertArrayNotHasKey('ONMOUSEOVER', $attrs);
     }
 }
-

@@ -101,7 +101,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $blockForms = [];
             foreach ($formMetadata->getForms() as $formKey => $form) {
                 if (\is_string($formKey)) {
-                    $this->enhanceBlockTabs($form, $locale, includeSharedTabs: true);
+                    $this->enhanceBlockTabs($form, $locale, includeSharedTabs: true, namespaceProps: true, updateSchema: false);
                     $this->enhanceBlockPreviewTags($form);
                     $blockForms[$formKey] = $form;
                 }
@@ -111,6 +111,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
         foreach ($formMetadata->getForms() as $form) {
             $this->visitFormMetadata($form, $locale, $metadataOptions);
+            if ('block' === $key && null !== $this->schemaMetadataProvider) {
+                $form->setSchema($this->schemaMetadataProvider->getMetadata($form->getItems()));
+            }
         }
     }
 
@@ -196,6 +199,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         string $locale,
         bool $includeSharedTabs = true,
         bool $namespaceProps = true,
+        bool $updateSchema = true,
     ): void {
         $blockKey = $blockForm->getKey();
         if ('' === $blockKey || 'default' === $blockKey) {
@@ -326,7 +330,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
         $blockForm->setItems([self::TABS_SECTION_NAME => $tabsSection]);
 
-        if (null !== $this->schemaMetadataProvider) {
+        if ($updateSchema && null !== $this->schemaMetadataProvider) {
             $blockForm->setSchema($this->schemaMetadataProvider->getMetadata($blockForm->getItems()));
         }
     }
@@ -1024,6 +1028,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                             $locale,
                             includeSharedTabs: $includeShared,
                             namespaceProps: $namespaceProps,
+                            updateSchema: false,
                         );
                     }
 
@@ -1279,8 +1284,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             return;
         }
 
-        $excludedMap = \array_fill_keys(['default', '', $rootForm->getKey(), ...$excludedTypes], true);
-        $rootSchema = $rootForm->getSchema();
+        $rootKey = $rootForm->getKey();
+        $isGlobalBlockRoot = isset($blockForms[$rootKey]);
+        $excludedMap = \array_fill_keys(['default', '', $rootKey, ...$excludedTypes], true);
         $existingTypes = $blocksProperty->getTypes();
 
         $addedCount = 0;
@@ -1293,8 +1299,16 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $this->enhanceBlockPreviewTags($blockForm);
 
             if (!isset($existingTypes[$typeKey])) {
-                $blocksProperty->addType($blockForm);
-                $rootSchema->addDefinition($typeKey, $blockForm->getSchema());
+                $globalBlockStub = new FormMetadata();
+                $globalBlockStub->setKey($typeKey);
+                $globalBlockStub->setTitles($blockForm->getTitles());
+
+                $globalTag = new TagMetadata();
+                $globalTag->setName('sulu.global_block');
+                $globalTag->setAttributes(['global_block' => $typeKey]);
+                $globalBlockStub->addTag($globalTag);
+
+                $blocksProperty->addType($globalBlockStub);
                 ++$addedCount;
             } else {
                 ++$addedCount;
@@ -1308,14 +1322,25 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $updatedTypes = $blocksProperty->getTypes();
         if (null !== $preferredDefault && isset($updatedTypes[$preferredDefault])) {
             $blocksProperty->setDefaultType($preferredDefault);
-
-            return;
+        } else {
+            $currentDefault = $blocksProperty->getDefaultType();
+            if ((null === $currentDefault || !isset($updatedTypes[$currentDefault]) || 'default' === $currentDefault) && [] !== $updatedTypes) {
+                $firstTypeKey = (string) \array_key_first($updatedTypes);
+                $blocksProperty->setDefaultType($firstTypeKey);
+            }
         }
 
-        $currentDefault = $blocksProperty->getDefaultType();
-        if ((null === $currentDefault || !isset($updatedTypes[$currentDefault]) || 'default' === $currentDefault) && [] !== $updatedTypes) {
-            $firstTypeKey = (string) \array_key_first($updatedTypes);
-            $blocksProperty->setDefaultType($firstTypeKey);
+        if (!$isGlobalBlockRoot) {
+            if (null !== $this->schemaMetadataProvider) {
+                $rootForm->setSchema($this->schemaMetadataProvider->getMetadata($rootForm->getItems()));
+            }
+
+            $rootSchema = $rootForm->getSchema();
+            foreach ($blockForms as $typeKey => $blockForm) {
+                if (!isset($excludedMap[$typeKey])) {
+                    $rootSchema->addDefinition($typeKey, $blockForm->getSchema());
+                }
+            }
         }
     }
 

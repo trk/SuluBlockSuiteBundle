@@ -165,4 +165,3 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $this->assertArrayNotHasKey('props/button_style', $resolvedSubSettings->getItems());
     }
 }
-

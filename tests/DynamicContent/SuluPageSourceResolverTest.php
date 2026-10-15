@@ -220,6 +220,7 @@ class SuluPageSourceResolverTest extends TestCase
 
         $this->assertSame([], $result);
     }
+
     public function testResolveCurrentPagePrioritizesPageOverContentWhenBothExist(): void
     {
         $resolver = new SuluPageSourceResolver();
