@@ -61,6 +61,13 @@ final class BlockPresetController extends AbstractController
     public function blockTypes(Request $request): JsonResponse
     {
         $locale = $request->query->getString('locale', $request->getLocale());
+        if (null !== $this->securityChecker) {
+            $this->securityChecker->checkPermission(
+                new SecurityCondition(SnippetAdmin::SECURITY_CONTEXT, $locale),
+                PermissionTypes::VIEW,
+            );
+        }
+
         if (null === $this->formMetadataVisitor) {
             return new JsonResponse(['blocks' => []]);
         }
@@ -93,6 +100,12 @@ final class BlockPresetController extends AbstractController
         }
 
         $locale = $request->query->getString('locale', $request->getLocale());
+        if (null !== $this->securityChecker) {
+            $this->securityChecker->checkPermission(
+                new SecurityCondition(SnippetAdmin::SECURITY_CONTEXT, $locale),
+                PermissionTypes::VIEW,
+            );
+        }
 
         $presets = $this->presetProvider->getPresets($blockType, $locale);
 
@@ -295,14 +308,25 @@ final class BlockPresetController extends AbstractController
         ], JsonResponse::HTTP_CREATED);
     }
 
-    #[Route('/admin/api/reusable-blocks/{id}', name: 'sulu_block_suite_reusable_block_info', methods: ['GET'])]
+    #[Route(
+        '/admin/api/reusable-blocks/{id}',
+        name: 'sulu_block_suite_reusable_block_info',
+        requirements: ['id' => '^(?!stats$)[^/]+'],
+        methods: ['GET'],
+    )]
     public function reusableBlock(Request $request, string $id): JsonResponse
     {
-        if (1 !== \preg_match('/^[a-z0-9_-]+$/i', $id) || null === $this->snippetRepository) {
-            return new JsonResponse(['error' => 'Not found'], JsonResponse::HTTP_NOT_FOUND);
+        $locale = $request->query->getString('locale', $request->getLocale());
+        if (null !== $this->securityChecker) {
+            $this->securityChecker->checkPermission(
+                new SecurityCondition(SnippetAdmin::SECURITY_CONTEXT, $locale),
+                PermissionTypes::VIEW,
+            );
         }
 
-        $locale = $request->query->getString('locale', $request->getLocale());
+        if ('stats' === $id || 1 !== \preg_match('/^[a-z0-9_-]+$/i', $id) || null === $this->snippetRepository) {
+            return new JsonResponse(['error' => 'Not found'], JsonResponse::HTTP_NOT_FOUND);
+        }
 
         try {
             $snippet = $this->snippetRepository->getOneBy(

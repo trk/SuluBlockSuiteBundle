@@ -151,7 +151,7 @@ export default class HotspotPicker extends React.Component<Props> {
     };
 
     fetchMediaById = (id: number | string) => {
-        if (this.lastResolvedMediaId === id && this.imageUrl) {
+        if (this.imageLoading || this.lastResolvedMediaId === id) {
             return;
         }
 

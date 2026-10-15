@@ -173,7 +173,8 @@ services:
             $twig: '@?twig'
             $pipeline: '@Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface'
             $templateNamespaces: '%sulu_block_suite.rendering.template_namespaces%'
-            $collectionRenderer: '@?Totoglu\SuluBlockSuiteBundle\Renderer\BlockCollectionRendererInterface'
+        calls:
+            - [setCollectionRenderer, ['@?Totoglu\SuluBlockSuiteBundle\Renderer\BlockCollectionRendererInterface']]
 
     Totoglu\SuluBlockSuiteBundle\Renderer\DefaultBlockCollectionRenderer:
         arguments:

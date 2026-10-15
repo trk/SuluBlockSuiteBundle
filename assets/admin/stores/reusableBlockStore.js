@@ -12,12 +12,19 @@ class ReusableBlockStore {
         return String(rawLoc).toLowerCase().split('_')[0];
     }
 
-    get(id: string): ?Object {
-        return this.cache.get(id);
+    getCacheKey(id: string, locale?: string): string {
+        const loc = locale || this.currentLocale;
+        return `${id}_${loc}`;
     }
 
-    set(id: string, data: Object) {
+    get(id: string, locale?: string): ?Object {
+        return this.cache.get(this.getCacheKey(id, locale)) || this.cache.get(id);
+    }
+
+    set(id: string, data: Object, locale?: string) {
+        const key = this.getCacheKey(id, locale);
         action(() => {
+            this.cache.set(key, data);
             this.cache.set(id, data);
         })();
     }
@@ -27,30 +34,33 @@ class ReusableBlockStore {
             return Promise.resolve(null);
         }
 
-        if (this.cache.has(id)) {
-            return Promise.resolve(this.cache.get(id));
-        }
-
-        if (this.loadingPromises.has(id)) {
-            return this.loadingPromises.get(id);
-        }
-
         const loc = locale || this.currentLocale;
+        const key = this.getCacheKey(id, loc);
+
+        if (this.cache.has(key)) {
+            return Promise.resolve(this.cache.get(key));
+        }
+
+        if (this.loadingPromises.has(key)) {
+            return this.loadingPromises.get(key);
+        }
+
         const promise = Requester.get(`/admin/api/reusable-blocks/${id}?locale=${loc}`)
             .then(action((data) => {
-                this.loadingPromises.delete(id);
+                this.loadingPromises.delete(key);
                 if (data && !data.error) {
+                    this.cache.set(key, data);
                     this.cache.set(id, data);
                     return data;
                 }
                 return null;
             }))
             .catch(action(() => {
-                this.loadingPromises.delete(id);
+                this.loadingPromises.delete(key);
                 return null;
             }));
 
-        this.loadingPromises.set(id, promise);
+        this.loadingPromises.set(key, promise);
         return promise;
     }
 }

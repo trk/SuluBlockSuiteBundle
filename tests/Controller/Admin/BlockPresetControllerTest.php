@@ -372,4 +372,45 @@ final class BlockPresetControllerTest extends TestCase
         $this->expectException(\Symfony\Component\Security\Core\Exception\AccessDeniedException::class);
         $controller->saveReusableBlock($request);
     }
+
+    public function testGetEndpointsCheckViewPermissionAndStatsExcludedFromReusableBlockRoute(): void
+    {
+        $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
+        $mockSecurityChecker = $this->createMock(\Sulu\Component\Security\Authorization\SecurityCheckerInterface::class);
+        $mockSecurityChecker->expects($this->exactly(3))
+            ->method('checkPermission')
+            ->with(
+                $this->callback(static function (\Sulu\Component\Security\Authorization\SecurityCondition $cond): bool {
+                    return 'sulu.snippet.snippets' === $cond->getSecurityContext();
+                }),
+                \Sulu\Component\Security\Authorization\PermissionTypes::VIEW,
+            );
+
+        $controller = new BlockPresetController(
+            $mockProvider,
+            null,
+            null,
+            null,
+            null,
+            $mockSecurityChecker,
+        );
+
+        $request = new Request(['locale' => 'en']);
+        $controller->blockTypes($request);
+        $controller->presets($request, 'card');
+        $res = $controller->reusableBlock($request, 'stats');
+        $this->assertSame(JsonResponse::HTTP_NOT_FOUND, $res->getStatusCode());
+
+        $refMethod = new \ReflectionMethod(BlockPresetController::class, 'reusableBlock');
+        $routeAttrs = $refMethod->getAttributes(\Symfony\Component\Routing\Attribute\Route::class);
+        $this->assertCount(1, $routeAttrs);
+        /** @var \Symfony\Component\Routing\Attribute\Route $route */
+        $route = $routeAttrs[0]->newInstance();
+        $requirements = $route->getRequirements();
+        $this->assertArrayHasKey('id', $requirements);
+        $idPattern = $requirements['id'];
+        $this->assertIsString($idPattern);
+        $this->assertSame(0, \preg_match('~' . $idPattern . '~', 'stats'));
+        $this->assertSame(1, \preg_match('~' . $idPattern . '~', '019a0000-0000-7000-8000-000000000001'));
+    }
 }

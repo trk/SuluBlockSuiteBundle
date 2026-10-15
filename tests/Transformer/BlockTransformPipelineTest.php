@@ -166,5 +166,45 @@ final class BlockTransformPipelineTest extends TestCase
         $this->assertCount(2, $results);
         $this->assertTrue($results[0]['processed']);
         $this->assertTrue($results[1]['processed']);
+        $this->assertTrue($results[0]['_pipeline_processed']);
+        $this->assertTrue($results[1]['_pipeline_processed']);
+    }
+
+    public function testProcessAndProcessCollectionSkipAlreadyProcessedBlocks(): void
+    {
+        $transformer = new class implements BlockTransformerInterface {
+            public int $calls = 0;
+
+            public static function getDefaultPriority(): int
+            {
+                return 50;
+            }
+
+            public function supports(array $block, array $context): bool
+            {
+                return true;
+            }
+
+            public function transform(array $block, array $context): array
+            {
+                ++$this->calls;
+
+                return $block;
+            }
+        };
+
+        $pipeline = new BlockTransformPipeline([$transformer]);
+
+        $first = $pipeline->process(['type' => 'card']);
+        $this->assertTrue($first['_pipeline_processed']);
+        $this->assertSame(1, $transformer->calls);
+
+        $second = $pipeline->process($first);
+        $this->assertSame(1, $transformer->calls);
+        $this->assertSame($first, $second);
+
+        $collection = $pipeline->processCollection([$first, ['type' => 'headline']]);
+        $this->assertCount(2, $collection);
+        $this->assertSame(2, $transformer->calls);
     }
 }

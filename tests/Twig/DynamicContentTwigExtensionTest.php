@@ -156,7 +156,7 @@ class DynamicContentTwigExtensionTest extends TestCase
         self::assertIsArray($result['rows'][0]['columns']);
         self::assertIsArray($result['rows'][0]['columns'][0]);
         self::assertSame(
-            [['type' => 'headline', 'title' => 'Visible', '_transformed' => true]],
+            [['type' => 'headline', 'title' => 'Visible', '_transformed' => true, '_pipeline_processed' => true]],
             $result['rows'][0]['columns'][0]['blocks'],
         );
         self::assertSame('section', $result['type']);

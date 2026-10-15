@@ -52,6 +52,10 @@ final class BlockTransformPipeline implements BlockTransformPipelineInterface
 
     public function process(array $block, array $context = []): array
     {
+        if (!empty($block['_pipeline_processed'])) {
+            return $block;
+        }
+
         foreach ($this->transformers as $item) {
             $transformer = $item['transformer'];
             if ($transformer->supports($block, $context)) {
@@ -59,6 +63,8 @@ final class BlockTransformPipeline implements BlockTransformPipelineInterface
                 unset($block['_expanded_blocks']);
             }
         }
+
+        $block['_pipeline_processed'] = true;
 
         return $block;
     }
@@ -79,6 +85,12 @@ final class BlockTransformPipeline implements BlockTransformPipelineInterface
             /** @var list<array<string, mixed>> $nextBlocks */
             $nextBlocks = [];
             foreach ($currentBlocks as $block) {
+                if (!empty($block['_pipeline_processed'])) {
+                    $nextBlocks[] = $block;
+
+                    continue;
+                }
+
                 if ($transformer->supports($block, $context)) {
                     $transformed = $transformer->transform($block, $context);
                     if (isset($transformed['_expanded_blocks']) && \is_array($transformed['_expanded_blocks'])) {
@@ -100,6 +112,11 @@ final class BlockTransformPipeline implements BlockTransformPipelineInterface
             }
             $currentBlocks = $nextBlocks;
         }
+
+        foreach ($currentBlocks as &$processedBlock) {
+            $processedBlock['_pipeline_processed'] = true;
+        }
+        unset($processedBlock);
 
         return $currentBlocks;
     }
