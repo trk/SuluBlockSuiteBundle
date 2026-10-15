@@ -130,27 +130,24 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
                 $content['parent_id'] = $resourceObj->getParent()->getUuid();
             }
 
-            /** @var mixed $headline */
-            $headline = $content['headline'] ?? ($content['title'] ?? null);
-            $content['headline'] = \is_string($headline) ? $headline : null;
+            $content['headline'] = $this->firstNonEmptyString($content['headline'] ?? null, $content['title'] ?? null);
 
             /** @var mixed $excerptDesc */
             $excerptDesc = null;
-            if (isset($context['extension']) && \is_array($context['extension']) && isset($context['extension']['excerpt']) && \is_array($context['extension']['excerpt'])) {
-                $excerptDesc = $context['extension']['excerpt']['description'] ?? null;
-            }
-            /** @var mixed $summary */
-            $summary = $content['summary'] ?? ($content['description'] ?? $excerptDesc);
-            $content['summary'] = \is_string($summary) ? $summary : null;
-
             /** @var mixed $excerptImage */
             $excerptImage = null;
             if (isset($context['extension']) && \is_array($context['extension']) && isset($context['extension']['excerpt']) && \is_array($context['extension']['excerpt'])) {
+                $excerptDesc = $context['extension']['excerpt']['description'] ?? null;
                 $excerptImage = $context['extension']['excerpt']['image'] ?? null;
             }
-            /** @var mixed $image */
-            $image = $content['image'] ?? $excerptImage;
-            $content['image'] = $image;
+
+            $rawSummary = $content['summary'] ?? null;
+            $rawDescription = $content['description'] ?? null;
+            $rawBodyContent = $content['content'] ?? null;
+
+            $content['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, $excerptDesc, $rawBodyContent);
+            $content['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, $excerptDesc, $rawBodyContent);
+            $content['image'] = $this->firstNonEmptyMedia($content['image'] ?? null, $excerptImage);
 
             /** @var mixed $url */
             $url = $content['url'] ?? null;
@@ -179,15 +176,14 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         if (isset($context['title']) || isset($context['headline'])) {
             /** @var array<string, mixed> $normalized */
             $normalized = $context;
-            /** @var mixed $title */
-            $title = $context['title'] ?? null;
-            /** @var mixed $headline */
-            $headline = $context['headline'] ?? $title;
-            $normalized['headline'] = \is_string($headline) ? $headline : null;
+            $normalized['headline'] = $this->firstNonEmptyString($context['headline'] ?? null, $context['title'] ?? null);
 
-            /** @var mixed $summary */
-            $summary = $context['summary'] ?? ($context['description'] ?? null);
-            $normalized['summary'] = \is_string($summary) ? $summary : null;
+            $rawSummary = $context['summary'] ?? null;
+            $rawDescription = $context['description'] ?? null;
+            $rawBodyContent = $context['content'] ?? null;
+
+            $normalized['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, null, $rawBodyContent);
+            $normalized['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, null, $rawBodyContent);
 
             /** @var mixed $url */
             $url = $context['url'] ?? null;
@@ -686,7 +682,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
                 if (null !== $title) {
                     $pageData['title'] = $title;
                 }
-                $pageData['headline'] = $pageData['headline'] ?? ($pageData['title'] ?? null);
+                $pageData['headline'] = $this->firstNonEmptyString($pageData['headline'] ?? null, $pageData['title'] ?? null);
 
                 /** @var mixed $excerptDesc */
                 $excerptDesc = null;
@@ -698,9 +694,13 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
                     $excerptImage = $excerpt['image'] ?? null;
                 }
 
-                $pageData['summary'] = $pageData['summary'] ?? ($pageData['description'] ?? $excerptDesc);
-                $pageData['description'] = $pageData['description'] ?? $excerptDesc;
-                $pageData['image'] = $pageData['image'] ?? $excerptImage;
+                $rawSummary = $pageData['summary'] ?? null;
+                $rawDescription = $pageData['description'] ?? null;
+                $rawBodyContent = $pageData['content'] ?? null;
+
+                $pageData['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, $excerptDesc, $rawBodyContent);
+                $pageData['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, $excerptDesc, $rawBodyContent);
+                $pageData['image'] = $this->firstNonEmptyMedia($pageData['image'] ?? null, $excerptImage);
 
                 if (isset($resolved['view']['url']) && \is_string($resolved['view']['url'])) {
                     $pageData['url'] = $resolved['view']['url'];
@@ -728,13 +728,16 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         $pageData['uuid'] = $page->getUuid();
         $entityTitle = $dimensionContent->getTitle();
         $pageData['title'] = $entityTitle;
-        $existingHeadline = $pageData['headline'] ?? null;
-        if (!\is_string($existingHeadline) || '' === \trim($existingHeadline)) {
-            $pageData['headline'] = $entityTitle;
-        }
-        $pageData['summary'] = $pageData['summary'] ?? ($pageData['description'] ?? $dimensionContent->getExcerptDescription());
-        $pageData['description'] = $pageData['description'] ?? $dimensionContent->getExcerptDescription();
-        $pageData['image'] = $pageData['image'] ?? $dimensionContent->getExcerptImage();
+        $pageData['headline'] = $this->firstNonEmptyString($pageData['headline'] ?? null, $entityTitle);
+
+        $excerptDesc = $dimensionContent->getExcerptDescription();
+        $rawSummary = $pageData['summary'] ?? null;
+        $rawDescription = $pageData['description'] ?? null;
+        $rawBodyContent = $pageData['content'] ?? null;
+
+        $pageData['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, $excerptDesc, $rawBodyContent);
+        $pageData['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, $excerptDesc, $rawBodyContent);
+        $pageData['image'] = $this->firstNonEmptyMedia($pageData['image'] ?? null, $dimensionContent->getExcerptImage());
 
         $route = $dimensionContent->getRoute();
         if (null !== $route) {
@@ -942,5 +945,56 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         }
 
         return 'en';
+    }
+
+    private function firstNonEmptyString(mixed ...$candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            if (\is_string($candidate) && '' !== \trim($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveSummaryWithContentFallback(
+        mixed $summary,
+        mixed $description,
+        mixed $excerptDescription,
+        mixed $content,
+    ): ?string {
+        $resolved = $this->firstNonEmptyString($summary, $description, $excerptDescription);
+        if (null !== $resolved) {
+            return $resolved;
+        }
+
+        if (\is_string($content) && '' !== \trim($content)) {
+            $truncated = DynamicContentHydrator::truncatePlainText($content, 160);
+            if ('' !== $truncated) {
+                return $truncated;
+            }
+        }
+
+        return null;
+    }
+
+    private function firstNonEmptyMedia(mixed ...$candidates): mixed
+    {
+        foreach ($candidates as $candidate) {
+            if (null === $candidate) {
+                continue;
+            }
+            if (\is_string($candidate) && '' === \trim($candidate)) {
+                continue;
+            }
+            if (\is_array($candidate) && [] === $candidate) {
+                continue;
+            }
+
+            return $candidate;
+        }
+
+        return null;
     }
 }

@@ -1,6 +1,11 @@
 {% set snippet = block.snippet|default(null) %}
 {% if snippet is not null and snippet is not iterable %}
     {% set snippet = reusable_block_load(snippet) %}
+{% elseif snippet is iterable and snippet.blocks is not defined and snippet.content.blocks is not defined %}
+    {% set snippet_id = snippet.id|default(snippet.uuid|default(null)) %}
+    {% if snippet_id %}
+        {% set snippet = reusable_block_load(snippet_id) %}
+    {% endif %}
 {% endif %}
 {% set inner_blocks = snippet.blocks|default(snippet.content.blocks|default([])) %}
 {% set props = block._props|default(block.props is iterable ? block.props : {}) %}

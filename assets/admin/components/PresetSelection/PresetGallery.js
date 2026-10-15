@@ -19,7 +19,7 @@ type Props = {
     componentType: string,
     currentPresetId: ?string,
     onClose: () => void,
-    onSelect: (presetId: string, preset: PresetItem) => void,
+    onSelect: (presetId: ?string, preset: ?PresetItem) => void,
     open: boolean,
     presets: Array<PresetItem>,
 };
@@ -164,10 +164,10 @@ export default class PresetGallery extends React.Component<Props> {
         if (props.text_align) {
             const alignKey = String(props.text_align).toLowerCase();
             const alignLabel = alignKey === 'center'
-                ? (translate('sulu_block_suite.opt_center') || 'Center')
+                ? this.t('sulu_block_suite.opt_center', 'Center')
                 : (alignKey === 'right'
-                    ? (translate('sulu_block_suite.opt_right') || 'Right')
-                    : (translate('sulu_block_suite.opt_left') || 'Left'));
+                    ? this.t('sulu_block_suite.opt_right', 'Right')
+                    : this.t('sulu_block_suite.opt_left', 'Left'));
             badges.push({id: 'align', label: alignLabel});
         }
         if (props.variant && badges.length < 3) {
@@ -177,11 +177,16 @@ export default class PresetGallery extends React.Component<Props> {
             badges.push({
                 id: 'content',
                 isContent: true,
-                label: translate('sulu_block_suite.includes_content') || 'Includes Content',
+                label: this.t('sulu_block_suite.includes_content', 'Includes Content'),
             });
         }
 
         return badges;
+    }
+
+    t(key: string, fallback: string): string {
+        const translated = translate(key);
+        return translated && translated !== key ? translated : fallback;
     }
 
     render() {
@@ -190,13 +195,14 @@ export default class PresetGallery extends React.Component<Props> {
             return null;
         }
 
-        const modalTitle = translate('sulu_block_suite.preset_gallery_title') || 'Preset Style Gallery';
-        const searchPlaceholder = translate('sulu_block_suite.search_presets') || 'Search presets...';
-        const applyText = translate('sulu_block_suite.apply_preset') || 'Apply Preset';
-        const reapplyText = translate('sulu_block_suite.reapply_button') || 'Re-apply';
-        const activeText = translate('sulu_block_suite.current_preset') || 'Active Preset';
-        const noResultsText = translate('sulu_block_suite.no_presets_found') || 'No presets found matching your query.';
-        const listedText = translate('sulu_block_suite.presets_listed') || 'presets listed';
+        const modalTitle = this.t('sulu_block_suite.preset_gallery_title', 'Preset Style Gallery');
+        const searchPlaceholder = this.t('sulu_block_suite.search_presets', 'Search presets...');
+        const applyText = this.t('sulu_block_suite.apply_preset', 'Apply Preset');
+        const reapplyText = this.t('sulu_block_suite.reapply_button', 'Re-apply');
+        const clearPresetText = this.t('sulu_block_suite.clear_preset', 'Clear Preset');
+        const activeText = this.t('sulu_block_suite.current_preset', 'Active Preset');
+        const noResultsText = this.t('sulu_block_suite.no_presets_found', 'No presets found matching your query.');
+        const listedText = this.t('sulu_block_suite.presets_listed', 'presets listed');
 
         return (
             <Overlay
@@ -282,6 +288,19 @@ export default class PresetGallery extends React.Component<Props> {
                                         </div>
 
                                         <div className={styles.cardFooter}>
+                                            {isActive && (
+                                                <Button
+                                                    icon="su-trash-alt"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onSelect(null, null);
+                                                        this.handleClose();
+                                                    }}
+                                                    skin="link"
+                                                >
+                                                    {clearPresetText}
+                                                </Button>
+                                            )}
                                             <Button
                                                 icon={isActive ? 'su-sync' : 'su-check'}
                                                 onClick={(e) => {

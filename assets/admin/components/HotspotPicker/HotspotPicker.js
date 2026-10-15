@@ -349,7 +349,7 @@ export default class HotspotPicker extends React.Component<Props> {
                             title={translate('sulu_block_suite.hotspot_picker.center') || 'Center (50%, 50%)'}
                             type="button"
                         >
-                            <Icon name="su-location" />
+                            <Icon name="su-focus" />
                         </button>
                     </div>
 

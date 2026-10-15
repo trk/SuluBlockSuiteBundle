@@ -89,6 +89,24 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
         $extractedTexts = [];
         $visitedSnippets = [];
 
+        foreach (['headline', 'subtitle', 'summary', 'description', 'content', 'article'] as $topLevelField) {
+            if (isset($templateData[$topLevelField]) && \is_string($templateData[$topLevelField])) {
+                $plain = $this->normalizePlainText($templateData[$topLevelField]);
+                if ('' !== $plain) {
+                    $extractedTexts[] = $plain;
+                }
+            }
+        }
+
+        if ((!isset($document['mediaId']) || '' === $document['mediaId'])
+            && isset($templateData['image'])
+            && \is_array($templateData['image'])
+            && isset($templateData['image']['id'])
+            && (\is_int($templateData['image']['id']) || \is_numeric($templateData['image']['id']))
+        ) {
+            $document['mediaId'] = (string) $templateData['image']['id'];
+        }
+
         foreach (self::CHILD_COLLECTION_KEYS as $collectionKey) {
             if (isset($templateData[$collectionKey]) && \is_array($templateData[$collectionKey])) {
                 $this->extractFromBlockList($templateData[$collectionKey], $locale, $extractedTexts, $visitedSnippets);

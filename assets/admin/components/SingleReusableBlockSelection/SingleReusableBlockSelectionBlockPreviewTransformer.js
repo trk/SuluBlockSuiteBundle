@@ -23,7 +23,7 @@ const PreviewItem = observer(({id}: PreviewItemProps) => {
         return (
             <span className={styles.previewContainer}>
                 <span className={styles.badge}>
-                    <Icon name="su-clone" />
+                    <Icon name="su-snippet" />
                     <span>{badgeLabel}</span>
                 </span>
                 <span className={styles.loading}>{loadingLabel}</span>
@@ -39,7 +39,7 @@ const PreviewItem = observer(({id}: PreviewItemProps) => {
     return (
         <span className={styles.previewContainer} title={tooltip}>
             <span className={styles.badge}>
-                <Icon name="su-clone" />
+                <Icon name="su-snippet" />
                 <span>{badgeLabel}</span>
             </span>
             <strong className={styles.title}>{snippet.title}</strong>

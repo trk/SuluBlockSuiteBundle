@@ -19,21 +19,37 @@ services:
             $mediaManager: '@?sulu_media.media_manager'
             $mediaPreviewUrlResolver: '@Totoglu\SuluBlockSuiteBundle\Preset\MediaPreviewUrlResolver'
 
-    Totoglu\SuluBlockSuiteBundle\Schema\BlockPropSchemaProviderInterface:
-        alias: Totoglu\SuluBlockSuiteBundle\Schema\YamlBlockPropSchemaProvider
-
-    Totoglu\SuluBlockSuiteBundle\Schema\YamlBlockPropSchemaProvider:
+    Totoglu\SuluBlockSuiteBundle\Preset\PresetBlockVisitor:
         arguments:
-            $schemaDirectory: '%sulu_block_suite.props.schema_dir%'
+            $presetProvider: '@Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
+            $presetsEnabled: '%sulu_block_suite.presets.enabled%'
+        tags: ['sulu_content.block_visitor']
+
+    Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor:
+        arguments:
+            $presetDirectory: '%sulu_block_suite.presets.yaml_dir%'
+            $projectDirectory: '%kernel.project_dir%'
             $translator: '@?translator'
+            $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
+            $formXmlLoader: '@?sulu_admin.form_metadata.form_xml_loader'
+            $schemaMetadataProvider: '@?sulu_admin.schema_metadata_provider'
+            $dynamicContentHydrator: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface'
+            $presetProvider: '@?Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
+        tags:
+            - { name: 'sulu_admin.form_metadata_visitor', priority: -50 }
+            - { name: 'sulu_admin.typed_form_metadata_visitor', priority: -50 }
+
+    Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteMetadataResolver:
+        decorates: 'sulu_content.metadata_resolver'
+        arguments:
+            $propertyResolverProvider: '@sulu_content.property_resolver_provider'
 
     Totoglu\SuluBlockSuiteBundle\Controller\Admin\BlockPresetController:
         arguments:
             $presetProvider: '@Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
             $snippetRepository: '@?sulu_snippet.snippet_repository'
             $mediaManager: '@?sulu_media.media_manager'
-            $schemaProvider: '@Totoglu\SuluBlockSuiteBundle\Schema\BlockPropSchemaProviderInterface'
-            $targetBlockVisitor: '@Totoglu\SuluBlockSuiteBundle\Metadata\TargetBlockOptionsFormMetadataVisitor'
+            $formMetadataVisitor: '@Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor'
             $messageBus: '@?Symfony\Component\Messenger\MessageBusInterface'
             $securityChecker: '@?sulu_security.security_checker'
             $mediaPreviewUrlResolver: '@Totoglu\SuluBlockSuiteBundle\Preset\MediaPreviewUrlResolver'
@@ -59,9 +75,6 @@ services:
 
     Totoglu\SuluBlockSuiteBundle\Twig\LayoutTwigExtension:
         tags: ['twig.extension']
-
-    Totoglu\SuluBlockSuiteBundle\Content\Type\BlockPropsPropertyResolver:
-        tags: ['sulu.content.property_resolver']
 
     Totoglu\SuluBlockSuiteBundle\Content\Type\SingleReusableBlockSelectionPropertyResolver:
         arguments:
@@ -90,17 +103,6 @@ services:
             $presetsEnabled: '%sulu_block_suite.presets.enabled%'
             $layoutEnabled: '%sulu_block_suite.layout.enabled%'
         tags: ['sulu.admin']
-
-    Totoglu\SuluBlockSuiteBundle\Metadata\TargetBlockOptionsFormMetadataVisitor:
-        arguments:
-            $schemaDirectory: '%sulu_block_suite.props.schema_dir%'
-            $presetDirectory: '%sulu_block_suite.presets.yaml_dir%'
-            $projectDirectory: '%kernel.project_dir%'
-            $translator: '@?translator'
-            $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
-        tags:
-            - { name: 'sulu_admin.form_metadata_visitor', priority: 50 }
-            - { name: 'sulu_admin.typed_form_metadata_visitor', priority: 50 }
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface:
         alias: Totoglu\SuluBlockSuiteBundle\DynamicContent\SuluPageSourceResolver
@@ -182,14 +184,6 @@ services:
     Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver:
         arguments:
             $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
-            $schemaDirectory: '%sulu_block_suite.props.schema_dir%'
-
-    Totoglu\SuluBlockSuiteBundle\Controller\Admin\DynamicContentMetadataController:
-        arguments:
-            $sourceResolver: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface'
-            $targetFieldResolver: '@Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver'
-            $customProviders: !tagged_iterator sulu_block_suite.dynamic_source_provider
-        tags: ['controller.service_arguments']
 
     Totoglu\SuluBlockSuiteBundle\Command\ExportBlockPresetsCommand:
         arguments:
@@ -201,4 +195,3 @@ services:
         arguments:
             $snippetRepository: '@?sulu_snippet.snippet_repository'
         tags: ['sulu_page.website_page_reindex_provider_enhancer']
-

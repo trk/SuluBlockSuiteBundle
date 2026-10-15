@@ -188,6 +188,7 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
             ['name' => 'subtitle', 'label' => 'Subtitle', 'type' => 'string'],
             ['name' => 'summary', 'label' => 'Summary', 'type' => 'text'],
             ['name' => 'description', 'label' => 'Description', 'type' => 'text'],
+            ['name' => 'content', 'label' => 'Content', 'type' => 'text'],
             ['name' => 'image', 'label' => 'Image', 'type' => 'media'],
             ['name' => 'url', 'label' => 'Page URL', 'type' => 'link'],
             ['name' => 'link', 'label' => 'Page Link', 'type' => 'link'],

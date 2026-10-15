@@ -116,4 +116,3 @@ final class BuiltInSourceProvidersTest extends TestCase
         $this->assertSame('/media/99/download/arch.png', $items[0]['image']['url']);
     }
 }
-

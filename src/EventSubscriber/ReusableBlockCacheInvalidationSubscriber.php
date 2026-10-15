@@ -63,4 +63,3 @@ final class ReusableBlockCacheInvalidationSubscriber implements EventSubscriberI
         $this->cacheManager->invalidateReference(SnippetInterface::RESOURCE_KEY, $uuid);
     }
 }
-

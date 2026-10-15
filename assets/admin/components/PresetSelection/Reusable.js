@@ -4,13 +4,20 @@ import {action, observable, toJS} from 'mobx';
 import {observer} from 'mobx-react';
 import {
     Button,
+    Checkbox,
     Dialog,
     Form,
     Input,
 } from 'sulu-admin-bundle/components';
 import {translate} from 'sulu-admin-bundle/utils';
 import {Requester} from 'sulu-admin-bundle/services';
-import blockPropsStyles from './blockProps.scss';
+import snackbarStore from 'sulu-admin-bundle/stores/snackbarStore';
+import blockPropsStyles from './presetSelection.scss';
+
+const t = (key: string, fallback: string): string => {
+    const translated = translate(key);
+    return translated && translated !== key ? translated : fallback;
+};
 
 type ReusableSnippet = {
     description?: ?string,
@@ -37,8 +44,8 @@ export class ReusableCard extends React.Component<ReusableCardProps> {
 
     render() {
         const {onChangeSnippet, snippet} = this.props;
-        const openInNewTabLabel = translate('sulu_block_suite.open_in_new_tab') || 'Edit in New Tab';
-        const changeLabel = translate('sulu_block_suite.change_reusable_block') || 'Change';
+        const openInNewTabLabel = t('sulu_block_suite.open_in_new_tab', 'Edit in New Tab');
+        const changeLabel = t('sulu_block_suite.change_reusable_block', 'Change');
 
         return (
             <div className={blockPropsStyles.reusableCard}>
@@ -75,7 +82,7 @@ type SaveReusableDialogProps = {
     componentType: string,
     locale: string,
     onCancel: () => void,
-    onSuccess: (createdSnippet: Object) => void,
+    onSuccess: (createdSnippet: Object, convertBlock: boolean) => void,
     open: boolean,
     propsValues: Object,
 };
@@ -84,6 +91,7 @@ type SaveReusableDialogProps = {
 export class SaveReusableDialog extends React.Component<SaveReusableDialogProps> {
     @observable title: string = '';
     @observable description: string = '';
+    @observable convertBlock: boolean = true;
     @observable saving: boolean = false;
     @observable error: ?string = null;
 
@@ -96,6 +104,7 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
     @action resetForm() {
         this.title = '';
         this.description = '';
+        this.convertBlock = true;
         this.saving = false;
         this.error = null;
     }
@@ -107,6 +116,10 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
 
     @action handleDescriptionChange = (val: ?string) => {
         this.description = val || '';
+    };
+
+    @action handleConvertBlockChange = (checked: boolean) => {
+        this.convertBlock = checked;
     };
 
     @action handleConfirm = () => {
@@ -142,11 +155,15 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
         Requester.post('/admin/api/reusable-blocks', payload)
             .then(action((createdSnippet) => {
                 this.saving = false;
-                onSuccess(createdSnippet);
+                snackbarStore.add({
+                    text: t('sulu_block_suite.save_reusable_success', `Reusable block "${title}" created successfully.`),
+                    type: 'success',
+                }, 3000);
+                onSuccess(createdSnippet, this.convertBlock);
             }))
             .catch(action((errorResponse) => {
                 this.saving = false;
-                const defaultErr = translate('sulu_block_suite.save_reusable_error') || 'Failed to save reusable block';
+                const defaultErr = t('sulu_block_suite.save_reusable_error', 'Failed to save reusable block');
                 if (errorResponse && errorResponse.json) {
                     errorResponse.json().then(action((err) => {
                         this.error = err.error || defaultErr;
@@ -165,11 +182,12 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
             return null;
         }
 
-        const titleText = translate('sulu_block_suite.save_reusable_title') || 'Save as Reusable Block';
-        const titleLabel = translate('sulu_block_suite.reusable_title_label') || 'Reusable Block Title';
-        const descLabel = translate('sulu_block_suite.reusable_desc_label') || 'Description / Note (Optional)';
-        const cancelButton = translate('sulu_admin.cancel') || 'Cancel';
-        const saveButton = translate('sulu_admin.save') || 'Save';
+        const titleText = t('sulu_block_suite.save_reusable_title', 'Save as Reusable Block');
+        const titleLabel = t('sulu_block_suite.reusable_title_label', 'Reusable Block Title');
+        const descLabel = t('sulu_block_suite.reusable_desc_label', 'Description / Note (Optional)');
+        const convertBlockLabel = t('sulu_block_suite.convert_to_reusable', 'Replace current block with this Reusable Block');
+        const cancelButton = t('sulu_admin.cancel', 'Cancel');
+        const saveButton = t('sulu_admin.save', 'Save');
 
         return (
             <Dialog
@@ -202,6 +220,14 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
                                 onChange={this.handleDescriptionChange}
                                 value={this.description}
                             />
+                        </Form.Field>
+                        <Form.Field colSpan={12}>
+                            <Checkbox
+                                checked={this.convertBlock}
+                                onChange={this.handleConvertBlockChange}
+                            >
+                                {convertBlockLabel}
+                            </Checkbox>
                         </Form.Field>
                     </Form>
                 </div>

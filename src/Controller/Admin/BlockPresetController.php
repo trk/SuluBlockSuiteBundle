@@ -22,10 +22,9 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\HandleTrait;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Totoglu\SuluBlockSuiteBundle\Metadata\TargetBlockOptionsFormMetadataVisitor;
+use Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor;
 use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
 use Totoglu\SuluBlockSuiteBundle\Preset\MediaPreviewUrlResolver;
-use Totoglu\SuluBlockSuiteBundle\Schema\BlockPropSchemaProviderInterface;
 
 final class BlockPresetController extends AbstractController
 {
@@ -37,8 +36,7 @@ final class BlockPresetController extends AbstractController
         private readonly BlockPresetProviderInterface $presetProvider,
         private readonly ?SnippetRepositoryInterface $snippetRepository = null,
         private readonly ?MediaManagerInterface $mediaManager = null,
-        private readonly ?BlockPropSchemaProviderInterface $schemaProvider = null,
-        private readonly ?TargetBlockOptionsFormMetadataVisitor $targetBlockVisitor = null,
+        private readonly ?BlockSuiteFormMetadataVisitor $formMetadataVisitor = null,
         ?MessageBusInterface $messageBus = null,
         private readonly ?SecurityCheckerInterface $securityChecker = null,
         ?MediaPreviewUrlResolver $mediaPreviewUrlResolver = null,
@@ -59,50 +57,25 @@ final class BlockPresetController extends AbstractController
         return $this->presets($request, $blockType);
     }
 
-    #[Route('/admin/api/block-props-schema/{blockType}', name: 'sulu_block_suite_prop_schema', methods: ['GET'])]
-    public function schema(Request $request, string $blockType): JsonResponse
-    {
-        if (1 !== \preg_match('/^[a-z0-9_-]+$/i', $blockType)) {
-            return new JsonResponse(['tabs' => []], JsonResponse::HTTP_BAD_REQUEST);
-        }
-
-        $locale = $request->query->getString('locale', $request->getLocale());
-
-        if (null === $this->schemaProvider) {
-            return new JsonResponse(['tabs' => []]);
-        }
-
-        $schema = $this->schemaProvider->getSchema($blockType, $locale);
-
-        return new JsonResponse($schema);
-    }
-
     #[Route('/admin/api/block-types', name: 'sulu_block_suite_block_types', methods: ['GET'])]
     public function blockTypes(Request $request): JsonResponse
     {
         $locale = $request->query->getString('locale', $request->getLocale());
-        if (null === $this->targetBlockVisitor) {
-            return new JsonResponse(['items' => []]);
+        if (null === $this->formMetadataVisitor) {
+            return new JsonResponse(['blocks' => []]);
         }
 
-        $types = $this->targetBlockVisitor->discoverAvailableBlockTypes($locale);
+        $types = $this->formMetadataVisitor->discoverAvailableBlockTypes($locale);
 
-        /** @var list<array{type: string, title: string, has_props: bool, presets_count: int}> $result */
+        /** @var list<array{type: string, title: string, presets_count: int}> $result */
         $result = [];
         foreach ($types as $type) {
-            $hasProps = false;
-            if (null !== $this->schemaProvider) {
-                $schema = $this->schemaProvider->getSchema($type, $locale);
-                $hasProps = \count($schema['tabs']) > 0;
-            }
-
             $presets = $this->presetProvider->getPresets($type, $locale);
-            $title = $this->targetBlockVisitor->resolveBlockTitle($type, $locale);
+            $title = $this->formMetadataVisitor->resolveBlockTitle($type, $locale);
 
             $result[] = [
                 'type' => $type,
                 'title' => $title,
-                'has_props' => $hasProps,
                 'presets_count' => \count($presets),
             ];
         }
@@ -171,7 +144,7 @@ final class BlockPresetController extends AbstractController
 
         /** @var array<string, mixed> $rawProps */
         $rawProps = isset($data['props']) && \is_array($data['props']) ? $data['props'] : [];
-        unset($rawProps['_preset']);
+        unset($rawProps['_preset'], $rawProps['preset']);
 
         /** @var array<string, mixed> $props */
         $props = [];
@@ -183,7 +156,7 @@ final class BlockPresetController extends AbstractController
 
         /** @var array<string, mixed> $rawValues */
         $rawValues = isset($data['values']) && \is_array($data['values']) ? $data['values'] : [];
-        unset($rawValues['type'], $rawValues['props'], $rawValues['_preset']);
+        unset($rawValues['type'], $rawValues['props'], $rawValues['_preset'], $rawValues['preset']);
 
         $blockEntry = \array_merge(
             $rawValues,
@@ -277,9 +250,9 @@ final class BlockPresetController extends AbstractController
             return new JsonResponse(['error' => 'Message bus is not configured.'], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        unset($block['_preset']);
+        unset($block['_preset'], $block['preset']);
         if (isset($block['props']) && \is_array($block['props'])) {
-            unset($block['props']['_preset']);
+            unset($block['props']['_preset'], $block['props']['preset']);
         }
 
         /** @var array<string, mixed> $snippetData */

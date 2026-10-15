@@ -36,6 +36,13 @@ final class SingleReusableBlockSelectionPropertyResolver implements PropertyReso
             ? $params['resourceLoader']
             : SnippetResourceLoader::getKey();
 
+        $properties = isset($params['properties']) && \is_array($params['properties'])
+            ? $params['properties']
+            : [
+                'title' => 'title',
+                'blocks' => 'blocks',
+            ];
+
         return ContentView::createResolvableWithReferences(
             id: $data,
             resourceLoaderKey: $resourceLoaderKey,
@@ -46,7 +53,7 @@ final class SingleReusableBlockSelectionPropertyResolver implements PropertyReso
             ],
             priority: 100,
             metadata: [
-                'properties' => $params['properties'] ?? null,
+                'properties' => $properties,
             ],
         );
     }

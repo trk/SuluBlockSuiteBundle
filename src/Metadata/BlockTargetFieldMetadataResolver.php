@@ -6,14 +6,14 @@ namespace Totoglu\SuluBlockSuiteBundle\Metadata;
 
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\ItemMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
-use Symfony\Component\Yaml\Exception\ParseException;
-use Symfony\Component\Yaml\Yaml;
 
 /**
- * Dynamically discovers mappable target fields for any registered Sulu CMS block
- * by inspecting Sulu FormMetadata and merging optional YAML overrides.
+ * Discovers mappable target content fields for any registered Sulu CMS block
+ * by inspecting Sulu FormMetadata (including fields nested inside sections/tabs).
  */
 final class BlockTargetFieldMetadataResolver
 {
@@ -29,20 +29,9 @@ final class BlockTargetFieldMetadataResolver
         'blocks',
     ];
 
-    /**
-     * @var list<string>
-     */
-    private array $schemaDirectories;
-
-    /**
-     * @param string|array<array-key, string> $schemaDirectory
-     */
     public function __construct(
         private readonly ?MetadataProviderRegistry $metadataProviderRegistry = null,
-        string|array $schemaDirectory = [],
     ) {
-        $dirs = \is_array($schemaDirectory) ? \array_values($schemaDirectory) : [$schemaDirectory];
-        $this->schemaDirectories = \array_values(\array_filter($dirs, static fn (string $dir): bool => '' !== \trim($dir)));
     }
 
     /**
@@ -76,16 +65,15 @@ final class BlockTargetFieldMetadataResolver
         $isMultiple = false;
         $defaultItemType = null;
 
-        // 1. Discover fields and multiplicity from Sulu FormMetadata
         $formMetadata = $this->getBlockFormMetadata($cleanType, $locale);
         if (null !== $formMetadata) {
-            foreach ($formMetadata->getItems() as $item) {
-                if (!$item instanceof FieldMetadata) {
-                    continue;
-                }
-
+            foreach ($this->flattenFieldItems($formMetadata->getItems()) as $item) {
                 $fieldName = $item->getName();
                 $fieldType = $item->getType();
+
+                if (\str_starts_with($fieldName, 'props/')) {
+                    continue;
+                }
 
                 if ('items' === $fieldName && 'block' === $fieldType) {
                     $isMultiple = true;
@@ -95,14 +83,14 @@ final class BlockTargetFieldMetadataResolver
                         if (null === $defaultItemType && \is_string($typeKey) && '' !== $typeKey) {
                             $defaultItemType = $typeKey;
                         }
-                        foreach ($childFormMetadata->getItems() as $childItem) {
-                            if (!$childItem instanceof FieldMetadata) {
-                                continue;
-                            }
-
+                        foreach ($this->flattenFieldItems($childFormMetadata->getItems()) as $childItem) {
                             $childFieldName = $childItem->getName();
                             $childFieldType = $childItem->getType();
-                            if (\in_array($childFieldName, self::EXCLUDED_FIELDS, true) || 'block' === $childFieldType || 'block_props' === $childFieldType) {
+                            if (
+                                \str_starts_with($childFieldName, 'props/')
+                                || \in_array($childFieldName, self::EXCLUDED_FIELDS, true)
+                                || 'block' === $childFieldType
+                            ) {
                                 continue;
                             }
 
@@ -122,7 +110,7 @@ final class BlockTargetFieldMetadataResolver
                     continue;
                 }
 
-                if (\in_array($fieldName, self::EXCLUDED_FIELDS, true) || 'block' === $fieldType || 'block_props' === $fieldType) {
+                if (\in_array($fieldName, self::EXCLUDED_FIELDS, true) || 'block' === $fieldType) {
                     continue;
                 }
 
@@ -139,70 +127,6 @@ final class BlockTargetFieldMetadataResolver
             }
         }
 
-        // 2. Merge/override with optional YAML `multiple`, `default_item_type`, and `dynamic_fields` in props schema directories
-        foreach ($this->schemaDirectories as $dir) {
-            $basePath = \rtrim($dir, '/');
-            $candidates = [
-                $basePath . '/' . $cleanType . '.yaml',
-                $basePath . '/' . $cleanType . '.yml',
-                $basePath . '/props/' . $cleanType . '.yaml',
-                $basePath . '/props/' . $cleanType . '.yml',
-            ];
-
-            foreach ($candidates as $yamlFile) {
-                if (!\is_file($yamlFile)) {
-                    continue;
-                }
-
-                try {
-                    $parsed = Yaml::parseFile($yamlFile);
-                    if (!\is_array($parsed)) {
-                        break;
-                    }
-
-                    if (isset($parsed['multiple']) && \is_bool($parsed['multiple'])) {
-                        $isMultiple = $parsed['multiple'];
-                    } elseif (isset($parsed['is_multiple']) && \is_bool($parsed['is_multiple'])) {
-                        $isMultiple = $parsed['is_multiple'];
-                    }
-
-                    if (isset($parsed['default_item_type']) && \is_string($parsed['default_item_type']) && '' !== \trim($parsed['default_item_type'])) {
-                        $defaultItemType = \trim($parsed['default_item_type']);
-                    }
-
-                    if (isset($parsed['dynamic_fields']) && \is_array($parsed['dynamic_fields'])) {
-                        foreach ($parsed['dynamic_fields'] as $entry) {
-                            if (!\is_array($entry) || !isset($entry['name']) || !\is_string($entry['name'])) {
-                                continue;
-                            }
-
-                            $name = \trim($entry['name']);
-                            if ('' === $name) {
-                                continue;
-                            }
-
-                            $rawLabel = isset($entry['label']) && \is_string($entry['label']) && '' !== \trim($entry['label'])
-                                ? \trim($entry['label'])
-                                : \ucwords(\str_replace(['_', '-'], ' ', $name));
-                            $type = isset($entry['type']) && \is_string($entry['type']) && '' !== \trim($entry['type'])
-                                ? \trim($entry['type'])
-                                : 'string';
-
-                            $fieldsByName[$name] = [
-                                'name' => $name,
-                                'label' => $this->formatFieldLabel($rawLabel, $name),
-                                'type' => $type,
-                            ];
-                        }
-                    }
-                } catch (ParseException) {
-                    // Ignore invalid YAML
-                }
-
-                break;
-            }
-        }
-
         $fields = [] === $fieldsByName
             ? $this->getDefaultFallbackFields()
             : \array_values($fieldsByName);
@@ -212,6 +136,38 @@ final class BlockTargetFieldMetadataResolver
             'default_item_type' => $defaultItemType,
             'fields' => $fields,
         ];
+    }
+
+    /**
+     * Collects FieldMetadata items exclusively from root fields and `content`/`media` sections
+     * (including `__tabs -> content`), skipping `settings`, `style`, `layout`, `general`, `dynamic_content`, and `advanced`.
+     *
+     * @param array<ItemMetadata> $items
+     *
+     * @return list<FieldMetadata>
+     */
+    private function flattenFieldItems(array $items): array
+    {
+        if (isset($items['__tabs']) && $items['__tabs'] instanceof SectionMetadata) {
+            $contentTab = $items['__tabs']->getItems()['content'] ?? null;
+
+            return $contentTab instanceof SectionMetadata
+                ? $this->flattenFieldItems($contentTab->getItems())
+                : [];
+        }
+
+        $fields = [];
+        foreach ($items as $item) {
+            if ($item instanceof FieldMetadata) {
+                $fields[] = $item;
+            } elseif ($item instanceof SectionMetadata && \in_array($item->getName(), ['content', 'media'], true)) {
+                foreach ($this->flattenFieldItems($item->getItems()) as $nested) {
+                    $fields[] = $nested;
+                }
+            }
+        }
+
+        return $fields;
     }
 
     private function getBlockFormMetadata(string $blockType, string $locale): ?FormMetadata

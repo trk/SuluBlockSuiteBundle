@@ -2,20 +2,20 @@
 
 [![Latest Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/trk/SuluBlockSuiteBundle)
 [![PHP Version](https://img.shields.io/badge/PHP-%3E%3D%208.2%20%7C%208.5-8892BF.svg)](https://php.net)
-[![Sulu CMS](https://img.shields.io/badge/Sulu%20CMS-%5E2.5%20%7C%20%5E3.0-orange.svg)](https://sulu.io)
-[![Symfony](https://img.shields.io/badge/Symfony-%5E6.4%20%7C%20%5E7.0-black.svg)](https://symfony.com)
+[![Sulu CMS](https://img.shields.io/badge/Sulu%20CMS-%5E3.0-orange.svg)](https://sulu.io)
+[![Symfony](https://img.shields.io/badge/Symfony-%5E7.4-black.svg)](https://symfony.com)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen.svg)](https://phpstan.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![i18n](https://img.shields.io/badge/i18n-en%20%7C%20tr%20%7C%20de%20%7C%20ru%20%7C%20es%20%7C%20fr-lightgrey.svg)](#internationalization-i18n)
 
-An enterprise-grade, modular, and developer-friendly **Sulu CMS 3.x / 2.5+** block engine bundle that delivers:
-1. **Standardized 4-Tab Block Props Engine**: Visual React modal (`Settings`, `General`, `Advanced`, `Dynamic Content`) with automatic `common.yaml` merging, `.el-element` scoped CSS, and safe custom HTML attribute injection.
-2. **Dynamic Content / Smart Content Engine**: Bind any block or repeater block (`grid`, `accordion`, `gallery`, `slideshow`, `table`, etc.) to live CMS data sources (`sulu_pages`, `sulu_articles`, `sulu_categories`, `sulu_media_collection`, or custom providers) with visual field mapping, filtering, sorting, and pagination/offset.
-3. **Zero-Config Automatic Block Type Discovery**: Eliminate repetitive `<type ref="..."/>` lists in page and container XMLs via `<param name="auto_inject" value="true"/>`.
-4. **Reusable Global Blocks & HTTP Cache Invalidation**: Centrally managed shared sections embedded anywhere with automatic Sulu HTTP cache tag/reference invalidation on snippet update, publish, or removal.
-5. **Dual-Source Style & Prop Presets**: Project-level YAML presets combined seamlessly with editor-created CMS `block_preset` snippets.
-6. **Central Page Layout Engine**: Render reusable page/article layouts (`layout_render()`, `sulu_layout_render()`) with automatic HTTP cache reference tracking.
-7. **Admin Block Card Header Badges**: Real-time DOM observer (`BlockNameSummaryObserver`) enriches collapsed and expanded Sulu block headers with custom block names (`props.name`), child item counts, and a `⚡ Dynamic` indicator badge.
+An enterprise-grade, native **Sulu CMS 3.x** block architecture bundle that delivers:
+1. **Compile-Time Native XML Block Tabs (`BlockSuiteFormMetadataVisitor` + `<TabSection>`)**: Define block fields using standard Sulu XML `<section>` elements (`content`, `settings`, `style`, `layout`, or any custom tab) and automatically inherit shared `General`, `Dynamic Content`, and `Advanced` tabs at form metadata compilation time—with zero runtime XHR schema requests or modal drawers.
+2. **Automatic `props/*` Namespacing**: Fields inside `content` stay at the block root (`block.title`, `block.content`), while fields in all other tabs (`settings`, `general`, `dynamic_content`, `advanced`, or custom tabs) are automatically namespaced under `props/*` (`block.props.tag`, `block.props.preset`, `block.props.margin_top`).
+3. **Preset & Reusable Block Workflow in the `Advanced` Tab (`preset_selection`)**: Select project YAML or CMS-managed presets, preview in a visual gallery, apply content & styles atomically across all tabs, or save any configured block as a **Preset** (`block_preset`) or **Reusable Block** (`reusable_block`) directly from the `Advanced` tab.
+4. **Native Collapsed Block Header Badges (`sulu.block_preview`)**: Displays active preset (`★ preset`), custom block name (`props.name`), dynamic source (`⚡ source`), and visibility status (`∅ hidden`) directly on collapsed Sulu block cards via `PresetSelectionBlockPreviewTransformer`.
+5. **Dynamic Content / Smart Content Engine**: Bind any block or repeater block (`grid`, `accordion`, `gallery`, `slideshow`, `table`, etc.) to live CMS data sources (`pages`, `subpages`, `articles`, `categories`, `media_collection`, or custom providers) with visual field mapping, filtering, sorting, and pagination/offset.
+6. **Zero-Config Automatic Block Type Discovery (`sulu_block_suite.auto_blocks`)**: Eliminate repetitive `<type ref="..."/>` lists in page and container XMLs via `<tag name="sulu_block_suite.auto_blocks" default="headline" exclude="row,column"/>`.
+7. **Reusable Global Blocks & Central Page Layouts**: Render shared sections (`reusable`) and full page layouts (`layout_render()`) with automatic Sulu HTTP cache tag and reference invalidation.
 8. **Full Internationalization (i18n)**: 6 languages supported out of the box (`en`, `tr`, `de`, `ru`, `es`, `fr`).
 
 ---
@@ -27,13 +27,13 @@ An enterprise-grade, modular, and developer-friendly **Sulu CMS 3.x / 2.5+** blo
 - [Installation](#installation)
 - [Configuration Reference](#configuration-reference)
 - [Feature Guides](#feature-guides)
-  - [1. Standardized 4-Tab Block Props Engine](#1-standardized-4-tab-block-props-engine)
-  - [2. Scoped `.el-element` CSS & Custom Attributes](#2-scoped-el-element-css--custom-attributes)
-  - [3. Dynamic Content / Smart Content Engine](#3-dynamic-content--smart-content-engine)
-  - [4. Automatic Block Type Injection (`auto_inject`)](#4-automatic-block-type-injection-auto_inject)
-  - [5. Reusable Global Blocks & HTTP Cache Invalidation](#5-reusable-global-blocks--http-cache-invalidation)
-  - [6. Project-Level Style & Prop Presets](#6-project-level-style--prop-presets)
-  - [7. Central Page Layout Engine](#7-central-page-layout-engine)
+  - [1. Native Sulu XML Block Tabs & Flexible Custom Sections](#1-native-sulu-xml-block-tabs--flexible-custom-sections)
+  - [2. Selective Tab Exclusion (`sulu_block_suite.tabs`)](#2-selective-tab-exclusion-sulu_block_suitetabs)
+  - [3. Preset & Reusable Block Actions in the `Advanced` Tab](#3-preset--reusable-block-actions-in-the-advanced-tab)
+  - [4. Scoped `.el-element` CSS & Custom Attributes](#4-scoped-el-element-css--custom-attributes)
+  - [5. Dynamic Content / Smart Content Engine](#5-dynamic-content--smart-content-engine)
+  - [6. Automatic Block Type Injection (`sulu_block_suite.auto_blocks`)](#6-automatic-block-type-injection-sulu_block_suiteauto_blocks)
+  - [7. Reusable Global Blocks & HTTP Cache Invalidation](#7-reusable-global-blocks--http-cache-invalidation)
 - [Internationalization (i18n)](#internationalization-i18n)
 - [Verification & Quality Assurance](#verification--quality-assurance)
 - [License](#license)
@@ -46,26 +46,20 @@ An enterprise-grade, modular, and developer-friendly **Sulu CMS 3.x / 2.5+** blo
   - **Reusable Blocks** (`sulu_block_suite.reusable_blocks.list`)
   - **Presets** (`sulu_block_suite.presets.list`)
   - **Layouts** (`sulu_block_suite.layouts.list`)
-- **4-Tab Modal Architecture**:
-  - **Settings**: Block-specific visual options (`card_style`, `html_tag`, `columns`, `overlay_style`, etc.).
-  - **General**: Shared layout utilities (`margin`, `margin_remove_top`, `margin_remove_bottom`, `maxwidth`, `maxwidth_breakpoint`, `block_align`, `text_align`, `visibility`, `position`, `z_index`, `animation`).
-  - **Advanced**: Full-width `name` (displayed directly on the Sulu block header), 50%/50% `id` and `class`, custom HTML `attributes`, and `.el-element` scoped `css`.
-  - **Dynamic Content**: Live data source selection, parent/category filtering, sorting, limit/offset, and field mapping.
-- **Automatic Root Attribute & Scoped CSS Injection**: `BlockRenderer` and `DefaultAttributesTransformer` automatically parse `props.attributes` (rejecting `on*` inline JS event handlers), generate a deterministic `el-*` ID when needed, compile `.el-element` CSS rules into a scoped `<style>` block, and inject attributes onto the rendered root element.
-- **Built-in Sulu 3 Dynamic Content Providers**:
-  - `SuluPageSourceProvider` (`sulu_pages`)
-  - `SuluArticleSourceProvider` (`sulu_articles`)
-  - `SuluCategorySourceProvider` (`sulu_categories`)
-  - `SuluMediaCollectionSourceProvider` (`sulu_media_collection`)
+- **Inline WAI-ARIA `<TabSection>`**:
+  - Replaces `Form.Section` for `<section name="__tabs">` to render an accessible horizontal tab bar (`role="tablist"`, `ArrowLeft`/`ArrowRight`/`Home`/`End` keyboard navigation) directly inside Sulu's `FieldBlocks` card.
+  - Preserves Sulu's native `Renderer` and `SchemaForm` lifecycle (`visible_condition`, `disabled_condition`, validation error badges per tab, and field types).
+- **Hierarchical `blockConditionDataProvider`**:
+  - Exposes the active block's properties at the evaluation root, `__parent`, and `__block` (including `__block.parent` and `__block.root`) so `visible_condition` expressions work seamlessly across tabs and nested block items.
 
 ---
 
 ## Requirements
 
 - **PHP**: `^8.2` or `^8.5` (strictly typed PHP 8.5 supported)
-- **Sulu CMS**: `^2.5` or `^3.0`
-- **Symfony**: `^6.4` or `^7.0`
-- **Doctrine ORM**: `^2.14` or `^3.0`
+- **Sulu CMS**: `~3.0.10`
+- **Symfony**: `^7.4`
+- **Doctrine ORM**: `^3.0`
 
 ---
 
@@ -93,12 +87,12 @@ return [
    ```json
    {
      "dependencies": {
-       "sulu-block-suite-bundle": "file:../../vendor/trk/sulu-block-suite-bundle/assets/admin"
+       "sulu-block-suite-bundle": "file:../../packages/sulu-block-suite-bundle/assets/admin"
      }
    }
    ```
 
-2. Import the bundle in `assets/admin/app.js`:
+2. Import the bundle in `assets/admin/index.js`:
    ```javascript
    import 'sulu-block-suite-bundle';
    ```
@@ -116,8 +110,6 @@ return [
 ```yaml
 # config/packages/sulu_block_suite.yaml
 sulu_block_suite:
-    props:
-        schema_dir: '%kernel.project_dir%/config/blocks/props'
     presets:
         enabled: true
         yaml_dir: '%kernel.project_dir%/config/blocks/presets'
@@ -126,93 +118,146 @@ sulu_block_suite:
         enabled: true
     layout:
         enabled: true
-        yaml_dir: '%kernel.project_dir%/config/blocks/layouts'
+    exclude_dynamic_blocks:
+        - section
+        - row
+        - column
+        - row_item
+        - column_item
+        - divider
+        - icon
+        - html
+        - code
+        - scroll_to
+        - reusable
 ```
 
 ---
 
 ## Feature Guides
 
-### 1. Standardized 4-Tab Block Props Engine
+### 1. Native Sulu XML Block Tabs & Flexible Custom Sections
 
-Every block with `<property name="props" type="block_props"/>` automatically receives the 4-tab configuration modal:
-1. **`settings`**: Defined per block in `config/blocks/props/{blockType}.yaml` (or provided by UI bundles such as `trk/sulu-preline-blocks-bundle`).
-2. **`general`**: Automatically merged from `common.yaml` (`margin`, `maxwidth`, `block_align`, `text_align`, `visibility`, `position`, `animation`).
-3. **`advanced`**: Automatically merged from `common.yaml` (`name`, `id`, `class`, `attributes`, `css`).
-4. **`dynamic_content`**: Automatically available for blocks with dynamic field targets.
+Define blocks using standard Sulu XML `<section>` elements in `config/templates/blocks/{block}.xml`.
+- Properties in `<section name="content">` (or top-level properties outside a section) remain at the root of the block payload.
+- Any other `<section>` you define (`settings`, `style`, `layout`, `animation`, etc.) becomes its own tab in the exact order defined, and its fields are automatically namespaced under `props/*`.
+- Shared tabs (`general` from `block_suite_general.xml`, `dynamic_content` from `block_suite_dynamic.xml`, and `advanced` from `block_suite_advanced.xml`) are automatically appended at compile time by `BlockSuiteFormMetadataVisitor`.
 
-Developers can also add custom tabs in their project's `config/blocks/props/{blockType}.yaml`; custom tabs are preserved alongside the 4 core tabs.
+```xml
+<?xml version="1.0" ?>
+<template xmlns="http://schemas.sulu.io/template/template"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/template-1.0.xsd">
+    <key>headline</key>
+    <meta>
+        <title lang="en">Headline</title>
+    </meta>
+    <properties>
+        <section name="content">
+            <meta>
+                <title lang="en">Content</title>
+            </meta>
+            <properties>
+                <property name="title" type="text_line" mandatory="true">
+                    <tag name="sulu.block_preview" priority="100"/>
+                </property>
+            </properties>
+        </section>
 
----
-
-### 2. Scoped `.el-element` CSS & Custom Attributes
-
-In the **Advanced** tab:
-- **Custom Attributes (`props.attributes`)**: Enter one attribute per line (`data-hs-overlay="#modal"`, `aria-label="Hero Banner"`, `data-aos="fade-up"`). Inline event handlers (`onclick`, `onload`, etc.) are automatically stripped for XSS safety.
-- **Scoped CSS (`props.css`)**: Write rules using `.el-element` (or bare CSS declarations like `border: 2px solid #3b82f6;`). `DefaultAttributesTransformer` automatically assigns or reuses the block's `#id`, rewrites `.el-element` to `#id`, strips any `<script>`/`<style>` tags, and `BlockRenderer` prepends `<style>...</style>` to the rendered block output.
-
-```css
-.el-element {
-    border: 1px solid rgba(59, 130, 246, 0.3);
-}
-.el-element:hover {
-    transform: translateY(-2px);
-}
+        <section name="settings">
+            <meta>
+                <title lang="en">Settings</title>
+            </meta>
+            <properties>
+                <property name="tag" type="single_select" colspan="6">
+                    <params>
+                        <param name="default_value" value="h2"/>
+                        <param name="values" type="collection">
+                            <param name="h1"><meta><title lang="en">H1</title></meta></param>
+                            <param name="h2"><meta><title lang="en">H2</title></meta></param>
+                        </param>
+                    </params>
+                </property>
+            </properties>
+        </section>
+    </properties>
+</template>
 ```
 
 ---
 
-### 3. Dynamic Content / Smart Content Engine
+### 2. Selective Tab Exclusion (`sulu_block_suite.tabs` & `exclude_dynamic_blocks`)
 
-Blocks can dynamically pull content from CMS sources without custom controllers:
+Structural or static blocks (`section`, `row`, `column`, `divider`, `icon`, `html`, `code`, `scroll_to`, `reusable`) are automatically excluded from receiving the `Dynamic Content` tab via `sulu_block_suite.exclude_dynamic_blocks`.
 
-| Source Key | Provider Class | Description |
-| --- | --- | --- |
-| `sulu_pages` | `SuluPageSourceProvider` | Published Sulu 3 pages with parent page filtering, sorting, limit, offset, and excerpt/SEO fields. |
-| `sulu_articles` | `SuluArticleSourceProvider` | Published Sulu 3 articles (`SuluArticleBundle`) with template data, route URL, and media fields. |
-| `sulu_categories` | `SuluCategorySourceProvider` | Sulu categories (`CategoryManagerInterface`) with optional parent category ID filtering and localized translations. |
-| `sulu_media_collection` | `SuluMediaCollectionSourceProvider` | Media assets from Sulu collections (`MediaManagerInterface`) with resolved image/thumbnail structures. |
+You can also exclude one or more shared tabs (`general`, `dynamic_content`, `advanced`) directly in a block XML template using `<tag name="sulu_block_suite.tabs" exclude="..."/>`:
 
-To create a custom source provider, implement `Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface` and tag it with `sulu_block_suite.dynamic_source_provider`.
+```xml
+<template xmlns="http://schemas.sulu.io/template/template"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/template-1.0.xsd">
+    <key>divider</key>
+    <tag name="sulu_block_suite.tabs" exclude="dynamic_content"/>
+    <!-- ... -->
+</template>
+```
 
 ---
 
-### 4. Automatic Block Type Injection (`auto_inject`)
+### 3. Preset & Reusable Block Actions in the `Advanced` Tab
 
-Instead of maintaining hardcoded `<type ref="..."/>` lists across page templates and column containers, enable `auto_inject`:
+The `block_suite_advanced.xml` form includes `<property name="preset" type="preset_selection">`, which renders inside the **Advanced** tab and provides:
+- **Active Preset Status Badge & Clear Action**: Displays the currently active preset name and source badge (`[CMS]` or `[YAML]`) with a one-click clear button.
+- **Visual Preset Gallery (`Browse Presets`)**: Opens a searchable modal gallery of all YAML and CMS presets for the block type; selecting a preset immediately applies all `props/*` defaults across tabs via atomic `formStore.changeMultiple()`.
+- **Apply Content & Styles**: Populates both content fields (`title`, `content`, nested items) and `props/*` from the active preset.
+- **Save as Preset**: Captures the current block's live form state and saves/publishes a `block_preset` snippet in Sulu CMS.
+- **Save as Reusable Block**: Saves and publishes the current block as a shared `reusable_block` snippet and optionally replaces the current block in-place with a `{ type: 'reusable', snippet: '<uuid>' }` reference.
+
+---
+
+### 4. Scoped `.el-element` CSS & Custom Attributes
+
+In the **Advanced** tab:
+- **Custom Attributes (`props.attributes`)**: Enter one `key="value"` attribute per line (`data-hs-overlay="#modal"`, `aria-label="Hero Banner"`). Inline event handlers (`onclick`, `onload`, etc.) are automatically stripped for XSS safety.
+- **Scoped CSS (`props.css`)**: Write rules using `.el-element`. `DefaultAttributesTransformer` assigns or reuses the block's `#id`, rewrites `.el-element` to `#id`, strips any `<script>`/`<style>` tags, and `BlockRenderer` prepends `<style>...</style>` to the rendered block output.
+
+---
+
+### 5. Dynamic Content / Smart Content Engine
+
+Blocks can dynamically pull single items or collections from Sulu CMS sources without custom controllers (including live resolution during Sulu Admin Live Preview):
+
+| Source Key | Mode | Provider Class | Description |
+| --- | --- | --- | --- |
+| `current_page` / `parent_page` / `specific_page` | Single | `SuluPageSourceProvider` | Current page, parent page, or a selected Sulu 3 page with content, SEO, and excerpt fields. |
+| `page_selection` / `page_children` / `sibling_pages` / `custom_query` | Multiple | `SuluPageSourceProvider` | Published Sulu 3 page collections with parent filtering, sorting, limit, offset, and tag/category filters. |
+| `single_article` / `sulu_articles` | Single / Multiple | `SuluArticleSourceProvider` | Published Sulu 3 articles (`SuluArticleBundle`) with template data, route URL, excerpt, and media fields. |
+| `single_category` / `sulu_categories` | Single / Multiple | `SuluCategorySourceProvider` | Sulu categories (`CategoryManagerInterface`) with optional parent category filtering and localized translations. |
+| `single_media` / `sulu_media` | Single / Multiple | `SuluMediaCollectionSourceProvider` | Media assets from Sulu collections (`MediaManagerInterface`) with resolved image/thumbnail structures. |
+
+---
+
+### 6. Automatic Block Type Injection (`sulu_block_suite.auto_blocks`)
+
+Instead of maintaining hardcoded `<type ref="..."/>` lists across page templates and column containers, add `<tag name="sulu_block_suite.auto_blocks"/>`:
 
 ```xml
-<property name="blocks" type="block" default-type="section">
-    <params>
-        <param name="auto_inject" value="true"/>
-        <param name="exclude_blocks" value="row_item,column_item"/>
-    </params>
+<property name="blocks" type="block" default-type="headline">
+    <tag name="sulu_block_suite.auto_blocks" default="headline" exclude="main_content,row,column"/>
     <types>
-        <type ref="section"/>
+        <type name="default">
+            <properties/>
+        </type>
     </types>
 </property>
 ```
 
-`TargetBlockOptionsFormMetadataVisitor` automatically injects all registered block types at form metadata build time while respecting `exclude_blocks` and `include_only_blocks`.
-
 ---
 
-### 5. Reusable Global Blocks & HTTP Cache Invalidation
+### 7. Reusable Global Blocks & HTTP Cache Invalidation
 
 - When a `reusable_block` or `page_layout` snippet is rendered on the website, `SingleReusableBlockSelectionPropertyResolver` and `PageLayoutProvider` automatically register the snippet UUID in Sulu's `ReferenceStoreInterface` (`snippet` reference pool).
-- `ReusableBlockCacheInvalidationSubscriber` listens to `SnippetModifiedEvent`, `SnippetWorkflowTransitionAppliedEvent`, and `SnippetRemovedEvent`, automatically invalidating Sulu HTTP cache tags and references so pages embedding a shared block refresh immediately upon snippet changes.
-
----
-
-### 6. Project-Level Style & Prop Presets
-
-Presets are stored in the host project (`config/blocks/presets/{blockType}.yaml`) and/or created by editors as `block_preset` snippets in the Sulu Admin. Both associative maps (`preset_key: { title: ... }`) and sequence lists (`- id: ...`) are supported, and any test-prefixed preset (`test_*` / `Test ...`) is automatically excluded from production preset lists.
-
----
-
-### 7. Central Page Layout Engine
-
-Render blocks centrally using `sulu_block_render()` and `sulu_blocks_render()`, or render full layout snippets via `layout_render('default')`.
+- `ReusableBlockCacheInvalidationSubscriber` listens to `SnippetModifiedEvent`, `SnippetWorkflowTransitionAppliedEvent`, and `SnippetRemovedEvent`, automatically invalidating Sulu HTTP cache tags and references.
 
 ---
 
@@ -226,7 +271,7 @@ Complete translations are bundled for **6 languages**: `en`, `tr`, `de`, `ru`, `
 
 ```bash
 # Run PHPUnit 12 test suite
-php ../../bin/phpunit -c phpunit.xml.dist
+../../vendor/bin/phpunit
 
 # Run PHPStan static analysis at level max
 ../../vendor/bin/phpstan analyse --debug -c phpstan.neon

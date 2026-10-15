@@ -11,6 +11,7 @@
         <title lang="es">Bloque / Sección Reutilizable</title>
         <title lang="fr">Bloc / Section Réutilisable</title>
     </meta>
+    <tag name="sulu_block_suite.tabs" exclude="dynamic_content"/>
     <properties>
         <property name="snippet" type="single_reusable_block_selection" mandatory="true">
             <tag name="sulu.block_preview" priority="100"/>
@@ -30,12 +31,10 @@
             </meta>
             <params>
                 <param name="templateKeys" value="reusable_block"/>
-            </params>
-        </property>
-
-        <property name="props" type="block_props" colspan="12">
-            <params>
-                <param name="component_type" value="reusable"/>
+                <param name="properties" type="collection">
+                    <param name="title" value="title"/>
+                    <param name="blocks" value="blocks"/>
+                </param>
             </params>
         </property>
     </properties>

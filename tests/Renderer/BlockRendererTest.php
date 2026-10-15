@@ -151,4 +151,3 @@ final class BlockRendererTest extends TestCase
         $this->assertStringContainsString('<div class="box" id="promo-box" data-campaign="autumn" aria-label="Promo">Scoped Box</div>', $html);
     }
 }
-

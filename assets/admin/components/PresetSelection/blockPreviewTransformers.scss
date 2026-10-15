@@ -31,6 +31,25 @@
     }
 }
 
+.presetBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 7px;
+    background: #f3e8ff;
+    color: #6b21a8;
+    border: 1px solid #d8b4fe;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    vertical-align: middle;
+
+    span {
+        font-size: 11px;
+    }
+}
+
 .dynamicBadge {
     display: inline-flex;
     align-items: center;
@@ -39,6 +58,25 @@
     background: #fef3c7;
     color: #92400e;
     border: 1px solid #fde68a;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    vertical-align: middle;
+
+    span {
+        font-size: 11px;
+    }
+}
+
+.visibilityBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 7px;
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
     border-radius: 3px;
     font-size: 11px;
     font-weight: 600;

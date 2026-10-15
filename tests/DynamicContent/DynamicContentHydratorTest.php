@@ -679,7 +679,7 @@ final class DynamicContentHydratorTest extends TestCase
 
             public function getLabel(string $locale = 'en'): string
             {
-                return $locale === 'tr' ? 'Ürünler' : 'Products';
+                return 'tr' === $locale ? 'Ürünler' : 'Products';
             }
 
             public function isMultiItem(): bool
@@ -803,48 +803,60 @@ final class DynamicContentHydratorTest extends TestCase
                 ['title' => 'About', 'url' => '/about'],
             ]);
 
-        $tempDir = \sys_get_temp_dir() . '/hydrator_meta_' . \uniqid('', true);
-        \mkdir($tempDir, 0777, true);
-        \file_put_contents(
-            $tempDir . '/breadcrumbs.yaml',
-            "multiple: true\ndefault_item_type: breadcrumb_item\n",
+        $breadcrumbsForm = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata();
+        $breadcrumbsForm->setKey('breadcrumbs');
+
+        $childItemForm = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata();
+        $childItemForm->setKey('breadcrumb_item');
+
+        $itemsBlockField = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata('items');
+        $itemsBlockField->setType('block');
+        $itemsBlockField->setDefaultType('breadcrumb_item');
+        $itemsBlockField->addType($childItemForm);
+        $breadcrumbsForm->addItem($itemsBlockField);
+
+        $typedFormMetadata = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata();
+        $typedFormMetadata->addForm('breadcrumbs', $breadcrumbsForm);
+
+        $provider = $this->createStub(\Sulu\Bundle\AdminBundle\Metadata\MetadataProviderInterface::class);
+        $provider->method('getMetadata')->willReturn($typedFormMetadata);
+
+        $registry = new \Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry(
+            new \Symfony\Component\DependencyInjection\ServiceLocator([
+                'form' => static fn () => $provider,
+            ]),
         );
 
-        try {
-            $targetFieldResolver = new \Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver(null, [$tempDir]);
-            $hydrator = new DynamicContentHydrator($sourceResolver, [], $targetFieldResolver);
+        $targetFieldResolver = new \Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver($registry);
+        $hydrator = new DynamicContentHydrator($sourceResolver, [], $targetFieldResolver);
 
-            $breadcrumbsBlock = [
-                'type' => 'breadcrumbs',
-                'props' => [
-                    '_dynamic' => [
-                        'enabled' => true,
-                        'source_type' => 'page_selection',
-                        'uuids' => ['uuid-1', 'uuid-2'],
-                        'limit' => 2,
-                        'mapping' => [
-                            'title' => 'title',
-                            'url' => 'url',
-                        ],
+        $breadcrumbsBlock = [
+            'type' => 'breadcrumbs',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_selection',
+                    'uuids' => ['uuid-1', 'uuid-2'],
+                    'limit' => 2,
+                    'mapping' => [
+                        'title' => 'title',
+                        'url' => 'url',
                     ],
                 ],
-            ];
+            ],
+        ];
 
-            $result = $hydrator->hydrateBlock($breadcrumbsBlock);
+        $result = $hydrator->hydrateBlock($breadcrumbsBlock);
 
-            self::assertCount(1, $result);
-            self::assertSame('breadcrumbs', $result[0]['type']);
-            self::assertIsArray($result[0]['items']);
-            /** @var list<array<string, mixed>> $items */
-            $items = $result[0]['items'];
-            self::assertCount(2, $items);
-            self::assertSame('breadcrumb_item', $items[0]['type']);
-            self::assertSame('Home', $items[0]['title']);
-            self::assertSame('/about', $items[1]['url']);
-        } finally {
-            @\unlink($tempDir . '/breadcrumbs.yaml');
-            @\rmdir($tempDir);
-        }
+        self::assertCount(1, $result);
+        self::assertSame('breadcrumbs', $result[0]['type']);
+        self::assertIsArray($result[0]['items']);
+        /** @var list<array<string, mixed>> $items */
+        $items = $result[0]['items'];
+        self::assertCount(2, $items);
+        self::assertSame('breadcrumb_item', $items[0]['type']);
+        self::assertSame('Home', $items[0]['title']);
+        self::assertSame('/about', $items[1]['url']);
     }
 
     public function testDualModeCustomProductSourceProviderSingleAndCollectionHydration(): void
@@ -956,5 +968,149 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertSame('CNC-X500', $items[0]['badge']);
         self::assertSame('Laser Cutter Pro L200', $items[1]['title']);
         self::assertSame('LSR-L200', $items[1]['badge']);
+    }
+
+    public function testFlatPropsDynamicMappingUnwrapsContentViewsAndAutoMapsWhenEmpty(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $sourceResolver->expects(self::exactly(2))
+            ->method('resolvePage')
+            ->willReturn([
+                'title' => 'Dynamic Current Page Headline',
+                'subtitle' => 'Dynamic Subtitle',
+            ]);
+
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $wrappedEntry = new class {
+            /**
+             * @return array<string, mixed>
+             */
+            public function getContent(): array
+            {
+                return [
+                    'type' => 'field_map',
+                    'target_field' => 'title',
+                    'source_field' => 'title',
+                ];
+            }
+        };
+
+        $headlineWithWrappedMapping = [
+            'type' => 'headline',
+            'title' => '',
+            'subtitle' => '',
+            'props' => [
+                'dynamic_source' => 'current_page',
+                'dynamic_mapping' => [$wrappedEntry],
+                'dynamic_condition_field' => 'non_existent_field',
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($headlineWithWrappedMapping, ['title' => 'Dynamic Current Page Headline']);
+        self::assertCount(1, $result);
+        self::assertSame('Dynamic Current Page Headline', $result[0]['title']);
+
+        $headlineWithoutExplicitMapping = [
+            'type' => 'headline',
+            'title' => '',
+            'subtitle' => '',
+            'props' => [
+                'dynamic_source' => 'current_page',
+                'dynamic_mapping' => [],
+            ],
+        ];
+
+        $autoResult = $hydrator->hydrateBlock($headlineWithoutExplicitMapping, ['title' => 'Dynamic Current Page Headline']);
+        self::assertCount(1, $autoResult);
+        self::assertSame('Dynamic Current Page Headline', $autoResult[0]['title']);
+        self::assertSame('Dynamic Subtitle', $autoResult[0]['subtitle']);
+    }
+
+    public function testExtractValueSupportsPipeFallbacksAndLengthModifier(): void
+    {
+        $hydrator = new DynamicContentHydrator();
+
+        $longHtml = '<p><strong>Sulu 3 Enterprise CMS</strong> delivers structured content management with Preline UI 5 and Tailwind CSS 4 for high-performance digital experiences across every channel and device worldwide.</p>';
+
+        $dataWithEmptyHeadlineAndSummary = [
+            'title' => 'Page Navigation Title',
+            'headline' => '',
+            'summary' => '   ',
+            'content' => $longHtml,
+        ];
+
+        self::assertSame(
+            'Page Navigation Title',
+            $hydrator->extractValue($dataWithEmptyHeadlineAndSummary, 'headline|title'),
+        );
+
+        $truncated = $hydrator->extractValue($dataWithEmptyHeadlineAndSummary, 'summary|content:length=160');
+        self::assertIsString($truncated);
+        self::assertLessThanOrEqual(160, \mb_strlen($truncated, 'UTF-8'));
+        self::assertStringStartsWith('Sulu 3 Enterprise CMS delivers structured content management', $truncated);
+        self::assertStringEndsWith('...', $truncated);
+        self::assertStringNotContainsString('<p>', $truncated);
+        self::assertStringNotContainsString('<strong>', $truncated);
+
+        $dataWithExplicitHeadlineAndSummary = [
+            'title' => 'Short Title',
+            'headline' => 'Custom Hero Display Headline',
+            'summary' => 'Concise custom summary.',
+            'content' => $longHtml,
+        ];
+
+        self::assertSame(
+            'Custom Hero Display Headline',
+            $hydrator->extractValue($dataWithExplicitHeadlineAndSummary, 'headline|title'),
+        );
+        self::assertSame(
+            'Concise custom summary.',
+            $hydrator->extractValue($dataWithExplicitHeadlineAndSummary, 'summary|content:length=160'),
+        );
+    }
+
+    public function testAutoMappingHydratesCardOverlayAndSlideshowContentFromSummaryOrTruncatedBody(): void
+    {
+        $longBody = '<p>' . \str_repeat('Modern Sulu 3 architecture with single source of truth content fields. ', 4) . '</p>';
+
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $sourceResolver->method('resolvePage')->willReturn([
+            'title' => 'Card Page Title',
+            'headline' => 'Card Display Headline',
+            'summary' => '',
+            'content' => $longBody,
+            'image' => ['id' => 99, 'url' => '/uploads/card.jpg'],
+            'url' => '/solutions/card-page',
+        ]);
+
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        foreach (['card', 'overlay', 'slideshow_item'] as $teaserBlockType) {
+            $block = [
+                'type' => $teaserBlockType,
+                'title' => '',
+                'content' => '',
+                'image' => null,
+                'link' => '',
+                'props' => [
+                    'dynamic_source' => 'specific_page',
+                    'dynamic_page_id' => 'page-123',
+                    'dynamic_mapping' => [],
+                ],
+            ];
+
+            $hydratedList = $hydrator->hydrateBlock($block);
+            self::assertCount(1, $hydratedList);
+            $hydrated = $hydratedList[0];
+
+            self::assertSame('Card Page Title', $hydrated['title']);
+            self::assertIsString($hydrated['content']);
+            self::assertLessThanOrEqual(160, \mb_strlen($hydrated['content'], 'UTF-8'));
+            self::assertStringNotContainsString('<p>', $hydrated['content']);
+            self::assertStringEndsWith('...', $hydrated['content']);
+            self::assertSame(['id' => 99, 'url' => '/uploads/card.jpg'], $hydrated['image']);
+            self::assertSame('/solutions/card-page', $hydrated['link']);
+        }
     }
 }

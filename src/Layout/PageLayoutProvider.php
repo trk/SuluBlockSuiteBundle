@@ -161,6 +161,16 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
             } else {
                 $layoutData = $layout;
             }
+
+            if (!isset($layoutData['blocks'])) {
+                $layoutId = $layoutData['id'] ?? ($layoutData['uuid'] ?? null);
+                if (\is_string($layoutId) && '' !== $layoutId) {
+                    $loadedLayout = $this->getLayout($layoutId, $resolvedLocale);
+                    if (null !== $loadedLayout) {
+                        $layoutData = $loadedLayout;
+                    }
+                }
+            }
         }
 
         if (null === $layoutData || null === $this->twig) {

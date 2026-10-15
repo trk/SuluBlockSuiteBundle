@@ -1,0 +1,87 @@
+<?xml version="1.0" ?>
+<form xmlns="http://schemas.sulu.io/template/template"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/form-1.0.xsd">
+    <key>block_suite_advanced</key>
+
+    <properties>
+        <section name="advanced">
+            <meta>
+                <title lang="en">Advanced</title>
+                <title lang="tr">Gelişmiş</title>
+                <title lang="de">Erweitert</title>
+                <title lang="ru">Расширенные</title>
+                <title lang="es">Avanzado</title>
+                <title lang="fr">Avancé</title>
+            </meta>
+            <properties>
+                <property name="preset" type="preset_selection" colspan="12" mandatory="false">
+                    <meta>
+                        <title lang="en">Style Preset &amp; Reusable Block</title>
+                        <title lang="tr">Stil Ön Ayarı ve Tekrar Kullanılabilir Blok</title>
+                        <title lang="de">Stil-Vorlage &amp; Wiederverwendbarer Block</title>
+                        <title lang="ru">Шаблон стиля и переиспользуемый блок</title>
+                        <title lang="es">Preajuste de Estilo y Bloque Reutilizable</title>
+                        <title lang="fr">Préréglage de Style et Bloc Réutilisable</title>
+                    </meta>
+                    <tag name="sulu.block_preview" priority="4096"/>
+                </property>
+
+                <property name="name" type="text_line" colspan="12" mandatory="false">
+                    <meta>
+                        <title lang="en">Name</title>
+                        <title lang="tr">Öğe Adı</title>
+                        <title lang="de">Name</title>
+                        <title lang="ru">Название</title>
+                        <title lang="es">Nombre</title>
+                        <title lang="fr">Nom</title>
+                    </meta>
+                </property>
+
+                <property name="id" type="text_line" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">HTML Element ID</title>
+                        <title lang="tr">HTML Eleman Kimliği</title>
+                        <title lang="de">HTML-Element-ID</title>
+                        <title lang="ru">ID HTML-элемента</title>
+                        <title lang="es">ID del Elemento HTML</title>
+                        <title lang="fr">ID de l'élément HTML</title>
+                    </meta>
+                </property>
+
+                <property name="class" type="text_line" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Custom CSS Classes</title>
+                        <title lang="tr">Özel CSS Sınıfları</title>
+                        <title lang="de">Benutzerdefinierte CSS-Klassen</title>
+                        <title lang="ru">Пользовательские CSS-классы</title>
+                        <title lang="es">Clases CSS Personalizadas</title>
+                        <title lang="fr">Classes CSS Personnalisées</title>
+                    </meta>
+                </property>
+
+                <property name="attributes" type="text_area" colspan="12" mandatory="false">
+                    <meta>
+                        <title lang="en">Attributes</title>
+                        <title lang="tr">Öznitelikler</title>
+                        <title lang="de">Attribute</title>
+                        <title lang="ru">Атрибуты</title>
+                        <title lang="es">Atributos</title>
+                        <title lang="fr">Attributs</title>
+                    </meta>
+                </property>
+
+                <property name="css" type="text_area" colspan="12" mandatory="false">
+                    <meta>
+                        <title lang="en">Custom CSS</title>
+                        <title lang="tr">Özel CSS</title>
+                        <title lang="de">Benutzerdefiniertes CSS</title>
+                        <title lang="ru">Пользовательский CSS</title>
+                        <title lang="es">CSS Personalizado</title>
+                        <title lang="fr">CSS Personnalisé</title>
+                    </meta>
+                </property>
+            </properties>
+        </section>
+    </properties>
+</form>
