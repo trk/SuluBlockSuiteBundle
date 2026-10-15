@@ -1,0 +1,530 @@
+<?xml version="1.0" ?>
+<form xmlns="http://schemas.sulu.io/template/template"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/form-1.0.xsd">
+    <key>block_suite_general</key>
+
+    <properties>
+        <section name="general">
+            <meta>
+                <title lang="en">General</title>
+                <title lang="tr">Genel</title>
+                <title lang="de">Allgemein</title>
+                <title lang="ru">Общие</title>
+                <title lang="es">General</title>
+                <title lang="fr">Général</title>
+            </meta>
+            <properties>
+                <property name="margin_top" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Margin Top</title>
+                        <title lang="tr">Üst Boşluk</title>
+                        <title lang="de">Abstand Oben</title>
+                        <title lang="ru">Отступ сверху</title>
+                        <title lang="es">Margen Superior</title>
+                        <title lang="fr">Marge Supérieure</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="none">
+                                <meta>
+                                    <title lang="en">None</title>
+                                    <title lang="tr">Yok</title>
+                                    <title lang="de">Keine</title>
+                                    <title lang="ru">Нет</title>
+                                    <title lang="es">Ninguno</title>
+                                    <title lang="fr">Aucun</title>
+                                </meta>
+                            </param>
+                            <param name="xs">
+                                <meta>
+                                    <title lang="en">Extra Small</title>
+                                    <title lang="tr">Çok Küçük</title>
+                                    <title lang="de">Extra Klein</title>
+                                    <title lang="ru">Очень малый</title>
+                                    <title lang="es">Extra Pequeño</title>
+                                    <title lang="fr">Très Petit</title>
+                                </meta>
+                            </param>
+                            <param name="sm">
+                                <meta>
+                                    <title lang="en">Small</title>
+                                    <title lang="tr">Küçük</title>
+                                    <title lang="de">Klein</title>
+                                    <title lang="ru">Малый</title>
+                                    <title lang="es">Pequeño</title>
+                                    <title lang="fr">Petit</title>
+                                </meta>
+                            </param>
+                            <param name="md">
+                                <meta>
+                                    <title lang="en">Medium</title>
+                                    <title lang="tr">Orta</title>
+                                    <title lang="de">Mittel</title>
+                                    <title lang="ru">Средний</title>
+                                    <title lang="es">Mediano</title>
+                                    <title lang="fr">Moyen</title>
+                                </meta>
+                            </param>
+                            <param name="lg">
+                                <meta>
+                                    <title lang="en">Large</title>
+                                    <title lang="tr">Büyük</title>
+                                    <title lang="de">Groß</title>
+                                    <title lang="ru">Большой</title>
+                                    <title lang="es">Grande</title>
+                                    <title lang="fr">Grand</title>
+                                </meta>
+                            </param>
+                            <param name="xl">
+                                <meta>
+                                    <title lang="en">Extra Large</title>
+                                    <title lang="tr">Çok Büyük</title>
+                                    <title lang="de">Extra Groß</title>
+                                    <title lang="ru">Очень большой</title>
+                                    <title lang="es">Extra Grande</title>
+                                    <title lang="fr">Très Grand</title>
+                                </meta>
+                            </param>
+                            <param name="auto">
+                                <meta>
+                                    <title lang="en">Auto</title>
+                                    <title lang="tr">Otomatik</title>
+                                    <title lang="de">Auto</title>
+                                    <title lang="ru">Авто</title>
+                                    <title lang="es">Auto</title>
+                                    <title lang="fr">Auto</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="margin_bottom" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Margin Bottom</title>
+                        <title lang="tr">Alt Boşluk</title>
+                        <title lang="de">Abstand Unten</title>
+                        <title lang="ru">Отступ снизу</title>
+                        <title lang="es">Margen Inferior</title>
+                        <title lang="fr">Marge Inférieure</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="none">
+                                <meta>
+                                    <title lang="en">None</title>
+                                    <title lang="tr">Yok</title>
+                                    <title lang="de">Keine</title>
+                                    <title lang="ru">Нет</title>
+                                    <title lang="es">Ninguno</title>
+                                    <title lang="fr">Aucun</title>
+                                </meta>
+                            </param>
+                            <param name="xs">
+                                <meta>
+                                    <title lang="en">Extra Small</title>
+                                    <title lang="tr">Çok Küçük</title>
+                                    <title lang="de">Extra Klein</title>
+                                    <title lang="ru">Очень малый</title>
+                                    <title lang="es">Extra Pequeño</title>
+                                    <title lang="fr">Très Petit</title>
+                                </meta>
+                            </param>
+                            <param name="sm">
+                                <meta>
+                                    <title lang="en">Small</title>
+                                    <title lang="tr">Küçük</title>
+                                    <title lang="de">Klein</title>
+                                    <title lang="ru">Малый</title>
+                                    <title lang="es">Pequeño</title>
+                                    <title lang="fr">Petit</title>
+                                </meta>
+                            </param>
+                            <param name="md">
+                                <meta>
+                                    <title lang="en">Medium</title>
+                                    <title lang="tr">Orta</title>
+                                    <title lang="de">Mittel</title>
+                                    <title lang="ru">Средний</title>
+                                    <title lang="es">Mediano</title>
+                                    <title lang="fr">Moyen</title>
+                                </meta>
+                            </param>
+                            <param name="lg">
+                                <meta>
+                                    <title lang="en">Large</title>
+                                    <title lang="tr">Büyük</title>
+                                    <title lang="de">Groß</title>
+                                    <title lang="ru">Большой</title>
+                                    <title lang="es">Grande</title>
+                                    <title lang="fr">Grand</title>
+                                </meta>
+                            </param>
+                            <param name="xl">
+                                <meta>
+                                    <title lang="en">Extra Large</title>
+                                    <title lang="tr">Çok Büyük</title>
+                                    <title lang="de">Extra Groß</title>
+                                    <title lang="ru">Очень большой</title>
+                                    <title lang="es">Extra Grande</title>
+                                    <title lang="fr">Très Grand</title>
+                                </meta>
+                            </param>
+                            <param name="auto">
+                                <meta>
+                                    <title lang="en">Auto</title>
+                                    <title lang="tr">Otomatik</title>
+                                    <title lang="de">Auto</title>
+                                    <title lang="ru">Авто</title>
+                                    <title lang="es">Auto</title>
+                                    <title lang="fr">Auto</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="text_align" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Text Alignment</title>
+                        <title lang="tr">Metin Hizalama</title>
+                        <title lang="de">Textausrichtung</title>
+                        <title lang="ru">Выравнивание текста</title>
+                        <title lang="es">Alineación de Texto</title>
+                        <title lang="fr">Alignement du Texte</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="left">
+                                <meta>
+                                    <title lang="en">Left</title>
+                                    <title lang="tr">Sola Hizalı</title>
+                                    <title lang="de">Links</title>
+                                    <title lang="ru">По левому краю</title>
+                                    <title lang="es">Izquierda</title>
+                                    <title lang="fr">Gauche</title>
+                                </meta>
+                            </param>
+                            <param name="center">
+                                <meta>
+                                    <title lang="en">Center</title>
+                                    <title lang="tr">Ortalı</title>
+                                    <title lang="de">Zentriert</title>
+                                    <title lang="ru">По центру</title>
+                                    <title lang="es">Centro</title>
+                                    <title lang="fr">Centre</title>
+                                </meta>
+                            </param>
+                            <param name="right">
+                                <meta>
+                                    <title lang="en">Right</title>
+                                    <title lang="tr">Sağa Hizalı</title>
+                                    <title lang="de">Rechts</title>
+                                    <title lang="ru">По правому краю</title>
+                                    <title lang="es">Derecha</title>
+                                    <title lang="fr">Droite</title>
+                                </meta>
+                            </param>
+                            <param name="justify">
+                                <meta>
+                                    <title lang="en">Justify</title>
+                                    <title lang="tr">İki Yana Yasla</title>
+                                    <title lang="de">Blocksatz</title>
+                                    <title lang="ru">По ширине</title>
+                                    <title lang="es">Justificar</title>
+                                    <title lang="fr">Justifier</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="position" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Position</title>
+                        <title lang="tr">Konum</title>
+                        <title lang="de">Position</title>
+                        <title lang="ru">Позиция</title>
+                        <title lang="es">Posición</title>
+                        <title lang="fr">Position</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="static">
+                                <meta>
+                                    <title lang="en">Static</title>
+                                    <title lang="tr">Statik</title>
+                                    <title lang="de">Statisch</title>
+                                    <title lang="ru">Статическая</title>
+                                    <title lang="es">Estático</title>
+                                    <title lang="fr">Statique</title>
+                                </meta>
+                            </param>
+                            <param name="relative">
+                                <meta>
+                                    <title lang="en">Relative</title>
+                                    <title lang="tr">Göreceli</title>
+                                    <title lang="de">Relativ</title>
+                                    <title lang="ru">Относительная</title>
+                                    <title lang="es">Relativo</title>
+                                    <title lang="fr">Relative</title>
+                                </meta>
+                            </param>
+                            <param name="sticky">
+                                <meta>
+                                    <title lang="en">Sticky</title>
+                                    <title lang="tr">Yapışkan</title>
+                                    <title lang="de">Sticky</title>
+                                    <title lang="ru">Липкая</title>
+                                    <title lang="es">Fijo al desplazarse</title>
+                                    <title lang="fr">Collant</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="max_width" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Max Width</title>
+                        <title lang="tr">Maksimum Genişlik</title>
+                        <title lang="de">Maximale Breite</title>
+                        <title lang="ru">Максимальная ширина</title>
+                        <title lang="es">Ancho Máximo</title>
+                        <title lang="fr">Largeur Maximale</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="none">
+                                <meta>
+                                    <title lang="en">None</title>
+                                    <title lang="tr">Sınırsız</title>
+                                    <title lang="de">Keine</title>
+                                    <title lang="ru">Без ограничений</title>
+                                    <title lang="es">Ninguno</title>
+                                    <title lang="fr">Aucun</title>
+                                </meta>
+                            </param>
+                            <param name="small">
+                                <meta>
+                                    <title lang="en">Small</title>
+                                    <title lang="tr">Küçük</title>
+                                    <title lang="de">Klein</title>
+                                    <title lang="ru">Малая</title>
+                                    <title lang="es">Pequeño</title>
+                                    <title lang="fr">Petit</title>
+                                </meta>
+                            </param>
+                            <param name="medium">
+                                <meta>
+                                    <title lang="en">Medium</title>
+                                    <title lang="tr">Orta</title>
+                                    <title lang="de">Mittel</title>
+                                    <title lang="ru">Средняя</title>
+                                    <title lang="es">Mediano</title>
+                                    <title lang="fr">Moyen</title>
+                                </meta>
+                            </param>
+                            <param name="large">
+                                <meta>
+                                    <title lang="en">Large</title>
+                                    <title lang="tr">Büyük</title>
+                                    <title lang="de">Groß</title>
+                                    <title lang="ru">Большая</title>
+                                    <title lang="es">Grande</title>
+                                    <title lang="fr">Grand</title>
+                                </meta>
+                            </param>
+                            <param name="xlarge">
+                                <meta>
+                                    <title lang="en">Extra Large</title>
+                                    <title lang="tr">Çok Büyük</title>
+                                    <title lang="de">Extra Groß</title>
+                                    <title lang="ru">Очень большая</title>
+                                    <title lang="es">Extra Grande</title>
+                                    <title lang="fr">Très Grand</title>
+                                </meta>
+                            </param>
+                            <param name="2xlarge">
+                                <meta>
+                                    <title lang="en">2X Large</title>
+                                    <title lang="tr">Ekstra Büyük</title>
+                                    <title lang="de">2X Groß</title>
+                                    <title lang="ru">2X Большая</title>
+                                    <title lang="es">2X Grande</title>
+                                    <title lang="fr">2X Grand</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="block_align" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Block Alignment</title>
+                        <title lang="tr">Blok Hizalama</title>
+                        <title lang="de">Blockausrichtung</title>
+                        <title lang="ru">Выравнивание блока</title>
+                        <title lang="es">Alineación del Bloque</title>
+                        <title lang="fr">Alignement du Bloc</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="left">
+                                <meta>
+                                    <title lang="en">Left</title>
+                                    <title lang="tr">Sola</title>
+                                    <title lang="de">Links</title>
+                                    <title lang="ru">Слева</title>
+                                    <title lang="es">Izquierda</title>
+                                    <title lang="fr">Gauche</title>
+                                </meta>
+                            </param>
+                            <param name="center">
+                                <meta>
+                                    <title lang="en">Center</title>
+                                    <title lang="tr">Ortalı</title>
+                                    <title lang="de">Zentriert</title>
+                                    <title lang="ru">По центру</title>
+                                    <title lang="es">Centro</title>
+                                    <title lang="fr">Centre</title>
+                                </meta>
+                            </param>
+                            <param name="right">
+                                <meta>
+                                    <title lang="en">Right</title>
+                                    <title lang="tr">Sağa</title>
+                                    <title lang="de">Rechts</title>
+                                    <title lang="ru">Справа</title>
+                                    <title lang="es">Derecha</title>
+                                    <title lang="fr">Droite</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="animation" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Animation</title>
+                        <title lang="tr">Animasyon</title>
+                        <title lang="de">Animation</title>
+                        <title lang="ru">Анимация</title>
+                        <title lang="es">Animación</title>
+                        <title lang="fr">Animation</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="none">
+                                <meta>
+                                    <title lang="en">None</title>
+                                    <title lang="tr">Yok</title>
+                                    <title lang="de">Keine</title>
+                                    <title lang="ru">Нет</title>
+                                    <title lang="es">Ninguna</title>
+                                    <title lang="fr">Aucune</title>
+                                </meta>
+                            </param>
+                            <param name="fade">
+                                <meta>
+                                    <title lang="en">Fade In</title>
+                                    <title lang="tr">Belirme</title>
+                                    <title lang="de">Einblenden</title>
+                                    <title lang="ru">Плавное появление</title>
+                                    <title lang="es">Aparecer</title>
+                                    <title lang="fr">Fondu</title>
+                                </meta>
+                            </param>
+                            <param name="slide-up">
+                                <meta>
+                                    <title lang="en">Slide Up</title>
+                                    <title lang="tr">Aşağıdan Yukarı</title>
+                                    <title lang="de">Nach oben gleiten</title>
+                                    <title lang="ru">Снизу вверх</title>
+                                    <title lang="es">Deslizar hacia arriba</title>
+                                    <title lang="fr">Glisser vers le haut</title>
+                                </meta>
+                            </param>
+                            <param name="slide-down">
+                                <meta>
+                                    <title lang="en">Slide Down</title>
+                                    <title lang="tr">Yukarıdan Aşağı</title>
+                                    <title lang="de">Nach unten gleiten</title>
+                                    <title lang="ru">Сверху вниз</title>
+                                    <title lang="es">Deslizar hacia abajo</title>
+                                    <title lang="fr">Glisser vers le bas</title>
+                                </meta>
+                            </param>
+                            <param name="zoom-in">
+                                <meta>
+                                    <title lang="en">Zoom In</title>
+                                    <title lang="tr">Yakınlaşarak</title>
+                                    <title lang="de">Heranzoomen</title>
+                                    <title lang="ru">Увеличение</title>
+                                    <title lang="es">Acercar</title>
+                                    <title lang="fr">Zoom avant</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="visibility" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Visibility</title>
+                        <title lang="tr">Görünürlük</title>
+                        <title lang="de">Sichtbarkeit</title>
+                        <title lang="ru">Видимость</title>
+                        <title lang="es">Visibilidad</title>
+                        <title lang="fr">Visibilité</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="all">
+                                <meta>
+                                    <title lang="en">Always Visible</title>
+                                    <title lang="tr">Her Zaman Görünür</title>
+                                    <title lang="de">Immer sichtbar</title>
+                                    <title lang="ru">Всегда видимо</title>
+                                    <title lang="es">Siempre visible</title>
+                                    <title lang="fr">Toujours visible</title>
+                                </meta>
+                            </param>
+                            <param name="hidden_sm">
+                                <meta>
+                                    <title lang="en">Hidden on Mobile</title>
+                                    <title lang="tr">Mobilde Gizle</title>
+                                    <title lang="de">Auf Mobilgeräten ausblenden</title>
+                                    <title lang="ru">Скрыть на мобильных</title>
+                                    <title lang="es">Oculto en móvil</title>
+                                    <title lang="fr">Masqué sur mobile</title>
+                                </meta>
+                            </param>
+                            <param name="hidden_md">
+                                <meta>
+                                    <title lang="en">Hidden on Tablet &amp; Below</title>
+                                    <title lang="tr">Tablet ve Altında Gizle</title>
+                                    <title lang="de">Bis Tablet ausblenden</title>
+                                    <title lang="ru">Скрыть на планшетах</title>
+                                    <title lang="es">Oculto en tablet</title>
+                                    <title lang="fr">Masqué sur tablette</title>
+                                </meta>
+                            </param>
+                            <param name="visible_sm">
+                                <meta>
+                                    <title lang="en">Mobile Only</title>
+                                    <title lang="tr">Sadece Mobil</title>
+                                    <title lang="de">Nur Mobil</title>
+                                    <title lang="ru">Только мобильные</title>
+                                    <title lang="es">Solo móvil</title>
+                                    <title lang="fr">Mobile uniquement</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+            </properties>
+        </section>
+    </properties>
+</form>

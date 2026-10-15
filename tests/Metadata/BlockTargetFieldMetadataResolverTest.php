@@ -7,6 +7,7 @@ namespace Totoglu\SuluBlockSuiteBundle\Tests\Metadata;
 use PHPUnit\Framework\TestCase;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderInterface;
 use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
@@ -14,49 +15,36 @@ use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
 
 final class BlockTargetFieldMetadataResolverTest extends TestCase
 {
-    private string $tempSchemaDir;
-
-    protected function setUp(): void
-    {
-        $this->tempSchemaDir = \sys_get_temp_dir() . '/block_target_fields_test_' . \uniqid('', true);
-        \mkdir($this->tempSchemaDir, 0777, true);
-    }
-
-    protected function tearDown(): void
-    {
-        if (\is_dir($this->tempSchemaDir)) {
-            $files = \glob($this->tempSchemaDir . '/*');
-            if (\is_array($files)) {
-                foreach ($files as $file) {
-                    \unlink($file);
-                }
-            }
-            \rmdir($this->tempSchemaDir);
-        }
-    }
-
-    public function testResolveTargetFieldsExtractsFieldsFromSuluFormMetadataAndSkipsInternalFields(): void
+    public function testResolveTargetFieldsExtractsFieldsFromSuluFormMetadataAndSkipsPropsFields(): void
     {
         $cardForm = new FormMetadata();
         $cardForm->setKey('card');
 
+        $tabsSection = new SectionMetadata('__tabs');
+        $contentSection = new SectionMetadata('content');
+
         $titleField = new FieldMetadata('title');
         $titleField->setType('text_line');
         $titleField->setLabel('Card Title', 'en');
-        $cardForm->addItem($titleField);
+        $contentSection->addItem($titleField);
 
         $mediaField = new FieldMetadata('image');
         $mediaField->setType('single_media_selection');
         $mediaField->setLabel('Featured Image', 'en');
-        $cardForm->addItem($mediaField);
+        $contentSection->addItem($mediaField);
 
-        $propsField = new FieldMetadata('props');
-        $propsField->setType('block_props');
-        $cardForm->addItem($propsField);
+        $settingsSection = new SectionMetadata('settings');
+        $variantField = new FieldMetadata('props/variant');
+        $variantField->setType('single_select');
+        $settingsSection->addItem($variantField);
 
         $nestedBlocksField = new FieldMetadata('blocks');
         $nestedBlocksField->setType('block');
-        $cardForm->addItem($nestedBlocksField);
+        $contentSection->addItem($nestedBlocksField);
+
+        $tabsSection->addItem($contentSection);
+        $tabsSection->addItem($settingsSection);
+        $cardForm->addItem($tabsSection);
 
         $typedFormMetadata = new TypedFormMetadata();
         $typedFormMetadata->addForm('card', $cardForm);
@@ -67,44 +55,13 @@ final class BlockTargetFieldMetadataResolverTest extends TestCase
         $registry = $this->createStub(MetadataProviderRegistry::class);
         $registry->method('getMetadataProvider')->willReturn($provider);
 
-        $resolver = new BlockTargetFieldMetadataResolver(
-            $registry,
-            [$this->tempSchemaDir],
-        );
+        $resolver = new BlockTargetFieldMetadataResolver($registry);
 
         $fields = $resolver->resolveTargetFields('card', 'en');
 
         $this->assertSame([
             ['name' => 'title', 'label' => 'Card Title', 'type' => 'string'],
             ['name' => 'image', 'label' => 'Featured Image', 'type' => 'media'],
-        ], $fields);
-    }
-
-    public function testResolveTargetFieldsMergesYamlDynamicFieldsOverride(): void
-    {
-        \file_put_contents(
-            $this->tempSchemaDir . '/custom_widget.yaml',
-            <<<'YAML'
-dynamic_fields:
-    - name: headline
-      label: Custom Headline
-      type: string
-    - name: cta_url
-      label: CTA URL
-      type: link
-YAML
-        );
-
-        $resolver = new BlockTargetFieldMetadataResolver(
-            null,
-            [$this->tempSchemaDir],
-        );
-
-        $fields = $resolver->resolveTargetFields('custom_widget', 'en');
-
-        $this->assertSame([
-            ['name' => 'headline', 'label' => 'Custom Headline', 'type' => 'string'],
-            ['name' => 'cta_url', 'label' => 'CTA URL', 'type' => 'link'],
         ], $fields);
     }
 
@@ -140,10 +97,7 @@ YAML
         $registry = $this->createStub(MetadataProviderRegistry::class);
         $registry->method('getMetadataProvider')->willReturn($provider);
 
-        $resolver = new BlockTargetFieldMetadataResolver(
-            $registry,
-            [$this->tempSchemaDir],
-        );
+        $resolver = new BlockTargetFieldMetadataResolver($registry);
 
         $metadata = $resolver->resolveBlockMetadata('accordion', 'en');
 
@@ -154,34 +108,4 @@ YAML
             ['name' => 'content', 'label' => 'Answer Body', 'type' => 'text'],
         ], $metadata['fields']);
     }
-
-    public function testResolveBlockMetadataHonorsYamlMultipleAndDefaultItemTypeOverrides(): void
-    {
-        \file_put_contents(
-            $this->tempSchemaDir . '/breadcrumbs.yaml',
-            <<<'YAML'
-multiple: true
-default_item_type: breadcrumb_item
-dynamic_fields:
-    - name: title
-      label: Breadcrumb Label
-      type: string
-    - name: url
-      label: Target URL
-      type: link
-YAML
-        );
-
-        $resolver = new BlockTargetFieldMetadataResolver(
-            null,
-            [$this->tempSchemaDir],
-        );
-
-        $metadata = $resolver->resolveBlockMetadata('breadcrumbs', 'en');
-
-        $this->assertTrue($metadata['multiple']);
-        $this->assertSame('breadcrumb_item', $metadata['default_item_type']);
-        $this->assertCount(2, $metadata['fields']);
-    }
 }
-

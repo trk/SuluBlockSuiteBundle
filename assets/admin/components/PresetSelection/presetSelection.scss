@@ -1,0 +1,145 @@
+@import 'sulu-admin-bundle/containers/Application/variables.scss';
+@import 'sulu-admin-bundle/containers/Application/colors.scss';
+
+$borderRadius: 3px;
+
+.presetContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.presetRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.selectWrapper {
+    flex: 1 1 260px;
+    max-width: 420px;
+}
+
+.actionGroup {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    button {
+        min-width: auto;
+        padding: 0 14px 0 30px;
+        height: 30px;
+        line-height: 28px;
+    }
+
+    button:has([class*="dropdown-icon"]) {
+        padding-right: 28px;
+    }
+}
+
+.presetDetails {
+    padding: 8px 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: $borderRadius;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.activePresetBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #047857;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 3px;
+    padding: 2px 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.inlinePreviewImage {
+    max-height: 40px;
+    max-width: 70px;
+    object-fit: cover;
+    border-radius: $borderRadius;
+    border: 1px solid $silver;
+    flex-shrink: 0;
+}
+
+.presetDescription {
+    font-size: 12px;
+    line-height: 16px;
+    color: #475569;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.clearPresetButton {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: $doveGray;
+    padding: 3px 6px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    font-size: 13px;
+    transition: all 0.15s ease-in-out;
+
+    &:hover {
+        color: #ef4444;
+        background: #fee2e2;
+    }
+}
+
+.reusableCard {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: $wildSand;
+    border: 1px solid $silver;
+    border-radius: $borderRadius;
+    padding: 8px 12px;
+    margin: 4px 0;
+    max-width: 680px;
+}
+
+.reusablePreviewImage {
+    width: 60px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: $borderRadius;
+    border: 1px solid $silver;
+}
+
+.reusableInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.reusableTitle {
+    font-size: 12px;
+    font-weight: 600;
+    color: $black;
+}
+
+.reusableDesc {
+    font-size: 11px;
+    line-height: 14px;
+    color: $doveGray;
+}
+
+.savePresetDialogForm {
+    padding: 10px 0 6px 0;
+}

@@ -9,6 +9,7 @@ use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Totoglu\SuluBlockSuiteBundle\Controller\Admin\BlockPresetController;
+use Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor;
 use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
 
 final class BlockPresetControllerTest extends TestCase
@@ -77,65 +78,19 @@ final class BlockPresetControllerTest extends TestCase
         $this->assertSame(JsonResponse::HTTP_NOT_FOUND, $response->getStatusCode());
     }
 
-    public function testSchemaReturnsBadRequestOnInvalidBlockType(): void
-    {
-        $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $controller = new BlockPresetController($mockProvider);
-        $request = new Request();
-
-        $response = $controller->schema($request, 'invalid/type');
-        $this->assertSame(JsonResponse::HTTP_BAD_REQUEST, $response->getStatusCode());
-    }
-
-    public function testSchemaReturnsSuccessfulJsonResponse(): void
-    {
-        $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $mockSchemaProvider = $this->createMock(\Totoglu\SuluBlockSuiteBundle\Schema\BlockPropSchemaProviderInterface::class);
-        $mockSchemaProvider->expects($this->once())
-            ->method('getSchema')
-            ->with('headline', 'en')
-            ->willReturn([
-                'tabs' => [
-                    [
-                        'id' => 'appearance',
-                        'title' => 'Appearance',
-                        'fields' => [
-                            ['name' => 'tag', 'type' => 'select', 'label' => 'Tag'],
-                        ],
-                    ],
-                ],
-            ]);
-
-        $controller = new BlockPresetController($mockProvider, null, null, $mockSchemaProvider);
-        $request = new Request(['locale' => 'en']);
-
-        $response = $controller->schema($request, 'headline');
-        $this->assertSame(JsonResponse::HTTP_OK, $response->getStatusCode());
-
-        $content = (string) $response->getContent();
-        /** @var array{tabs: list<array{id: string, title: string, fields: list<mixed>}>} $data */
-        $data = \json_decode($content, true);
-
-        $this->assertCount(1, $data['tabs']);
-        $this->assertSame('appearance', $data['tabs'][0]['id']);
-    }
-
     public function testBlockTypesReturnsAvailableBlocks(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
         $mockProvider->method('getPresets')->willReturn([]);
 
-        $mockSchemaProvider = $this->createStub(\Totoglu\SuluBlockSuiteBundle\Schema\BlockPropSchemaProviderInterface::class);
-        $mockSchemaProvider->method('getSchema')->willReturn(['tabs' => [['id' => 'appearance', 'title' => 'Appearance', 'fields' => []]]]);
-
         $tempDir = \sys_get_temp_dir() . '/block_types_test_' . \uniqid('', true);
         \mkdir($tempDir, 0777, true);
-        \file_put_contents($tempDir . '/card.yaml', 'tabs: []');
-        \file_put_contents($tempDir . '/headline.yaml', 'tabs: []');
+        \file_put_contents($tempDir . '/card.yaml', 'presets: []');
+        \file_put_contents($tempDir . '/headline.yaml', 'presets: []');
 
-        $visitor = new \Totoglu\SuluBlockSuiteBundle\Metadata\TargetBlockOptionsFormMetadataVisitor($tempDir, $tempDir);
+        $visitor = new BlockSuiteFormMetadataVisitor($tempDir);
 
-        $controller = new BlockPresetController($mockProvider, null, null, $mockSchemaProvider, $visitor);
+        $controller = new BlockPresetController($mockProvider, null, null, $visitor);
         $request = new Request(['locale' => 'en']);
 
         $response = $controller->blockTypes($request);
@@ -149,12 +104,11 @@ final class BlockPresetControllerTest extends TestCase
         $this->assertArrayHasKey('blocks', $data);
         $this->assertIsArray($data['blocks']);
         $this->assertCount(2, $data['blocks']);
-        /** @var array{type: string, title: string, has_props: bool, presets_count: int} $firstBlock */
+        /** @var array{type: string, title: string, presets_count: int} $firstBlock */
         $firstBlock = $data['blocks'][0];
         $this->assertSame('card', $firstBlock['type']);
         $this->assertSame('Card', $firstBlock['title']);
-        $this->assertTrue($firstBlock['has_props']);
-        /** @var array{type: string, title: string, has_props: bool, presets_count: int} $secondBlock */
+        /** @var array{type: string, title: string, presets_count: int} $secondBlock */
         $secondBlock = $data['blocks'][1];
         $this->assertSame('headline', $secondBlock['type']);
 
@@ -233,7 +187,6 @@ final class BlockPresetControllerTest extends TestCase
             null,
             null,
             null,
-            null,
             $mockBus,
         );
 
@@ -242,7 +195,7 @@ final class BlockPresetControllerTest extends TestCase
             'title' => 'Special Card',
             'description' => 'Test preset desc',
             'locale' => 'en',
-            'props' => ['variant' => 'bordered', '_preset' => 'old_id'],
+            'props' => ['variant' => 'bordered', '_preset' => 'old_id', 'preset' => 'old_id'],
             'values' => ['title' => 'Sample Heading', 'type' => 'card'],
         ]));
 
@@ -257,6 +210,7 @@ final class BlockPresetControllerTest extends TestCase
         $this->assertSame('Special Card', $data['title']);
         $this->assertSame('Test preset desc', $data['description']);
         $this->assertArrayNotHasKey('_preset', $data['props']);
+        $this->assertArrayNotHasKey('preset', $data['props']);
         $this->assertSame('bordered', $data['props']['variant']);
         $this->assertSame('card', $data['values']['type']);
         $this->assertSame('Sample Heading', $data['values']['title']);
@@ -278,7 +232,6 @@ final class BlockPresetControllerTest extends TestCase
 
         $controller = new BlockPresetController(
             $mockProvider,
-            null,
             null,
             null,
             null,
@@ -359,7 +312,6 @@ final class BlockPresetControllerTest extends TestCase
             null,
             null,
             null,
-            null,
             $mockBus,
         );
 
@@ -370,7 +322,7 @@ final class BlockPresetControllerTest extends TestCase
             'block' => [
                 'type' => 'headline',
                 '_preset' => 'old_preset',
-                'props' => ['level' => 'h2', '_preset' => 'old_preset'],
+                'props' => ['level' => 'h2', '_preset' => 'old_preset', 'preset' => 'old_preset'],
                 'content' => 'Welcome',
             ],
         ]));
@@ -404,7 +356,6 @@ final class BlockPresetControllerTest extends TestCase
 
         $controller = new BlockPresetController(
             $mockProvider,
-            null,
             null,
             null,
             null,

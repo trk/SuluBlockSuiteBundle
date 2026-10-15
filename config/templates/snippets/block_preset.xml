@@ -95,9 +95,7 @@
                         <title lang="es">Contenido del Bloque</title>
                         <title lang="fr">Contenu du Bloc</title>
                     </meta>
-                    <properties>
-                        <property name="props" type="block_props" colspan="12"/>
-                    </properties>
+                    <properties/>
                 </type>
             </types>
         </property>

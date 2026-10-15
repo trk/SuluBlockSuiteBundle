@@ -18,6 +18,11 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
     {
         if ($container->hasExtension('sulu_admin')) {
             $container->prependExtensionConfig('sulu_admin', [
+                'forms' => [
+                    'directories' => [
+                        \dirname(__DIR__, 2) . '/config/forms',
+                    ],
+                ],
                 'templates' => [
                     'block' => [
                         'directories' => [
@@ -74,39 +79,6 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
         $container->setParameter('sulu_block_suite.layout.enabled', $layoutConfig['enabled']);
         $container->setParameter('sulu_block_suite.layout.yaml_dir', $layoutConfig['yaml_dir']);
         $container->setParameter('sulu_block_suite.layout.mappings', $layoutConfig['mappings']);
-
-        // Collect all schema_dir entries across all prepended bundle configs and app configs
-        // Order: 1) BlockSuite engine, 2) Framework bundles (e.g. Preline), 3) Host project overrides
-        $engineSchemaDir = \dirname(__DIR__, 2) . '/config/blocks/props';
-        $projectSchemaDir = '%kernel.project_dir%/config/blocks/props';
-        $collectedSchemaDirs = [$engineSchemaDir];
-
-        foreach ($configs as $rawConfig) {
-            if (!\is_array($rawConfig) || !isset($rawConfig['props']) || !\is_array($rawConfig['props'])) {
-                continue;
-            }
-            $rawDirs = $rawConfig['props']['schema_dir'] ?? null;
-            if (\is_string($rawDirs) && '' !== \trim($rawDirs)) {
-                $collectedSchemaDirs[] = \trim($rawDirs);
-            } elseif (\is_array($rawDirs)) {
-                foreach ($rawDirs as $dir) {
-                    if (\is_string($dir) && '' !== \trim($dir)) {
-                        $collectedSchemaDirs[] = \trim($dir);
-                    }
-                }
-            }
-        }
-
-        // Ensure projectSchemaDir is always last so project overrides take highest precedence
-        $finalSchemaDirs = [];
-        foreach ($collectedSchemaDirs as $dir) {
-            if ($dir !== $projectSchemaDir && !\in_array($dir, $finalSchemaDirs, true)) {
-                $finalSchemaDirs[] = $dir;
-            }
-        }
-        $finalSchemaDirs[] = $projectSchemaDir;
-
-        $container->setParameter('sulu_block_suite.props.schema_dir', $finalSchemaDirs);
 
         /** @var array{template_namespaces: string|array<array-key, string>} $renderingConfig */
         $renderingConfig = $config['rendering'];

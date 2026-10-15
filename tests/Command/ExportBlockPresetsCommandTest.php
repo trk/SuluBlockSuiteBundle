@@ -64,10 +64,18 @@ final class ExportBlockPresetsCommandTest extends TestCase
             'target_block' => 'card',
             'preset_group' => 'Hero',
             'description' => 'Frosted glass card with large padding',
-            'props' => [
-                'card_style' => 'card-primary',
-                'card_padding' => 'large',
-                '_preset' => 'should_be_stripped',
+            'block' => [
+                [
+                    'type' => 'card',
+                    'title' => 'Default Hero Heading',
+                    'preset' => 'should_be_stripped_root',
+                    'props' => [
+                        'card_style' => 'card-primary',
+                        'card_padding' => 'large',
+                        'preset' => 'should_be_stripped_native',
+                        '_preset' => 'should_be_stripped_legacy',
+                    ],
+                ],
             ],
         ]);
 
@@ -105,5 +113,8 @@ final class ExportBlockPresetsCommandTest extends TestCase
             'card_style' => 'card-primary',
             'card_padding' => 'large',
         ], $presets['glass_hero_card']['props']);
+        self::assertSame([
+            'title' => 'Default Hero Heading',
+        ], $presets['glass_hero_card']['values']);
     }
 }

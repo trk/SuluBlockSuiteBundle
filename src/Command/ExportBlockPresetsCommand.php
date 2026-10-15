@@ -141,8 +141,9 @@ final class ExportBlockPresetsCommand extends Command
 
                 if (\is_array($rawProps)) {
                     foreach ($rawProps as $k => $v) {
-                        if ('_preset' !== (string) $k && null !== $v && '' !== $v) {
-                            $props[(string) $k] = $v;
+                        $propKey = (string) $k;
+                        if (!\in_array($propKey, ['preset', '_preset'], true) && null !== $v && '' !== $v) {
+                            $props[$propKey] = $v;
                         }
                     }
                 }
@@ -152,7 +153,7 @@ final class ExportBlockPresetsCommand extends Command
                 if (null !== $blockEntry) {
                     foreach ($blockEntry as $k => $v) {
                         $keyStr = (string) $k;
-                        if (!\in_array($keyStr, ['type', 'props', '_preset', '_id'], true) && null !== $v && '' !== $v) {
+                        if (!\in_array($keyStr, ['type', 'props', 'preset', '_preset', '_id'], true) && null !== $v && '' !== $v) {
                             $values[$keyStr] = $v;
                         }
                     }

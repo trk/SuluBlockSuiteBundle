@@ -209,15 +209,23 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             }
         }
 
-        if (\is_array($props) && isset($props['_dynamic'])) {
-            $dyn = $props['_dynamic'];
-            if (\is_object($dyn) && \method_exists($dyn, 'getContent')) {
-                /** @var mixed $dyn */
-                $dyn = $dyn->getContent();
+        if (\is_array($props)) {
+            if (isset($props['_dynamic'])) {
+                $dyn = $props['_dynamic'];
+                if (\is_object($dyn) && \method_exists($dyn, 'getContent')) {
+                    /** @var mixed $dyn */
+                    $dyn = $dyn->getContent();
+                }
+                if (\is_array($dyn)) {
+                    /** @var array<string, mixed> $dyn */
+                    return $dyn;
+                }
             }
-            if (\is_array($dyn)) {
-                /** @var array<string, mixed> $dyn */
-                return $dyn;
+
+            $sourceType = $props['dynamic_source'] ?? null;
+            if (\is_string($sourceType) && '' !== \trim($sourceType) && 'none' !== \trim($sourceType)) {
+                /** @var array<string, mixed> $props */
+                return $this->buildDynamicConfigFromFlatProps($props);
             }
         }
 
@@ -233,7 +241,99 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             }
         }
 
+        $rootSourceType = $block['dynamic_source'] ?? null;
+        if (\is_string($rootSourceType) && '' !== \trim($rootSourceType) && 'none' !== \trim($rootSourceType)) {
+            return $this->buildDynamicConfigFromFlatProps($block);
+        }
+
         return null;
+    }
+
+    /**
+     * @param array<string, mixed> $props
+     *
+     * @return array<string, mixed>
+     */
+    private function buildDynamicConfigFromFlatProps(array $props): array
+    {
+        $sourceType = isset($props['dynamic_source']) && \is_string($props['dynamic_source'])
+            ? \trim($props['dynamic_source'])
+            : 'none';
+
+        /** @var array<string, string> $mapping */
+        $mapping = [];
+        $rawMapping = $props['dynamic_mapping'] ?? null;
+        if (\is_string($rawMapping) && '' !== \trim($rawMapping)) {
+            foreach (\explode("\n", $rawMapping) as $line) {
+                $line = \trim($line);
+                if ('' === $line || !\str_contains($line, '=')) {
+                    continue;
+                }
+                [$targetField, $sourcePath] = \explode('=', $line, 2);
+                $targetField = \trim($targetField);
+                $sourcePath = \trim($sourcePath);
+                if ('' !== $targetField && '' !== $sourcePath) {
+                    $mapping[$targetField] = $sourcePath;
+                }
+            }
+        } elseif (\is_array($rawMapping)) {
+            foreach ($rawMapping as $key => $entry) {
+                if (\is_array($entry)) {
+                    $targetField = isset($entry['target_field']) && \is_string($entry['target_field']) ? \trim($entry['target_field']) : '';
+                    $sourceField = isset($entry['source_field']) && \is_string($entry['source_field']) ? \trim($entry['source_field']) : '';
+                    if ('' !== $targetField && '' !== $sourceField) {
+                        $mapping[$targetField] = $sourceField;
+                    }
+                } elseif (\is_string($key) && \is_string($entry) && '' !== \trim($key) && '' !== \trim($entry)) {
+                    $mapping[\trim($key)] = \trim($entry);
+                }
+            }
+        }
+
+        $conditionEnabled = (bool) ($props['dynamic_condition_enabled'] ?? true);
+        $conditionField = isset($props['dynamic_condition_field']) && \is_string($props['dynamic_condition_field'])
+            ? \trim($props['dynamic_condition_field'])
+            : '';
+        $condition = null;
+        if ($conditionEnabled && '' !== $conditionField) {
+            $condition = [
+                'field' => $conditionField,
+                'operator' => isset($props['dynamic_condition_operator']) && \is_string($props['dynamic_condition_operator'])
+                    ? \trim($props['dynamic_condition_operator'])
+                    : 'not_empty',
+                'value' => isset($props['dynamic_condition_value']) && \is_scalar($props['dynamic_condition_value'])
+                    ? (string) $props['dynamic_condition_value']
+                    : '',
+            ];
+        }
+
+        return [
+            'enabled' => 'none' !== $sourceType && '' !== $sourceType,
+            'source_type' => $sourceType,
+            'hydrate_mode' => isset($props['dynamic_hydrate_mode']) && \is_string($props['dynamic_hydrate_mode'])
+                ? \trim($props['dynamic_hydrate_mode'])
+                : 'auto',
+            'page_id' => $props['dynamic_page_id'] ?? ($props['dynamic_page'] ?? null),
+            'parent_id' => $props['dynamic_parent_id'] ?? ($props['dynamic_parent_page'] ?? null),
+            'uuids' => $props['dynamic_uuids'] ?? null,
+            'article_id' => $props['dynamic_article_id'] ?? null,
+            'article_ids' => $props['dynamic_article_ids'] ?? null,
+            'category_id' => $props['dynamic_category_id'] ?? null,
+            'category_ids' => $props['dynamic_category_ids'] ?? null,
+            'media_id' => $props['dynamic_media_id'] ?? null,
+            'media_ids' => $props['dynamic_media_ids'] ?? null,
+            'collection_id' => $props['dynamic_collection_id'] ?? null,
+            'template_keys' => $props['dynamic_template_keys'] ?? null,
+            'tag_names' => $props['dynamic_tag_names'] ?? null,
+            'category_keys' => $props['dynamic_category_keys'] ?? null,
+            'exclude_current' => (bool) ($props['dynamic_exclude_current'] ?? true),
+            'sort_by' => $props['dynamic_sort_by'] ?? 'published',
+            'sort_order' => $props['dynamic_sort_order'] ?? 'desc',
+            'limit' => isset($props['dynamic_limit']) && \is_numeric($props['dynamic_limit']) ? (int) $props['dynamic_limit'] : 6,
+            'offset' => isset($props['dynamic_offset']) && \is_numeric($props['dynamic_offset']) ? (int) $props['dynamic_offset'] : 0,
+            'mapping' => $mapping,
+            'condition' => $condition,
+        ];
     }
 
     /**

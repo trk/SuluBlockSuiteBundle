@@ -803,48 +803,60 @@ final class DynamicContentHydratorTest extends TestCase
                 ['title' => 'About', 'url' => '/about'],
             ]);
 
-        $tempDir = \sys_get_temp_dir() . '/hydrator_meta_' . \uniqid('', true);
-        \mkdir($tempDir, 0777, true);
-        \file_put_contents(
-            $tempDir . '/breadcrumbs.yaml',
-            "multiple: true\ndefault_item_type: breadcrumb_item\n",
+        $breadcrumbsForm = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata();
+        $breadcrumbsForm->setKey('breadcrumbs');
+
+        $childItemForm = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata();
+        $childItemForm->setKey('breadcrumb_item');
+
+        $itemsBlockField = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata('items');
+        $itemsBlockField->setType('block');
+        $itemsBlockField->setDefaultType('breadcrumb_item');
+        $itemsBlockField->addType($childItemForm);
+        $breadcrumbsForm->addItem($itemsBlockField);
+
+        $typedFormMetadata = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata();
+        $typedFormMetadata->addForm('breadcrumbs', $breadcrumbsForm);
+
+        $provider = $this->createStub(\Sulu\Bundle\AdminBundle\Metadata\MetadataProviderInterface::class);
+        $provider->method('getMetadata')->willReturn($typedFormMetadata);
+
+        $registry = new \Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry(
+            new \Symfony\Component\DependencyInjection\ServiceLocator([
+                'form' => static fn () => $provider,
+            ]),
         );
 
-        try {
-            $targetFieldResolver = new \Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver(null, [$tempDir]);
-            $hydrator = new DynamicContentHydrator($sourceResolver, [], $targetFieldResolver);
+        $targetFieldResolver = new \Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver($registry);
+        $hydrator = new DynamicContentHydrator($sourceResolver, [], $targetFieldResolver);
 
-            $breadcrumbsBlock = [
-                'type' => 'breadcrumbs',
-                'props' => [
-                    '_dynamic' => [
-                        'enabled' => true,
-                        'source_type' => 'page_selection',
-                        'uuids' => ['uuid-1', 'uuid-2'],
-                        'limit' => 2,
-                        'mapping' => [
-                            'title' => 'title',
-                            'url' => 'url',
-                        ],
+        $breadcrumbsBlock = [
+            'type' => 'breadcrumbs',
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_selection',
+                    'uuids' => ['uuid-1', 'uuid-2'],
+                    'limit' => 2,
+                    'mapping' => [
+                        'title' => 'title',
+                        'url' => 'url',
                     ],
                 ],
-            ];
+            ],
+        ];
 
-            $result = $hydrator->hydrateBlock($breadcrumbsBlock);
+        $result = $hydrator->hydrateBlock($breadcrumbsBlock);
 
-            self::assertCount(1, $result);
-            self::assertSame('breadcrumbs', $result[0]['type']);
-            self::assertIsArray($result[0]['items']);
-            /** @var list<array<string, mixed>> $items */
-            $items = $result[0]['items'];
-            self::assertCount(2, $items);
-            self::assertSame('breadcrumb_item', $items[0]['type']);
-            self::assertSame('Home', $items[0]['title']);
-            self::assertSame('/about', $items[1]['url']);
-        } finally {
-            @\unlink($tempDir . '/breadcrumbs.yaml');
-            @\rmdir($tempDir);
-        }
+        self::assertCount(1, $result);
+        self::assertSame('breadcrumbs', $result[0]['type']);
+        self::assertIsArray($result[0]['items']);
+        /** @var list<array<string, mixed>> $items */
+        $items = $result[0]['items'];
+        self::assertCount(2, $items);
+        self::assertSame('breadcrumb_item', $items[0]['type']);
+        self::assertSame('Home', $items[0]['title']);
+        self::assertSame('/about', $items[1]['url']);
     }
 
     public function testDualModeCustomProductSourceProviderSingleAndCollectionHydration(): void

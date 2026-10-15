@@ -32,11 +32,5 @@
                 <param name="templateKeys" value="reusable_block"/>
             </params>
         </property>
-
-        <property name="props" type="block_props" colspan="12">
-            <params>
-                <param name="component_type" value="reusable"/>
-            </params>
-        </property>
     </properties>
 </template>

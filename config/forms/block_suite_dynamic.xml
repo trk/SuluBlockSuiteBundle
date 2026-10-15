@@ -1,0 +1,461 @@
+<?xml version="1.0" ?>
+<form xmlns="http://schemas.sulu.io/template/template"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/form-1.0.xsd">
+    <key>block_suite_dynamic</key>
+
+    <properties>
+        <section name="dynamic_content">
+            <meta>
+                <title lang="en">Dynamic Content</title>
+                <title lang="tr">Dinamik İçerik</title>
+                <title lang="de">Dynamischer Inhalt</title>
+                <title lang="ru">Динамический контент</title>
+                <title lang="es">Contenido Dinámico</title>
+                <title lang="fr">Contenu Dynamique</title>
+            </meta>
+            <properties>
+                <property name="dynamic_source" type="single_select" colspan="12" mandatory="false">
+                    <meta>
+                        <title lang="en">Dynamic Content Source</title>
+                        <title lang="tr">Dinamik İçerik Kaynağı</title>
+                        <title lang="de">Dynamische Inhaltsquelle</title>
+                        <title lang="ru">Источник динамического контента</title>
+                        <title lang="es">Fuente de Contenido Dinámico</title>
+                        <title lang="fr">Source de Contenu Dynamique</title>
+                        <info_text lang="en">Select where the content for this block will be pulled from.</info_text>
+                        <info_text lang="tr">Bu bloğun içeriğinin nereden çekileceğini seçin.</info_text>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="none"/>
+                        <param name="values" type="collection">
+                            <param name="none">
+                                <meta>
+                                    <title lang="en">None (Static Content)</title>
+                                    <title lang="tr">Yok (Statik İçerik)</title>
+                                    <title lang="de">Keine (Statischer Inhalt)</title>
+                                    <title lang="ru">Нет (Статический контент)</title>
+                                    <title lang="es">Ninguno (Contenido Estático)</title>
+                                    <title lang="fr">Aucun (Contenu Statique)</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="dynamic_page_id" type="single_page_selection" colspan="12" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'specific_page' or __parent.dynamic_source == 'page_children'">
+                    <meta>
+                        <title lang="en">Source Page</title>
+                        <title lang="tr">Kaynak Sayfa</title>
+                        <title lang="de">Quellseite</title>
+                        <title lang="ru">Исходная страница</title>
+                        <title lang="es">Página de Origen</title>
+                        <title lang="fr">Page Source</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_uuids" type="page_selection" colspan="12" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_selection'">
+                    <meta>
+                        <title lang="en">Selected Pages</title>
+                        <title lang="tr">Seçilen Sayfalar</title>
+                        <title lang="de">Ausgewählte Seiten</title>
+                        <title lang="ru">Выбранные страницы</title>
+                        <title lang="es">Páginas Seleccionadas</title>
+                        <title lang="fr">Pages Sélectionnées</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_article_id" type="single_article_selection" colspan="12" mandatory="false"
+                          onInvalid="ignore"
+                          visibleCondition="__parent.dynamic_source == 'single_article'">
+                    <meta>
+                        <title lang="en">Source Article</title>
+                        <title lang="tr">Kaynak Makale</title>
+                        <title lang="de">Quellartikel</title>
+                        <title lang="ru">Исходная статья</title>
+                        <title lang="es">Artículo de Origen</title>
+                        <title lang="fr">Article Source</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_article_ids" type="article_selection" colspan="12" mandatory="false"
+                          onInvalid="ignore"
+                          visibleCondition="__parent.dynamic_source == 'sulu_articles'">
+                    <meta>
+                        <title lang="en">Selected Articles</title>
+                        <title lang="tr">Seçilen Makaleler</title>
+                        <title lang="de">Ausgewählte Artikel</title>
+                        <title lang="ru">Выбранные статьи</title>
+                        <title lang="es">Artículos Seleccionados</title>
+                        <title lang="fr">Articles Sélectionnés</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_category_id" type="single_category_selection" colspan="12" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'single_category'">
+                    <meta>
+                        <title lang="en">Source Category</title>
+                        <title lang="tr">Kaynak Kategori</title>
+                        <title lang="de">Quellkategorie</title>
+                        <title lang="ru">Исходная категория</title>
+                        <title lang="es">Categoría de Origen</title>
+                        <title lang="fr">Catégorie Source</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_category_ids" type="category_selection" colspan="6" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'sulu_categories'">
+                    <meta>
+                        <title lang="en">Selected Categories</title>
+                        <title lang="tr">Seçilen Kategoriler</title>
+                        <title lang="de">Ausgewählte Kategorien</title>
+                        <title lang="ru">Выбранные категории</title>
+                        <title lang="es">Categorías Seleccionadas</title>
+                        <title lang="fr">Catégories Sélectionnées</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_parent_id" type="single_category_selection" colspan="6" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'sulu_categories'">
+                    <meta>
+                        <title lang="en">Parent Category</title>
+                        <title lang="tr">Üst Kategori</title>
+                        <title lang="de">Übergeordnete Kategorie</title>
+                        <title lang="ru">Родительская категория</title>
+                        <title lang="es">Categoría Superior</title>
+                        <title lang="fr">Catégorie Parente</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_media_id" type="single_media_selection" colspan="12" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'single_media'">
+                    <meta>
+                        <title lang="en">Source Media</title>
+                        <title lang="tr">Kaynak Medya</title>
+                        <title lang="de">Quellmedium</title>
+                        <title lang="ru">Исходный медиафайл</title>
+                        <title lang="es">Medio de Origen</title>
+                        <title lang="fr">Média Source</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_collection_id" type="single_collection_selection" colspan="6" mandatory="false"
+                          onInvalid="ignore"
+                          visibleCondition="__parent.dynamic_source == 'sulu_media_collection'">
+                    <meta>
+                        <title lang="en">Media Collection</title>
+                        <title lang="tr">Medya Koleksiyonu</title>
+                        <title lang="de">Mediensammlung</title>
+                        <title lang="ru">Медиаколлекция</title>
+                        <title lang="es">Colección Multimedia</title>
+                        <title lang="fr">Collection Média</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_media_ids" type="media_selection" colspan="6" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'sulu_media_collection'">
+                    <meta>
+                        <title lang="en">Selected Media</title>
+                        <title lang="tr">Seçilen Medyalar</title>
+                        <title lang="de">Ausgewählte Medien</title>
+                        <title lang="ru">Выбранные медиафайлы</title>
+                        <title lang="es">Medios Seleccionados</title>
+                        <title lang="fr">Médias Sélectionnés</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_limit" type="number" colspan="3" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection'">
+                    <meta>
+                        <title lang="en">Limit</title>
+                        <title lang="tr">Limit</title>
+                        <title lang="de">Limit</title>
+                        <title lang="ru">Лимит</title>
+                        <title lang="es">Límite</title>
+                        <title lang="fr">Limite</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_offset" type="number" colspan="3" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection'">
+                    <meta>
+                        <title lang="en">Offset</title>
+                        <title lang="tr">Başlangıç (Offset)</title>
+                        <title lang="de">Offset</title>
+                        <title lang="ru">Смещение</title>
+                        <title lang="es">Desplazamiento</title>
+                        <title lang="fr">Décalage</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_sort_by" type="single_select" colspan="3" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles'">
+                    <meta>
+                        <title lang="en">Sort By</title>
+                        <title lang="tr">Sıralama Alanı</title>
+                        <title lang="de">Sortieren nach</title>
+                        <title lang="ru">Сортировать по</title>
+                        <title lang="es">Ordenar por</title>
+                        <title lang="fr">Trier par</title>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="published"/>
+                        <param name="values" type="collection">
+                            <param name="published">
+                                <meta>
+                                    <title lang="en">Published Date</title>
+                                    <title lang="tr">Yayın Tarihi</title>
+                                </meta>
+                            </param>
+                            <param name="created">
+                                <meta>
+                                    <title lang="en">Created Date</title>
+                                    <title lang="tr">Oluşturulma Tarihi</title>
+                                </meta>
+                            </param>
+                            <param name="changed">
+                                <meta>
+                                    <title lang="en">Modified Date</title>
+                                    <title lang="tr">Güncellenme Tarihi</title>
+                                </meta>
+                            </param>
+                            <param name="title">
+                                <meta>
+                                    <title lang="en">Title</title>
+                                    <title lang="tr">Başlık</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="dynamic_sort_order" type="single_select" colspan="3" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles'">
+                    <meta>
+                        <title lang="en">Sort Direction</title>
+                        <title lang="tr">Sıralama Yönü</title>
+                        <title lang="de">Sortierrichtung</title>
+                        <title lang="ru">Направление</title>
+                        <title lang="es">Dirección</title>
+                        <title lang="fr">Ordre</title>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="desc"/>
+                        <param name="values" type="collection">
+                            <param name="desc">
+                                <meta>
+                                    <title lang="en">Descending</title>
+                                    <title lang="tr">Azalan (DESC)</title>
+                                </meta>
+                            </param>
+                            <param name="asc">
+                                <meta>
+                                    <title lang="en">Ascending</title>
+                                    <title lang="tr">Artan (ASC)</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="dynamic_template_keys" type="text_line" colspan="4" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles'">
+                    <meta>
+                        <title lang="en">Template Filter (comma-separated)</title>
+                        <title lang="tr">Şablon Filtresi (virgülle ayrılmış)</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_tag_names" type="tag_selection" colspan="4" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles'">
+                    <meta>
+                        <title lang="en">Tag Filter</title>
+                        <title lang="tr">Etiket Filtresi</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_category_keys" type="category_selection" colspan="4" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles'">
+                    <meta>
+                        <title lang="en">Category Filter</title>
+                        <title lang="tr">Kategori Filtresi</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_exclude_current" type="checkbox" colspan="12" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'sibling_pages'">
+                    <meta>
+                        <title lang="en">Exclude Current Page</title>
+                        <title lang="tr">Mevcut Sayfayı Hariç Tut</title>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="true"/>
+                    </params>
+                </property>
+
+                <block name="dynamic_mapping" default-type="field_map" minOccurs="0" mandatory="false"
+                       visibleCondition="__parent.dynamic_source != null and __parent.dynamic_source != 'none' and __parent.dynamic_source != ''">
+                    <meta>
+                        <title lang="en">Field Mapping</title>
+                        <title lang="tr">Alan Eşleştirme</title>
+                        <title lang="de">Feldzuordnung</title>
+                        <title lang="ru">Сопоставление полей</title>
+                        <title lang="es">Mapeo de Campos</title>
+                        <title lang="fr">Mappage des Champs</title>
+                    </meta>
+                    <types>
+                        <type name="field_map">
+                            <meta>
+                                <title lang="en">Field Map</title>
+                                <title lang="tr">Alan Eşleşmesi</title>
+                            </meta>
+                            <properties>
+                                <property name="target_field" type="single_select" colspan="6" mandatory="true">
+                                    <meta>
+                                        <title lang="en">Target Block Field</title>
+                                        <title lang="tr">Hedef Blok Alanı</title>
+                                    </meta>
+                                    <tag name="sulu.block_preview" priority="200"/>
+                                    <params>
+                                        <param name="values" type="collection"/>
+                                    </params>
+                                </property>
+                                <property name="source_field" type="single_select" colspan="6" mandatory="true">
+                                    <meta>
+                                        <title lang="en">Source Field</title>
+                                        <title lang="tr">Kaynak Alanı</title>
+                                    </meta>
+                                    <tag name="sulu.block_preview" priority="100"/>
+                                    <params>
+                                        <param name="values" type="collection"/>
+                                    </params>
+                                </property>
+                            </properties>
+                        </type>
+                    </types>
+                </block>
+
+                <property name="dynamic_condition_enabled" type="checkbox" colspan="12" mandatory="false"
+                          visibleCondition="__parent.dynamic_source != null and __parent.dynamic_source != 'none' and __parent.dynamic_source != ''">
+                    <meta>
+                        <title lang="en">Enable Display Condition</title>
+                        <title lang="tr">Gösterim Koşulunu Etkinleştir</title>
+                    </meta>
+                </property>
+
+                <property name="dynamic_condition_field" type="single_select" colspan="4" mandatory="false"
+                          visibleCondition="__parent.dynamic_source != null and __parent.dynamic_source != 'none' and __parent.dynamic_source != '' and __parent.dynamic_condition_enabled == true">
+                    <meta>
+                        <title lang="en">Condition Field</title>
+                        <title lang="tr">Koşul Alanı</title>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="title"/>
+                        <param name="values" type="collection"/>
+                    </params>
+                </property>
+
+                <property name="dynamic_condition_operator" type="single_select" colspan="4" mandatory="false"
+                          visibleCondition="__parent.dynamic_source != null and __parent.dynamic_source != 'none' and __parent.dynamic_source != '' and __parent.dynamic_condition_enabled == true">
+                    <meta>
+                        <title lang="en">Condition Operator</title>
+                        <title lang="tr">Koşul Operatörü</title>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="not_empty"/>
+                        <param name="values" type="collection">
+                            <param name="not_empty">
+                                <meta>
+                                    <title lang="en">Is Not Empty</title>
+                                    <title lang="tr">Boş Değil</title>
+                                </meta>
+                            </param>
+                            <param name="is_empty">
+                                <meta>
+                                    <title lang="en">Is Empty</title>
+                                    <title lang="tr">Boş</title>
+                                </meta>
+                            </param>
+                            <param name="equals">
+                                <meta>
+                                    <title lang="en">Equals</title>
+                                    <title lang="tr">Eşittir</title>
+                                </meta>
+                            </param>
+                            <param name="not_equals">
+                                <meta>
+                                    <title lang="en">Does Not Equal</title>
+                                    <title lang="tr">Eşit Değildir</title>
+                                </meta>
+                            </param>
+                            <param name="contains">
+                                <meta>
+                                    <title lang="en">Contains</title>
+                                    <title lang="tr">İçerir</title>
+                                </meta>
+                            </param>
+                            <param name="not_contains">
+                                <meta>
+                                    <title lang="en">Does Not Contain</title>
+                                    <title lang="tr">İçermez</title>
+                                </meta>
+                            </param>
+                            <param name="starts_with">
+                                <meta>
+                                    <title lang="en">Starts With</title>
+                                    <title lang="tr">İle Başlar</title>
+                                </meta>
+                            </param>
+                            <param name="ends_with">
+                                <meta>
+                                    <title lang="en">Ends With</title>
+                                    <title lang="tr">İle Biter</title>
+                                </meta>
+                            </param>
+                            <param name="in">
+                                <meta>
+                                    <title lang="en">In List</title>
+                                    <title lang="tr">Listede Var</title>
+                                </meta>
+                            </param>
+                            <param name="gt">
+                                <meta>
+                                    <title lang="en">Greater Than</title>
+                                    <title lang="tr">Büyüktür</title>
+                                </meta>
+                            </param>
+                            <param name="gte">
+                                <meta>
+                                    <title lang="en">Greater Than or Equal</title>
+                                    <title lang="tr">Büyük veya Eşittir</title>
+                                </meta>
+                            </param>
+                            <param name="lt">
+                                <meta>
+                                    <title lang="en">Less Than</title>
+                                    <title lang="tr">Küçüktür</title>
+                                </meta>
+                            </param>
+                            <param name="lte">
+                                <meta>
+                                    <title lang="en">Less Than or Equal</title>
+                                    <title lang="tr">Küçük veya Eşittir</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="dynamic_condition_value" type="text_line" colspan="4" mandatory="false"
+                          visibleCondition="__parent.dynamic_source != null and __parent.dynamic_source != 'none' and __parent.dynamic_source != '' and __parent.dynamic_condition_enabled == true and __parent.dynamic_condition_operator != 'not_empty' and __parent.dynamic_condition_operator != 'is_empty'">
+                    <meta>
+                        <title lang="en">Expected Value</title>
+                        <title lang="tr">Beklenen Değer</title>
+                    </meta>
+                </property>
+            </properties>
+        </section>
+    </properties>
+</form>
