@@ -167,14 +167,16 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
                 [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_WEBSITE => true],
             );
 
-            $article ??= $this->articleRepository->findOneBy(
-                [
-                    'uuid' => \trim($uuid),
-                    'locale' => $resolvedLocale,
-                    'stage' => DimensionContentInterface::STAGE_DRAFT,
-                ],
-                [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_ADMIN => true],
-            );
+            if (null === $article && $this->isPreviewContext()) {
+                $article = $this->articleRepository->findOneBy(
+                    [
+                        'uuid' => \trim($uuid),
+                        'locale' => $resolvedLocale,
+                        'stage' => DimensionContentInterface::STAGE_DRAFT,
+                    ],
+                    [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_ADMIN => true],
+                );
+            }
 
             return null !== $article ? $this->normalizeArticleEntity($article, $resolvedLocale) : null;
         } catch (\Throwable) {
@@ -434,25 +436,38 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
         /** @var iterable<ArticleDimensionContentInterface> $dimensionContents */
         $dimensionContents = $article->getDimensionContents();
 
-        $fallback = null;
+        $isPreview = $this->isPreviewContext();
+        $draftFallback = null;
         foreach ($dimensionContents as $content) {
             if ($content->getLocale() === $locale) {
-                if (DimensionContentInterface::STAGE_LIVE === $content->getStage()) {
+                $stage = $content->getStage();
+                if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
                     return $content;
                 }
-                $fallback ??= $content;
+                if ($isPreview && DimensionContentInterface::STAGE_DRAFT === $stage) {
+                    $draftFallback ??= $content;
+                }
             }
         }
 
-        if (null !== $fallback) {
-            return $fallback;
+        return $draftFallback;
+    }
+
+    private function isPreviewContext(): bool
+    {
+        $request = $this->requestStack?->getCurrentRequest();
+        if (null === $request) {
+            return false;
         }
 
-        foreach ($dimensionContents as $content) {
-            return $content;
-        }
+        $provider = $request->query->get('provider');
+        $route = $request->attributes->get('_route');
 
-        return null;
+        return ('articles' === $provider || 'pages' === $provider || 'snippets' === $provider)
+            || $request->query->getBoolean('preview')
+            || $request->attributes->getBoolean('preview')
+            || $request->attributes->getBoolean('_sulu_preview')
+            || (\is_string($route) && \str_starts_with($route, 'sulu_preview'));
     }
 
     private function firstNonEmptyString(mixed ...$candidates): ?string

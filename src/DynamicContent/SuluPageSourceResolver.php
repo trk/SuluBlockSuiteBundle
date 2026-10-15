@@ -211,8 +211,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
 
         // 1. Preview request query parameter (?provider=pages&id=UUID)
         $previewId = $request->query->get('id');
-        $provider = $request->query->get('provider');
-        if (('pages' === $provider || null === $provider) && \is_string($previewId) && '' !== \trim($previewId)) {
+        if ($this->isPreviewContext() && \is_string($previewId) && '' !== \trim($previewId)) {
             $resolved = $this->resolvePage(\trim($previewId), $locale);
             if (null !== $resolved) {
                 return $resolved;
@@ -799,18 +798,22 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         /** @var iterable<PageDimensionContentInterface> $dimensionContents */
         $dimensionContents = $page->getDimensionContents();
 
-        $fallback = null;
+        $isPreview = $this->isPreviewContext();
+        $draftFallback = null;
         foreach ($dimensionContents as $content) {
             if ($content->getLocale() === $locale) {
-                if (DimensionContentInterface::STAGE_LIVE === $content->getStage()) {
+                $stage = $content->getStage();
+                if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
                     return $content;
                 }
-                $fallback ??= $content;
+                if ($isPreview && DimensionContentInterface::STAGE_DRAFT === $stage) {
+                    $draftFallback ??= $content;
+                }
             }
         }
 
-        if (null !== $fallback) {
-            return $fallback;
+        if (null !== $draftFallback) {
+            return $draftFallback;
         }
 
         // If localized dimension content was not initialized on this entity (e.g. parent proxy), reload it
@@ -819,17 +822,6 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             if (null !== $reloaded) {
                 return $this->extractDimensionContent($reloaded, $locale, false);
             }
-        }
-
-        // Secondary fallback: check unlocalized
-        foreach ($dimensionContents as $content) {
-            if (null === $content->getLocale() || '' === $content->getLocale()) {
-                return $content;
-            }
-        }
-
-        foreach ($dimensionContents as $content) {
-            return $content;
         }
 
         return null;
@@ -856,6 +848,10 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
                 return $pageEntity;
             }
 
+            if (!$this->isPreviewContext()) {
+                return null;
+            }
+
             return $this->pageRepository->findOneBy(
                 [
                     'uuid' => $trimId,
@@ -867,6 +863,23 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function isPreviewContext(): bool
+    {
+        $request = $this->requestStack?->getCurrentRequest();
+        if (null === $request) {
+            return false;
+        }
+
+        $provider = $request->query->get('provider');
+        $route = $request->attributes->get('_route');
+
+        return ('pages' === $provider || 'articles' === $provider || 'snippets' === $provider)
+            || $request->query->getBoolean('preview')
+            || $request->attributes->getBoolean('preview')
+            || $request->attributes->getBoolean('_sulu_preview')
+            || (\is_string($route) && \str_starts_with($route, 'sulu_preview'));
     }
 
     /**

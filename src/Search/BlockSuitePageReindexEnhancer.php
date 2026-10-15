@@ -215,7 +215,10 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
             }
 
             foreach ($snippet->getDimensionContents() as $content) {
-                if ($content->getLocale() !== $locale) {
+                if (
+                    $content->getLocale() !== $locale
+                    || DimensionContentInterface::STAGE_LIVE !== $content->getStage()
+                ) {
                     continue;
                 }
 

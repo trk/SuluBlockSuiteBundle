@@ -532,4 +532,37 @@ class SuluPageSourceResolverTest extends TestCase
         $this->assertStringEndsWith('...', $result['summary']);
         $this->assertSame(['id' => 77, 'url' => '/media/77.jpg'], $result['image']);
     }
+
+    public function testResolvePageDoesNotLeakDraftOrOtherLocaleOnPublicWebsite(): void
+    {
+        $draftEn = $this->createStub(PageDimensionContentInterface::class);
+        $draftEn->method('getLocale')->willReturn('en');
+        $draftEn->method('getStage')->willReturn('draft');
+        $draftEn->method('getTitle')->willReturn('Secret Draft EN');
+
+        $liveDe = $this->createStub(PageDimensionContentInterface::class);
+        $liveDe->method('getLocale')->willReturn('de');
+        $liveDe->method('getStage')->willReturn('live');
+        $liveDe->method('getTitle')->willReturn('German Live Title');
+
+        $pageStub = $this->createStub(PageInterface::class);
+        $pageStub->method('getUuid')->willReturn('unpublished-en-page');
+        $pageStub->method('getDimensionContents')->willReturn(new ArrayCollection([$draftEn, $liveDe]));
+
+        $resolver = new SuluPageSourceResolver();
+        $this->assertNull($resolver->resolvePage($pageStub, 'en'));
+    }
+
+    public function testResolveFromRequestIgnoresQueryIdWhenNotPreviewRequest(): void
+    {
+        $pageRepositoryMock = $this->createMock(PageRepositoryInterface::class);
+        $pageRepositoryMock->expects($this->never())->method('findOneBy');
+
+        $request = new Request(query: ['id' => 'hijacked-uuid-999']);
+        $requestStack = new RequestStack();
+        $requestStack->push($request);
+
+        $resolver = new SuluPageSourceResolver($pageRepositoryMock, null, $requestStack);
+        $this->assertNull($resolver->resolvePage(null, 'en'));
+    }
 }

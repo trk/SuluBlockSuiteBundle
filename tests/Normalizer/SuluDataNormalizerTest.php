@@ -65,6 +65,13 @@ final class SuluDataNormalizerTest extends TestCase
         $this->assertSame('/object-url', SuluDataNormalizer::resolveUrl($linkObj));
         $this->assertSame('#', SuluDataNormalizer::resolveUrl(null));
         $this->assertSame('/fallback', SuluDataNormalizer::resolveUrl(null, '/fallback'));
+
+        // Reject dangerous URL schemes
+        $this->assertSame('#', SuluDataNormalizer::resolveUrl('javascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::resolveUrl(" \t\nJavaScript:alert(1)"));
+        $this->assertSame('#', SuluDataNormalizer::resolveUrl(['url' => 'data:text/html,<script>alert(1)</script>']));
+        $this->assertSame('/safe', SuluDataNormalizer::resolveUrl(['href' => 'vbscript:msgbox(1)'], '/safe'));
+        $this->assertNull(SuluDataNormalizer::resolveImageUrl('javascript:alert(1)'));
     }
 
     public function testResolveImageUrlHandlesStringsArraysAndObjects(): void

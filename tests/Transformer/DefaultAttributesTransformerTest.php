@@ -109,12 +109,41 @@ final class DefaultAttributesTransformerTest extends TestCase
 
     public function testParseAttributesRejectsInlineEventHandlers(): void
     {
-        $attrs = DefaultAttributesTransformer::parseAttributes("data-track=\"hero\"\nonclick=\"alert(1)\"\nONMOUSEOVER=hack()\naria-expanded=\"false\"\ndisabled");
+        $attrs = DefaultAttributesTransformer::parseAttributes("data-track=\"hero\"\nonclick=\"alert(1)\"\nONMOUSEOVER=hack()\naria-expanded=\"false\"\ndisabled\nhref=\"javascript:alert(1)\"\nsrcdoc=\"<script>alert(1)</script>\"");
 
         $this->assertSame('hero', $attrs['data-track'] ?? null);
         $this->assertSame('false', $attrs['aria-expanded'] ?? null);
         $this->assertTrue($attrs['disabled'] ?? false);
         $this->assertArrayNotHasKey('onclick', $attrs);
         $this->assertArrayNotHasKey('ONMOUSEOVER', $attrs);
+        $this->assertArrayNotHasKey('href', $attrs);
+        $this->assertArrayNotHasKey('srcdoc', $attrs);
+    }
+
+    public function testScopeCssPreventsNestedStyleTagBreakoutAndImportInjection(): void
+    {
+        $malicious = 'color: red;</sty</style>le><img src=x onerror=alert(1)>@import url("https://evil.test/x.css");';
+        $scoped = DefaultAttributesTransformer::scopeCss($malicious, '#safe-el');
+
+        $this->assertStringNotContainsString('<', $scoped);
+        $this->assertStringNotContainsString('>', $scoped);
+        $this->assertStringNotContainsString('</style', $scoped);
+        $this->assertStringNotContainsString('@import', $scoped);
+        $this->assertStringContainsString('#safe-el { color: red; }', $scoped);
+    }
+
+    public function testSanitizeAttributesArrayFiltersEventHandlersAndDangerousSchemes(): void
+    {
+        $sanitized = DefaultAttributesTransformer::sanitizeAttributesArray([
+            'id' => 'ignored-id',
+            'class' => 'ignored-class',
+            'onfocus' => 'alert(1)',
+            'href' => " \tjavascript:alert(1)",
+            'data-hs-overlay' => '#modal-1',
+            'disabled' => true,
+            'hidden' => false,
+        ]);
+
+        $this->assertSame(['data-hs-overlay' => '#modal-1', 'disabled' => true], $sanitized);
     }
 }

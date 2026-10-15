@@ -165,4 +165,40 @@ final class BlockSuitePageReindexEnhancerTest extends TestCase
         self::assertContains('Top level plain summary text.', $content);
         self::assertContains('Top level rich body content.', $content);
     }
+
+    public function testEnhanceDocumentSkipsDraftReusableSnippet(): void
+    {
+        $draftDimension = $this->createStub(SnippetDimensionContentInterface::class);
+        $draftDimension->method('getLocale')->willReturn('en');
+        $draftDimension->method('getStage')->willReturn(DimensionContentInterface::STAGE_DRAFT);
+        $draftDimension->method('getTemplateData')->willReturn([
+            'title' => 'Unpublished Draft Snippet Title',
+            'blocks' => [
+                ['type' => 'headline', 'title' => 'Unpublished Draft Headline'],
+            ],
+        ]);
+
+        $snippet = $this->createStub(SnippetInterface::class);
+        $snippet->method('getDimensionContents')->willReturn(
+            new \Doctrine\Common\Collections\ArrayCollection([$draftDimension]),
+        );
+
+        $snippetRepository = $this->createStub(SnippetRepositoryInterface::class);
+        $snippetRepository->method('findOneBy')->willReturn($snippet);
+
+        $enhancer = new BlockSuitePageReindexEnhancer($snippetRepository);
+        $enhanced = $enhancer->enhanceDocument([
+            'locale' => 'en',
+            'templateData' => [
+                'blocks' => [
+                    ['type' => 'reusable', 'snippet' => 'draft-snippet-uuid'],
+                ],
+            ],
+        ], ['id' => 'page-1', 'content' => []]);
+
+        /** @var list<string> $content */
+        $content = $enhanced['content'];
+        self::assertNotContains('Unpublished Draft Snippet Title', $content);
+        self::assertNotContains('Unpublished Draft Headline', $content);
+    }
 }

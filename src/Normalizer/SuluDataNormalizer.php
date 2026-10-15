@@ -51,17 +51,20 @@ final class SuluDataNormalizer
     }
 
     /**
-     * Resolves a Sulu link structure, object, or plain URL string into an href string.
+     * Resolves a Sulu link structure, object, or plain URL string into a safe href string.
      */
     public static function resolveUrl(mixed $link, string $fallback = '#'): string
     {
         if (\is_string($link)) {
-            return '' !== \trim($link) ? $link : $fallback;
+            return self::sanitizeUrl($link, $fallback);
         }
 
         if (\is_array($link)) {
             if (isset($link['url']) && \is_string($link['url']) && '' !== \trim($link['url'])) {
-                $url = $link['url'];
+                $url = self::sanitizeUrl($link['url'], '');
+                if ('' === $url) {
+                    return $fallback;
+                }
                 if (isset($link['anchor']) && \is_string($link['anchor']) && '' !== $link['anchor']) {
                     $url .= '#' . \ltrim($link['anchor'], '#');
                 }
@@ -70,7 +73,7 @@ final class SuluDataNormalizer
             }
 
             if (isset($link['href']) && \is_string($link['href']) && '' !== \trim($link['href'])) {
-                return $link['href'];
+                return self::sanitizeUrl($link['href'], $fallback);
             }
         }
 
@@ -78,11 +81,29 @@ final class SuluDataNormalizer
             /** @var mixed $url */
             $url = $link->getUrl();
             if (\is_string($url) && '' !== $url) {
-                return $url;
+                return self::sanitizeUrl($url, $fallback);
             }
         }
 
         return $fallback;
+    }
+
+    /**
+     * Sanitize a URL string by rejecting executable schemes (javascript:, vbscript:, data:).
+     */
+    public static function sanitizeUrl(string $url, string $fallback = '#'): string
+    {
+        $trimmed = \trim($url);
+        if ('' === $trimmed) {
+            return $fallback;
+        }
+
+        $normalized = (string) \preg_replace('/[\x00-\x20]+/', '', $trimmed);
+        if (1 === \preg_match('/^(?:javascript|vbscript|data):/i', $normalized)) {
+            return $fallback;
+        }
+
+        return $trimmed;
     }
 
     /**
@@ -95,25 +116,25 @@ final class SuluDataNormalizer
         }
 
         if (\is_string($media)) {
-            return '' !== \trim($media) ? $media : $fallback;
+            return self::sanitizeNullableUrl($media, $fallback);
         }
 
         if (\is_array($media)) {
             if (null !== $preferredFormat && isset($media['formats']) && \is_array($media['formats'])) {
                 $candidate = $media['formats'][$preferredFormat] ?? null;
                 if (\is_string($candidate) && '' !== \trim($candidate)) {
-                    return $candidate;
+                    return self::sanitizeNullableUrl($candidate, $fallback);
                 }
             }
 
             if (isset($media['url']) && \is_string($media['url']) && '' !== \trim($media['url'])) {
-                return $media['url'];
+                return self::sanitizeNullableUrl($media['url'], $fallback);
             }
 
             if (isset($media['formats']) && \is_array($media['formats'])) {
                 $first = \reset($media['formats']);
                 if (\is_string($first) && '' !== \trim($first)) {
-                    return $first;
+                    return self::sanitizeNullableUrl($first, $fallback);
                 }
             }
 
@@ -127,7 +148,7 @@ final class SuluDataNormalizer
                 /** @var mixed $url */
                 $url = $media->getUrl();
                 if (\is_string($url) && '' !== $url) {
-                    return $url;
+                    return self::sanitizeNullableUrl($url, $fallback);
                 }
             }
 
@@ -136,18 +157,25 @@ final class SuluDataNormalizer
                 $formats = $media->getFormats();
                 if (\is_array($formats) && [] !== $formats) {
                     if (null !== $preferredFormat && isset($formats[$preferredFormat]) && \is_string($formats[$preferredFormat]) && '' !== $formats[$preferredFormat]) {
-                        return $formats[$preferredFormat];
+                        return self::sanitizeNullableUrl($formats[$preferredFormat], $fallback);
                     }
 
                     $first = \reset($formats);
                     if (\is_string($first) && '' !== $first) {
-                        return $first;
+                        return self::sanitizeNullableUrl($first, $fallback);
                     }
                 }
             }
         }
 
         return $fallback;
+    }
+
+    private static function sanitizeNullableUrl(string $url, ?string $fallback = null): ?string
+    {
+        $sanitized = self::sanitizeUrl($url, '');
+
+        return '' !== $sanitized ? $sanitized : $fallback;
     }
 
     /**

@@ -80,9 +80,10 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
         $scopedCss = null;
         if (\is_string($rawCss) && '' !== \trim($rawCss)) {
             if (null === $elementId || '' === $elementId) {
-                // Generate a stable unique element ID for CSS scoping
+                // Generate a stable unique element ID for CSS scoping without PHP object serialization
                 $blockType = isset($block['type']) && \is_scalar($block['type']) ? (string) $block['type'] : '';
-                $blockHash = \substr(\md5(\serialize($block) . $blockType), 0, 8);
+                $encoded = \json_encode($block, \JSON_PARTIAL_OUTPUT_ON_ERROR);
+                $blockHash = \substr(\md5((false !== $encoded ? $encoded : '') . $blockType), 0, 8);
                 $elementId = 'el-' . $blockHash;
             }
 
@@ -128,7 +129,8 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
     }
 
     /**
-     * Parse multi-line key=value custom HTML attributes safely, rejecting inline JS event handlers.
+     * Parse multi-line key=value custom HTML attributes safely, rejecting inline JS event handlers
+     * and dangerous URL schemes.
      *
      * @return array<string, string|bool>
      */
@@ -148,14 +150,8 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
 
             $parts = \explode('=', $line, 2);
             $attrName = \trim($parts[0]);
-            $lowerName = \strtolower($attrName);
 
-            if (
-                '' === $attrName
-                || \in_array($lowerName, ['id', 'class'], true)
-                || \str_starts_with($lowerName, 'on')
-                || 1 !== \preg_match('/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/', $attrName)
-            ) {
+            if (!self::isAllowedAttributeName($attrName)) {
                 continue;
             }
 
@@ -163,6 +159,9 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
                 $val = \trim($parts[1]);
                 // Strip surrounding quotes if present
                 $unquoted = (string) \preg_replace('/^([\'"])(.*)(\1)$/', '$2', $val);
+                if (!self::isAllowedAttributeValue($attrName, $unquoted)) {
+                    continue;
+                }
                 $attributes[$attrName] = $unquoted;
             } else {
                 $attributes[$attrName] = true;
@@ -173,28 +172,125 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
     }
 
     /**
+     * Sanitize an associative array of custom attributes, enforcing the same security rules as parseAttributes().
+     *
+     * @param array<mixed, mixed> $rawAttributes
+     *
+     * @return array<string, string|bool>
+     */
+    public static function sanitizeAttributesArray(array $rawAttributes): array
+    {
+        /** @var array<string, string|bool> $sanitized */
+        $sanitized = [];
+        foreach ($rawAttributes as $name => $value) {
+            if (!\is_string($name)) {
+                continue;
+            }
+            $attrName = \trim($name);
+            if (!self::isAllowedAttributeName($attrName)) {
+                continue;
+            }
+
+            if (\is_bool($value)) {
+                if ($value) {
+                    $sanitized[$attrName] = true;
+                }
+                continue;
+            }
+
+            if (\is_scalar($value)) {
+                $strVal = (string) $value;
+                if (!self::isAllowedAttributeValue($attrName, $strVal)) {
+                    continue;
+                }
+                $sanitized[$attrName] = $strVal;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    private static function isAllowedAttributeName(string $attrName): bool
+    {
+        if ('' === $attrName) {
+            return false;
+        }
+
+        $lowerName = \strtolower($attrName);
+        if (
+            \in_array($lowerName, ['id', 'class', 'srcdoc'], true)
+            || \str_starts_with($lowerName, 'on')
+            || 1 !== \preg_match('/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/', $attrName)
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function isAllowedAttributeValue(string $attrName, string $value): bool
+    {
+        $lowerName = \strtolower($attrName);
+        if (\in_array($lowerName, ['href', 'src', 'xlink:href', 'action', 'formaction', 'data', 'poster'], true)) {
+            $normalized = (string) \preg_replace('/[\x00-\x20]+/', '', $value);
+            if (1 === \preg_match('/^(?:javascript|vbscript|data):/i', $normalized)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Sanitize pre-scoped or raw CSS so it cannot break out of a <style> tag or execute script expressions.
+     */
+    public static function sanitizeCssFragment(string $css): string
+    {
+        $clean = \trim($css);
+        if ('' === $clean) {
+            return '';
+        }
+
+        do {
+            $previous = $clean;
+            $clean = (string) \preg_replace('/<script\b[^<>]*>.*?<\/script>/is', '', $clean);
+            $clean = (string) \preg_replace('/<\/?[a-zA-Z!\/?][^<>]*>/s', '', $clean);
+        } while ($clean !== $previous);
+
+        // Strip any remaining angle brackets so </style> breakout is impossible
+        $clean = \str_replace(['<', '>'], '', $clean);
+
+        // Strip @import and legacy script expressions
+        $clean = (string) \preg_replace('/@import\b[^;{}]*;?/i', '', $clean);
+        $clean = (string) \preg_replace('/expression\s*\([^)]*\)/i', '', $clean);
+        $clean = (string) \preg_replace('/url\s*\(\s*[\'"]?\s*(?:javascript|vbscript|data):[^)]*\)/i', 'none', $clean);
+
+        return \trim($clean);
+    }
+
+    /**
      * Scope CSS by replacing .el-element with the prefix, wrapping bare declarations,
      * or prepending the prefix to each rule selector.
      */
     public static function scopeCss(string $css, string $prefix): string
     {
-        $withoutScripts = (string) \preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', \trim($css));
-        $cleanCss = (string) \preg_replace('/<\/?\s*(style|script)[^>]*>/i', '', $withoutScripts);
-        if ('' === \trim($cleanCss)) {
+        $cleanCss = self::sanitizeCssFragment($css);
+        $cleanPrefix = self::sanitizeCssFragment($prefix);
+        if ('' === $cleanCss || '' === $cleanPrefix) {
             return '';
         }
 
         if (\str_contains($cleanCss, '.el-element')) {
-            $scoped = \str_replace('.el-element', $prefix, $cleanCss);
+            $scoped = \str_replace('.el-element', $cleanPrefix, $cleanCss);
         } elseif (!\str_contains($cleanCss, '{')) {
             $declarations = \rtrim(\trim($cleanCss), ';');
-            $scoped = $prefix . ' { ' . $declarations . '; }';
+            $scoped = $cleanPrefix . ' { ' . $declarations . '; }';
         } else {
             // Match CSS rule blocks: selector { declarations }
-            $pattern = '/([@#:.\w[\]][\\\\@#:,<>~="\'+\-^$.()\w\s[\]*]*)({[^{}]+})/u';
+            $pattern = '/([@#:.\w[\]][\\\\@#:,~="\'+\-^$.()\w\s[\]*]*)({[^{}]+})/u';
             $scoped = (string) \preg_replace_callback(
                 $pattern,
-                static function (array $matches) use ($prefix): string {
+                static function (array $matches) use ($cleanPrefix): string {
                     $selector = \trim((string) $matches[1]);
                     $body = (string) $matches[2];
 
@@ -204,7 +300,7 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
                     }
 
                     $selectors = \array_map('trim', \explode(',', $selector));
-                    $prefixed = \array_map(static fn (string $s): string => $prefix . ' ' . $s, $selectors);
+                    $prefixed = \array_map(static fn (string $s): string => $cleanPrefix . ' ' . $s, $selectors);
 
                     return \implode(', ', $prefixed) . ' ' . $body;
                 },
