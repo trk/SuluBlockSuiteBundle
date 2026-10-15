@@ -12,8 +12,8 @@ import styles from './tabSection.scss';
 
 const TAB_ICONS: {[string]: string} = {
     content: 'su-document',
-    settings: 'su-sliders',
-    style: 'su-brush',
+    settings: 'su-brush',
+    style: 'su-paint',
     layout: 'su-columns',
     general: 'su-cog',
     dynamic_content: 'su-sync',
@@ -69,7 +69,7 @@ function resolveTabIcon(tabKey: string, tabSchema: Object): string {
         }
     }
 
-    return TAB_ICONS[tabKey] || 'su-sliders';
+    return TAB_ICONS[tabKey] || 'su-cog';
 }
 
 type Props = {

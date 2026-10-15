@@ -7,13 +7,17 @@ import {
     Dialog,
     Form,
     Input,
-    SingleSelect,
 } from 'sulu-admin-bundle/components';
 import {translate} from 'sulu-admin-bundle/utils';
 import {Requester} from 'sulu-admin-bundle/services';
 import snackbarStore from 'sulu-admin-bundle/stores/snackbarStore';
 import PresetGallery from './PresetGallery';
 import blockPropsStyles from './presetSelection.scss';
+
+const t = (key: string, fallback: string): string => {
+    const translated = translate(key);
+    return translated && translated !== key ? translated : fallback;
+};
 
 type PresetItem = {
     description?: ?string,
@@ -23,40 +27,6 @@ type PresetItem = {
     title: string,
     values?: ?Object,
 };
-
-type PresetSelectProps = {
-    disabled?: boolean,
-    onChange: (presetId: ?string, preset: ?PresetItem) => void,
-    presets: Array<PresetItem>,
-    value: ?string,
-};
-
-@observer
-export class PresetSelect extends React.Component<PresetSelectProps> {
-    handleChange = (presetId: ?string) => {
-        const {onChange, presets} = this.props;
-        const presetList = presets ? (Array.isArray(presets) ? presets : Array.from(presets)) : [];
-        const selected = presetList.find((p) => p.id === presetId) || null;
-        onChange(presetId || null, selected);
-    };
-
-    render() {
-        const {disabled, presets, value} = this.props;
-        const noPresetLabel = translate('sulu_block_suite.no_preset') || 'Custom Configuration (No Preset)';
-        const presetList = presets ? (Array.isArray(presets) ? presets : Array.from(presets)) : [];
-
-        return (
-            <SingleSelect disabled={disabled} onChange={this.handleChange} value={value || ''}>
-                <SingleSelect.Option value="">{noPresetLabel}</SingleSelect.Option>
-                {presetList.map((preset) => (
-                    <SingleSelect.Option key={preset.id} value={preset.id}>
-                        {preset.title}
-                    </SingleSelect.Option>
-                ))}
-            </SingleSelect>
-        );
-    }
-}
 
 type SavePresetDialogProps = {
     componentType: string,
@@ -140,14 +110,14 @@ export class SavePresetDialog extends React.Component<SavePresetDialogProps> {
             .then(action((createdPreset: PresetItem) => {
                 this.saving = false;
                 snackbarStore.add({
-                    text: translate('sulu_block_suite.save_preset_success') || `Preset "${title}" saved successfully.`,
+                    text: t('sulu_block_suite.save_preset_success', `Preset "${title}" saved successfully.`),
                     type: 'success',
                 }, 3000);
                 onSuccess(createdPreset);
             }))
             .catch(action((errorResponse) => {
                 this.saving = false;
-                const defaultErr = translate('sulu_block_suite.save_preset_error') || 'Failed to save preset';
+                const defaultErr = t('sulu_block_suite.save_preset_error', 'Failed to save preset');
                 if (errorResponse && typeof errorResponse.json === 'function') {
                     errorResponse.json().then(action((errData) => {
                         this.error = (errData && errData.error) || defaultErr;
@@ -168,12 +138,12 @@ export class SavePresetDialog extends React.Component<SavePresetDialogProps> {
             return null;
         }
 
-        const titleText = translate('sulu_block_suite.save_preset_title') || 'Save as Style Preset';
-        const titleLabel = translate('sulu_block_suite.preset_title_label') || 'Preset Name';
-        const descLabel = translate('sulu_block_suite.preset_desc_label') || 'Description (Optional)';
-        const includeValuesLabel = translate('sulu_block_suite.include_content_values') || 'Include block content values (text, media, items)';
-        const cancelButton = translate('sulu_admin.cancel') || 'Cancel';
-        const saveButton = translate('sulu_admin.save') || 'Save';
+        const titleText = t('sulu_block_suite.save_preset_title', 'Save as Style Preset');
+        const titleLabel = t('sulu_block_suite.preset_title_label', 'Preset Name');
+        const descLabel = t('sulu_block_suite.preset_desc_label', 'Description (Optional)');
+        const includeValuesLabel = t('sulu_block_suite.include_content_values', 'Include block content values (text, media, items)');
+        const cancelButton = t('sulu_admin.cancel', 'Cancel');
+        const saveButton = t('sulu_admin.save', 'Save');
 
         return (
             <Dialog
@@ -223,7 +193,6 @@ export class SavePresetDialog extends React.Component<SavePresetDialogProps> {
 }
 
 export default {
-    Select: PresetSelect,
     SaveDialog: SavePresetDialog,
     Gallery: PresetGallery,
 };

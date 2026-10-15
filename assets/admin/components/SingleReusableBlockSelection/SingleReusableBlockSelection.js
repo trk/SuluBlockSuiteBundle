@@ -59,20 +59,25 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
     }
 
     @computed get t(): Object {
+        const tr = (key: string, fallback: string): string => {
+            const val = translate(key);
+            return val && val !== key ? val : fallback;
+        };
+
         return {
-            selectBlock: translate('sulu_block_suite.select_reusable_block') || 'Select Reusable Block',
-            changeBlock: translate('sulu_block_suite.change_reusable_block') || 'Change',
-            noBlockSelected: translate('sulu_block_suite.no_reusable_block_selected') || 'No Reusable Block Selected',
-            selectPrompt: translate('sulu_block_suite.reusable_block_select_prompt') || 'Choose a shared reusable block to display here.',
-            innerBlocks: translate('sulu_block_suite.reusable_block_inner_blocks') || 'blocks',
-            usedIn: translate('sulu_block_suite.reusable_block_used_in') || 'Used in',
-            resources: translate('sulu_block_suite.reusable_block_resources') || 'resources',
-            notInUse: translate('sulu_block_suite.reusable_block_not_in_use') || 'Not currently in use',
-            editMaster: translate('sulu_block_suite.open_in_new_tab') || 'Edit in New Tab',
-            modalTitle: translate('sulu_block_suite.reusable_block_modal_title') || 'Select Reusable Block',
-            searchPlaceholder: translate('sulu_block_suite.reusable_block_search_placeholder') || 'Search reusable blocks...',
-            noResults: translate('sulu_block_suite.reusable_block_no_results') || 'No reusable blocks found matching your query.',
-            loading: translate('sulu_block_suite.reusable_block_loading') || 'Loading reusable blocks...',
+            selectBlock: tr('sulu_block_suite.select_reusable_block', 'Select Reusable Block'),
+            changeBlock: tr('sulu_block_suite.change_reusable_block', 'Change'),
+            noBlockSelected: tr('sulu_block_suite.no_reusable_block_selected', 'No Reusable Block Selected'),
+            selectPrompt: tr('sulu_block_suite.reusable_block_select_prompt', 'Choose a shared reusable block to display here.'),
+            innerBlocks: tr('sulu_block_suite.reusable_block_inner_blocks', 'blocks'),
+            usedIn: tr('sulu_block_suite.reusable_block_used_in', 'Used in'),
+            resources: tr('sulu_block_suite.reusable_block_resources', 'resources'),
+            notInUse: tr('sulu_block_suite.reusable_block_not_in_use', 'Not currently in use'),
+            editMaster: tr('sulu_block_suite.open_in_new_tab', 'Edit in New Tab'),
+            modalTitle: tr('sulu_block_suite.reusable_block_modal_title', 'Select Reusable Block'),
+            searchPlaceholder: tr('sulu_block_suite.reusable_block_search_placeholder', 'Search reusable blocks...'),
+            noResults: tr('sulu_block_suite.reusable_block_no_results', 'No reusable blocks found matching your query.'),
+            loading: tr('sulu_block_suite.reusable_block_loading', 'Loading reusable blocks...'),
         };
     }
 
@@ -307,7 +312,7 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
 
                             <div className={styles.externalLinkAction}>
                                 <Button
-                                    icon="su-external-link"
+                                    icon="su-link"
                                     onClick={this.handleOpenMaster}
                                     size="small"
                                     skin="link"

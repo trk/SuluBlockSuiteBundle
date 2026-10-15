@@ -57,6 +57,8 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         'social' => true,
         'popover' => true,
         'map' => true,
+        'action-block-empty' => true,
+        'action-blocks' => true,
     ];
 
     private const EXCLUDED_TARGET_FIELDS = [
@@ -69,6 +71,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         'items' => true,
         'columns' => true,
         'blocks' => true,
+        'action-blocks' => true,
     ];
 
     /**

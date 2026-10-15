@@ -374,28 +374,25 @@ export default class PresetSelection extends React.Component<Props> {
         }
     };
 
+    t(key: string, fallback: string): string {
+        const translated = translate(key);
+        return translated && translated !== key ? translated : fallback;
+    }
+
     render() {
         const {disabled, value} = this.props;
         const currentPresetId = value ? String(value) : '';
         const activePreset = this.presets.find((p) => p.id === currentPresetId) || null;
 
-        const browseLabel = translate('sulu_block_suite.browse_presets') || 'Browse Presets';
-        const applyFullPreset = translate('sulu_block_suite.apply_full_preset') || 'Apply Content & Styles';
-        const saveAsPresetLabel = translate('sulu_block_suite.save_as_preset') || 'Save as Preset';
-        const saveAsReusableLabel = translate('sulu_block_suite.save_as_reusable') || 'Save as Reusable Block';
+        const browseLabel = this.t('sulu_block_suite.browse_presets', 'Browse Presets');
+        const applyFullPreset = this.t('sulu_block_suite.apply_full_preset', 'Apply Content & Styles');
+        const saveAsPresetLabel = this.t('sulu_block_suite.save_as_preset', 'Save as Preset');
+        const saveAsReusableLabel = this.t('sulu_block_suite.save_as_reusable', 'Save as Reusable Block');
+        const clearPresetLabel = this.t('sulu_block_suite.clear_preset', 'Clear Preset');
 
         return (
             <div className={styles.presetContainer}>
                 <div className={styles.presetRow}>
-                    <div className={styles.selectWrapper}>
-                        <Preset.Select
-                            disabled={disabled}
-                            onChange={this.handleSelectPreset}
-                            presets={this.presets}
-                            value={currentPresetId}
-                        />
-                    </div>
-
                     <div className={styles.actionGroup}>
                         {this.presets.length > 0 && (
                             <Button
@@ -420,7 +417,7 @@ export default class PresetSelection extends React.Component<Props> {
                         )}
                         <Button
                             disabled={disabled}
-                            icon="su-sliders"
+                            icon="su-magic"
                             onClick={this.handleOpenSavePreset}
                             skin="secondary"
                         >
@@ -429,7 +426,7 @@ export default class PresetSelection extends React.Component<Props> {
                         {this.componentType !== 'reusable' && (
                             <Button
                                 disabled={disabled}
-                                icon="su-clone"
+                                icon="su-snippet"
                                 onClick={this.handleOpenSaveReusable}
                                 skin="secondary"
                             >
@@ -458,10 +455,10 @@ export default class PresetSelection extends React.Component<Props> {
                             </div>
                         )}
                         <button
-                            aria-label={translate('sulu_block_suite.clear_preset') || 'Clear Preset'}
+                            aria-label={clearPresetLabel}
                             className={styles.clearPresetButton}
                             onClick={this.handleClearPreset}
-                            title={translate('sulu_block_suite.clear_preset') || 'Clear Preset'}
+                            title={clearPresetLabel}
                             type="button"
                         >
                             <Icon name="su-trash-alt" />

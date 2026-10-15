@@ -82,14 +82,15 @@ export default class PresetSelectionBlockPreviewTransformer implements BlockPrev
             const presetTitle = resolvePresetTitle(presetId, schema);
             badges.push(
                 <span className={styles.presetBadge} key="preset" title={`Preset: ${presetTitle}`}>
-                    <Icon name="su-sliders" />
+                    <Icon name="su-magic" />
                     <span>{presetTitle}</span>
                 </span>
             );
         }
 
         if (dynamicSource) {
-            const dynamicLabel = translate('sulu_block_suite.preview_dynamic') || 'Dynamic';
+            const rawDynamic = translate('sulu_block_suite.preview_dynamic');
+            const dynamicLabel = rawDynamic && rawDynamic !== 'sulu_block_suite.preview_dynamic' ? rawDynamic : 'Dynamic';
             badges.push(
                 <span className={styles.dynamicBadge} key="dynamic" title={`${dynamicLabel}: ${dynamicSource}`}>
                     <Icon name="su-sync" />

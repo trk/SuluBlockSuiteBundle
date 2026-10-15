@@ -14,6 +14,11 @@ import {Requester} from 'sulu-admin-bundle/services';
 import snackbarStore from 'sulu-admin-bundle/stores/snackbarStore';
 import blockPropsStyles from './presetSelection.scss';
 
+const t = (key: string, fallback: string): string => {
+    const translated = translate(key);
+    return translated && translated !== key ? translated : fallback;
+};
+
 type ReusableSnippet = {
     description?: ?string,
     id: string,
@@ -39,8 +44,8 @@ export class ReusableCard extends React.Component<ReusableCardProps> {
 
     render() {
         const {onChangeSnippet, snippet} = this.props;
-        const openInNewTabLabel = translate('sulu_block_suite.open_in_new_tab') || 'Edit in New Tab';
-        const changeLabel = translate('sulu_block_suite.change_reusable_block') || 'Change';
+        const openInNewTabLabel = t('sulu_block_suite.open_in_new_tab', 'Edit in New Tab');
+        const changeLabel = t('sulu_block_suite.change_reusable_block', 'Change');
 
         return (
             <div className={blockPropsStyles.reusableCard}>
@@ -151,14 +156,14 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
             .then(action((createdSnippet) => {
                 this.saving = false;
                 snackbarStore.add({
-                    text: translate('sulu_block_suite.save_reusable_success') || `Reusable block "${title}" created successfully.`,
+                    text: t('sulu_block_suite.save_reusable_success', `Reusable block "${title}" created successfully.`),
                     type: 'success',
                 }, 3000);
                 onSuccess(createdSnippet, this.convertBlock);
             }))
             .catch(action((errorResponse) => {
                 this.saving = false;
-                const defaultErr = translate('sulu_block_suite.save_reusable_error') || 'Failed to save reusable block';
+                const defaultErr = t('sulu_block_suite.save_reusable_error', 'Failed to save reusable block');
                 if (errorResponse && errorResponse.json) {
                     errorResponse.json().then(action((err) => {
                         this.error = err.error || defaultErr;
@@ -177,12 +182,12 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
             return null;
         }
 
-        const titleText = translate('sulu_block_suite.save_reusable_title') || 'Save as Reusable Block';
-        const titleLabel = translate('sulu_block_suite.reusable_title_label') || 'Reusable Block Title';
-        const descLabel = translate('sulu_block_suite.reusable_desc_label') || 'Description / Note (Optional)';
-        const convertBlockLabel = translate('sulu_block_suite.convert_to_reusable') || 'Replace current block with this Reusable Block';
-        const cancelButton = translate('sulu_admin.cancel') || 'Cancel';
-        const saveButton = translate('sulu_admin.save') || 'Save';
+        const titleText = t('sulu_block_suite.save_reusable_title', 'Save as Reusable Block');
+        const titleLabel = t('sulu_block_suite.reusable_title_label', 'Reusable Block Title');
+        const descLabel = t('sulu_block_suite.reusable_desc_label', 'Description / Note (Optional)');
+        const convertBlockLabel = t('sulu_block_suite.convert_to_reusable', 'Replace current block with this Reusable Block');
+        const cancelButton = t('sulu_admin.cancel', 'Cancel');
+        const saveButton = t('sulu_admin.save', 'Save');
 
         return (
             <Dialog

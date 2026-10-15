@@ -188,6 +188,8 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
             'social',
             'popover',
             'map',
+            'action-block-empty',
+            'action-blocks',
         ];
 
         $typedForm = new TypedFormMetadata();

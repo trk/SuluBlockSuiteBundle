@@ -37,7 +37,7 @@ export default class BlockCollectionBlockPreviewTransformer implements BlockPrev
 
         return (
             <span className={styles.childBlocksBadge} title={tooltip}>
-                <Icon name="su-layer" />
+                <Icon name="su-th-large" />
                 <span>{count} {unitLabel}</span>
             </span>
         );
