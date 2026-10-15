@@ -1026,4 +1026,91 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertSame('Dynamic Current Page Headline', $autoResult[0]['title']);
         self::assertSame('Dynamic Subtitle', $autoResult[0]['subtitle']);
     }
+
+    public function testExtractValueSupportsPipeFallbacksAndLengthModifier(): void
+    {
+        $hydrator = new DynamicContentHydrator();
+
+        $longHtml = '<p><strong>Sulu 3 Enterprise CMS</strong> delivers structured content management with Preline UI 5 and Tailwind CSS 4 for high-performance digital experiences across every channel and device worldwide.</p>';
+
+        $dataWithEmptyHeadlineAndSummary = [
+            'title' => 'Page Navigation Title',
+            'headline' => '',
+            'summary' => '   ',
+            'content' => $longHtml,
+        ];
+
+        self::assertSame(
+            'Page Navigation Title',
+            $hydrator->extractValue($dataWithEmptyHeadlineAndSummary, 'headline|title'),
+        );
+
+        $truncated = $hydrator->extractValue($dataWithEmptyHeadlineAndSummary, 'summary|content:length=160');
+        self::assertIsString($truncated);
+        self::assertLessThanOrEqual(160, \mb_strlen($truncated, 'UTF-8'));
+        self::assertStringStartsWith('Sulu 3 Enterprise CMS delivers structured content management', $truncated);
+        self::assertStringEndsWith('...', $truncated);
+        self::assertStringNotContainsString('<p>', $truncated);
+        self::assertStringNotContainsString('<strong>', $truncated);
+
+        $dataWithExplicitHeadlineAndSummary = [
+            'title' => 'Short Title',
+            'headline' => 'Custom Hero Display Headline',
+            'summary' => 'Concise custom summary.',
+            'content' => $longHtml,
+        ];
+
+        self::assertSame(
+            'Custom Hero Display Headline',
+            $hydrator->extractValue($dataWithExplicitHeadlineAndSummary, 'headline|title'),
+        );
+        self::assertSame(
+            'Concise custom summary.',
+            $hydrator->extractValue($dataWithExplicitHeadlineAndSummary, 'summary|content:length=160'),
+        );
+    }
+
+    public function testAutoMappingHydratesCardOverlayAndSlideshowContentFromSummaryOrTruncatedBody(): void
+    {
+        $longBody = '<p>' . \str_repeat('Modern Sulu 3 architecture with single source of truth content fields. ', 4) . '</p>';
+
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $sourceResolver->method('resolvePage')->willReturn([
+            'title' => 'Card Page Title',
+            'headline' => 'Card Display Headline',
+            'summary' => '',
+            'content' => $longBody,
+            'image' => ['id' => 99, 'url' => '/uploads/card.jpg'],
+            'url' => '/solutions/card-page',
+        ]);
+
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        foreach (['card', 'overlay', 'slideshow_item'] as $teaserBlockType) {
+            $block = [
+                'type' => $teaserBlockType,
+                'title' => '',
+                'content' => '',
+                'image' => null,
+                'link' => '',
+                'props' => [
+                    'dynamic_source' => 'specific_page',
+                    'dynamic_page_id' => 'page-123',
+                    'dynamic_mapping' => [],
+                ],
+            ];
+
+            $hydratedList = $hydrator->hydrateBlock($block);
+            self::assertCount(1, $hydratedList);
+            $hydrated = $hydratedList[0];
+
+            self::assertSame('Card Page Title', $hydrated['title']);
+            self::assertIsString($hydrated['content']);
+            self::assertLessThanOrEqual(160, \mb_strlen($hydrated['content'], 'UTF-8'));
+            self::assertStringNotContainsString('<p>', $hydrated['content']);
+            self::assertStringEndsWith('...', $hydrated['content']);
+            self::assertSame(['id' => 99, 'url' => '/uploads/card.jpg'], $hydrated['image']);
+            self::assertSame('/solutions/card-page', $hydrated['link']);
+        }
+    }
 }

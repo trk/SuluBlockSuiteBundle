@@ -11,6 +11,7 @@ use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator;
 
 /**
  * Built-in Dynamic Content source provider for Sulu 3 Articles (Single & Collection).
@@ -96,6 +97,7 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             ['name' => 'headline', 'label' => 'Headline', 'type' => 'text_line'],
             ['name' => 'summary', 'label' => 'Summary', 'type' => 'text_area'],
             ['name' => 'description', 'label' => 'Description', 'type' => 'text_editor'],
+            ['name' => 'content', 'label' => 'Content', 'type' => 'text_editor'],
             ['name' => 'image', 'label' => 'Image', 'type' => 'single_media_selection'],
             ['name' => 'url', 'label' => 'URL', 'type' => 'url'],
             ['name' => 'link', 'label' => 'Link', 'type' => 'link'],
@@ -328,7 +330,7 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
                 if (null !== $title) {
                     $articleData['title'] = $title;
                 }
-                $articleData['headline'] = $articleData['headline'] ?? ($articleData['title'] ?? null);
+                $articleData['headline'] = $this->firstNonEmptyString($articleData['headline'] ?? null, $articleData['title'] ?? null);
 
                 /** @var mixed $excerptDesc */
                 $excerptDesc = null;
@@ -340,9 +342,16 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
                     $excerptImage = $excerpt['image'] ?? null;
                 }
 
-                $articleData['summary'] = $articleData['summary'] ?? ($articleData['description'] ?? $excerptDesc);
-                $articleData['description'] = $articleData['description'] ?? $excerptDesc;
-                $articleData['image'] = $articleData['image'] ?? $excerptImage;
+                $rawSummary = $articleData['summary'] ?? null;
+                $rawDescription = $articleData['description'] ?? null;
+                $rawBodyContent = $this->firstNonEmptyString($articleData['content'] ?? null, $articleData['article'] ?? null);
+                if (null !== $rawBodyContent && !isset($articleData['content'])) {
+                    $articleData['content'] = $rawBodyContent;
+                }
+
+                $articleData['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, $excerptDesc, $rawBodyContent);
+                $articleData['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, $excerptDesc, $rawBodyContent);
+                $articleData['image'] = $this->firstNonEmptyMedia($articleData['image'] ?? null, $excerptImage);
 
                 if (isset($resolved['view']['url']) && \is_string($resolved['view']['url'])) {
                     $articleData['url'] = $resolved['view']['url'];
@@ -366,13 +375,19 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
         $articleData['uuid'] = $article->getUuid();
         $entityTitle = $dimensionContent->getTitle();
         $articleData['title'] = $entityTitle;
-        $existingHeadline = $articleData['headline'] ?? null;
-        if (!\is_string($existingHeadline) || '' === \trim($existingHeadline)) {
-            $articleData['headline'] = $entityTitle;
+        $articleData['headline'] = $this->firstNonEmptyString($articleData['headline'] ?? null, $entityTitle);
+
+        $excerptDesc = $dimensionContent->getExcerptDescription();
+        $rawSummary = $articleData['summary'] ?? null;
+        $rawDescription = $articleData['description'] ?? null;
+        $rawBodyContent = $this->firstNonEmptyString($articleData['content'] ?? null, $articleData['article'] ?? null);
+        if (null !== $rawBodyContent && !isset($articleData['content'])) {
+            $articleData['content'] = $rawBodyContent;
         }
-        $articleData['summary'] = $articleData['summary'] ?? ($articleData['description'] ?? $dimensionContent->getExcerptDescription());
-        $articleData['description'] = $articleData['description'] ?? $dimensionContent->getExcerptDescription();
-        $articleData['image'] = $articleData['image'] ?? $dimensionContent->getExcerptImage();
+
+        $articleData['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, $excerptDesc, $rawBodyContent);
+        $articleData['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, $excerptDesc, $rawBodyContent);
+        $articleData['image'] = $this->firstNonEmptyMedia($articleData['image'] ?? null, $dimensionContent->getExcerptImage());
 
         $route = $dimensionContent->getRoute();
         if (null !== $route) {
@@ -435,6 +450,57 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
 
         foreach ($dimensionContents as $content) {
             return $content;
+        }
+
+        return null;
+    }
+
+    private function firstNonEmptyString(mixed ...$candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            if (\is_string($candidate) && '' !== \trim($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveSummaryWithContentFallback(
+        mixed $summary,
+        mixed $description,
+        mixed $excerptDescription,
+        mixed $content,
+    ): ?string {
+        $resolved = $this->firstNonEmptyString($summary, $description, $excerptDescription);
+        if (null !== $resolved) {
+            return $resolved;
+        }
+
+        if (\is_string($content) && '' !== \trim($content)) {
+            $truncated = DynamicContentHydrator::truncatePlainText($content, 160);
+            if ('' !== $truncated) {
+                return $truncated;
+            }
+        }
+
+        return null;
+    }
+
+    private function firstNonEmptyMedia(mixed ...$candidates): mixed
+    {
+        foreach ($candidates as $candidate) {
+            if (null === $candidate) {
+                continue;
+            }
+            if (\is_string($candidate) && '' === \trim($candidate)) {
+                continue;
+            }
+            if (\is_array($candidate) && [] === $candidate) {
+                continue;
+            }
+
+            return $candidate;
         }
 
         return null;

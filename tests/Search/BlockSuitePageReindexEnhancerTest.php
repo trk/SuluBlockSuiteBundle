@@ -133,4 +133,36 @@ final class BlockSuitePageReindexEnhancerTest extends TestCase
         self::assertNotContains('Internal Card Name Should Not Be Indexed', $content);
         self::assertNotContains('.el-element { color: red; }', $content);
     }
+
+    public function testEnhanceDocumentIndexesTopLevelHeadlineSummaryContentAndImageMediaId(): void
+    {
+        $enhancer = new BlockSuitePageReindexEnhancer();
+
+        $queryResult = [
+            'locale' => 'en',
+            'templateData' => [
+                'headline' => 'Top Level Display Headline',
+                'summary' => 'Top level plain summary text.',
+                'content' => '<p>Top level <strong>rich body</strong> content.</p>',
+                'image' => ['id' => 42],
+                'blocks' => [],
+            ],
+        ];
+
+        $document = [
+            'id' => 'page-top-1',
+            'title' => 'Page Title',
+            'content' => [],
+        ];
+
+        $enhanced = $enhancer->enhanceDocument($queryResult, $document);
+
+        self::assertSame('42', $enhanced['mediaId'] ?? null);
+        self::assertIsArray($enhanced['content']);
+        /** @var list<string> $content */
+        $content = $enhanced['content'];
+        self::assertContains('Top Level Display Headline', $content);
+        self::assertContains('Top level plain summary text.', $content);
+        self::assertContains('Top level rich body content.', $content);
+    }
 }

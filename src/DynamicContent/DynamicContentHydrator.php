@@ -375,14 +375,41 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         $hydrated = $block;
 
         if ([] === $mapping) {
-            $autoCandidates = ['title', 'headline', 'subtitle', 'summary', 'description', 'content', 'image', 'link', 'url', 'badge', 'date', 'author'];
+            $blockType = isset($block['type']) && \is_string($block['type']) ? $block['type'] : '';
+            $isFullBodyBlock = \in_array($blockType, ['text', 'html', 'main_content', 'page_header', 'code'], true);
+
+            if (\array_key_exists('title', $block)) {
+                $mapping['title'] = 'title|headline';
+            }
+            if (\array_key_exists('headline', $block)) {
+                $mapping['headline'] = 'headline|title';
+            }
+            if (\array_key_exists('summary', $block)) {
+                $mapping['summary'] = 'summary|description|content:length=160';
+            }
+            if (\array_key_exists('description', $block)) {
+                $mapping['description'] = 'description|summary|content:length=160';
+            }
+            if (\array_key_exists('content', $block)) {
+                $mapping['content'] = (!$isFullBodyBlock && !\array_key_exists('summary', $block))
+                    ? 'summary|description|content:length=160'
+                    : 'content';
+            }
+            if (\array_key_exists('link', $block)) {
+                $mapping['link'] = 'link|url';
+            }
+            if (\array_key_exists('url', $block)) {
+                $mapping['url'] = 'url|link';
+            }
+
+            $autoCandidates = ['subtitle', 'image', 'badge', 'date', 'author'];
             foreach ($autoCandidates as $candidate) {
                 if (\array_key_exists($candidate, $block) && isset($pageData[$candidate]) && $this->isValuePresent($pageData[$candidate])) {
                     $mapping[$candidate] = $candidate;
                 }
             }
-            if ([] === $mapping && isset($pageData['title']) && $this->isValuePresent($pageData['title'])) {
-                $mapping['title'] = 'title';
+            if ([] === $mapping && (isset($pageData['title']) || isset($pageData['headline']))) {
+                $mapping['title'] = 'title|headline';
             }
         }
 
@@ -403,9 +430,84 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
     }
 
     /**
+     * Extracts a value from source data supporting dot-notation (`a.b`),
+     * pipe-separated fallback chains (`headline|title`, `summary|content:length=160`),
+     * and inline text modifiers (`:length=160`, `:limit=160`, `:truncate=160`, `:plain`).
+     *
      * @param array<string, mixed> $data
      */
     public function extractValue(array $data, string $path): mixed
+    {
+        $alternatives = \explode('|', $path);
+        $lastValue = null;
+
+        foreach ($alternatives as $rawCandidate) {
+            $candidate = \trim($rawCandidate);
+            if ('' === $candidate) {
+                continue;
+            }
+
+            $fieldPath = $candidate;
+            $maxLength = 0;
+            $stripHtml = false;
+
+            if (1 === \preg_match('/^([^:]+):(?:length|limit|truncate)=(\d+)$/i', $candidate, $matches)) {
+                $fieldPath = \trim($matches[1]);
+                $maxLength = (int) $matches[2];
+                $stripHtml = true;
+            } elseif (1 === \preg_match('/^([^:]+):plain$/i', $candidate, $matches)) {
+                $fieldPath = \trim($matches[1]);
+                $maxLength = 0;
+                $stripHtml = true;
+            }
+
+            $val = $this->extractSinglePathValue($data, $fieldPath);
+
+            if ($stripHtml && \is_scalar($val)) {
+                $val = self::truncatePlainText((string) $val, $maxLength);
+            }
+
+            $lastValue = $val;
+            if ($this->isValuePresent($val)) {
+                return $val;
+            }
+        }
+
+        return $lastValue;
+    }
+
+    public static function truncatePlainText(string $value, int $maxLength = 160): string
+    {
+        if ('' === \trim($value)) {
+            return '';
+        }
+
+        $spaced = \preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr|section|article)>|<br\s*\/?>/i', ' ', $value) ?? $value;
+        $stripped = \strip_tags($spaced);
+        $decoded = \html_entity_decode($stripped, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
+        $normalized = \trim(\preg_replace('/\s+/u', ' ', $decoded) ?? $decoded);
+
+        if ('' === $normalized || $maxLength <= 0) {
+            return $normalized;
+        }
+
+        if (\mb_strlen($normalized, 'UTF-8') <= $maxLength) {
+            return $normalized;
+        }
+
+        if ($maxLength <= 3) {
+            return \mb_substr($normalized, 0, $maxLength, 'UTF-8');
+        }
+
+        $cut = \mb_substr($normalized, 0, $maxLength - 3, 'UTF-8');
+
+        return \rtrim($cut, " \t\n\r\0\x0B.,;:-") . '...';
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function extractSinglePathValue(array $data, string $path): mixed
     {
         $segments = \explode('.', $path);
         $current = $data;

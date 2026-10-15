@@ -118,6 +118,18 @@ sulu_block_suite:
         enabled: true
     layout:
         enabled: true
+    exclude_dynamic_blocks:
+        - section
+        - row
+        - column
+        - row_item
+        - column_item
+        - divider
+        - icon
+        - html
+        - code
+        - scroll_to
+        - reusable
 ```
 
 ---
@@ -174,9 +186,11 @@ Define blocks using standard Sulu XML `<section>` elements in `config/templates/
 
 ---
 
-### 2. Selective Tab Exclusion (`sulu_block_suite.tabs`)
+### 2. Selective Tab Exclusion (`sulu_block_suite.tabs` & `exclude_dynamic_blocks`)
 
-If a specific block does not need one or more shared tabs (for example, `general` or `dynamic_content`), add `<tag name="sulu_block_suite.tabs" exclude="..."/>` to the block template:
+Structural or static blocks (`section`, `row`, `column`, `divider`, `icon`, `html`, `code`, `scroll_to`, `reusable`) are automatically excluded from receiving the `Dynamic Content` tab via `sulu_block_suite.exclude_dynamic_blocks`.
+
+You can also exclude one or more shared tabs (`general`, `dynamic_content`, `advanced`) directly in a block XML template using `<tag name="sulu_block_suite.tabs" exclude="..."/>`:
 
 ```xml
 <template xmlns="http://schemas.sulu.io/template/template"
@@ -193,7 +207,8 @@ If a specific block does not need one or more shared tabs (for example, `general
 ### 3. Preset & Reusable Block Actions in the `Advanced` Tab
 
 The `block_suite_advanced.xml` form includes `<property name="preset" type="preset_selection">`, which renders inside the **Advanced** tab and provides:
-- **Preset Selector & Visual Gallery (`Browse Presets`)**: Select any YAML or CMS preset; immediately applies all `props/*` defaults across tabs via atomic `formStore.changeMultiple()`.
+- **Active Preset Status Badge & Clear Action**: Displays the currently active preset name and source badge (`[CMS]` or `[YAML]`) with a one-click clear button.
+- **Visual Preset Gallery (`Browse Presets`)**: Opens a searchable modal gallery of all YAML and CMS presets for the block type; selecting a preset immediately applies all `props/*` defaults across tabs via atomic `formStore.changeMultiple()`.
 - **Apply Content & Styles**: Populates both content fields (`title`, `content`, nested items) and `props/*` from the active preset.
 - **Save as Preset**: Captures the current block's live form state and saves/publishes a `block_preset` snippet in Sulu CMS.
 - **Save as Reusable Block**: Saves and publishes the current block as a shared `reusable_block` snippet and optionally replaces the current block in-place with a `{ type: 'reusable', snippet: '<uuid>' }` reference.
@@ -210,14 +225,15 @@ In the **Advanced** tab:
 
 ### 5. Dynamic Content / Smart Content Engine
 
-Blocks can dynamically pull content from CMS sources without custom controllers:
+Blocks can dynamically pull single items or collections from Sulu CMS sources without custom controllers (including live resolution during Sulu Admin Live Preview):
 
-| Source Key | Provider Class | Description |
-| --- | --- | --- |
-| `pages` / `subpages` / `siblings` | `SuluPageSourceProvider` | Published Sulu 3 pages with parent page filtering, sorting, limit, offset, and excerpt/SEO fields. |
-| `articles` | `SuluArticleSourceProvider` | Published Sulu 3 articles (`SuluArticleBundle`) with template data, route URL, and media fields. |
-| `categories` | `SuluCategorySourceProvider` | Sulu categories (`CategoryManagerInterface`) with optional parent category ID filtering and localized translations. |
-| `media_collection` | `SuluMediaCollectionSourceProvider` | Media assets from Sulu collections (`MediaManagerInterface`) with resolved image/thumbnail structures. |
+| Source Key | Mode | Provider Class | Description |
+| --- | --- | --- | --- |
+| `current_page` / `parent_page` / `specific_page` | Single | `SuluPageSourceProvider` | Current page, parent page, or a selected Sulu 3 page with content, SEO, and excerpt fields. |
+| `page_selection` / `page_children` / `sibling_pages` / `custom_query` | Multiple | `SuluPageSourceProvider` | Published Sulu 3 page collections with parent filtering, sorting, limit, offset, and tag/category filters. |
+| `single_article` / `sulu_articles` | Single / Multiple | `SuluArticleSourceProvider` | Published Sulu 3 articles (`SuluArticleBundle`) with template data, route URL, excerpt, and media fields. |
+| `single_category` / `sulu_categories` | Single / Multiple | `SuluCategorySourceProvider` | Sulu categories (`CategoryManagerInterface`) with optional parent category filtering and localized translations. |
+| `single_media` / `sulu_media` | Single / Multiple | `SuluMediaCollectionSourceProvider` | Media assets from Sulu collections (`MediaManagerInterface`) with resolved image/thumbnail structures. |
 
 ---
 

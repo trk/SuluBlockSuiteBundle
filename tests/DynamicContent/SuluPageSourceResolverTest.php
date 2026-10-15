@@ -496,4 +496,40 @@ class SuluPageSourceResolverTest extends TestCase
         $this->assertSame('Website', $processed[1]['title']);
         $this->assertSame('Website', $processed[2]['title']);
     }
+
+    public function testResolvePageFallsBackWhenHeadlineAndSummaryAreEmptyStrings(): void
+    {
+        $pageStub = $this->createStub(PageInterface::class);
+        $pageStub->method('getUuid')->willReturn('page-fallback-999');
+
+        $longHtmlContent = '<p>' . \str_repeat('Comprehensive enterprise architecture overview and implementation details. ', 3) . '</p>';
+
+        $dimensionContentStub = $this->createStub(PageDimensionContentInterface::class);
+        $dimensionContentStub->method('getLocale')->willReturn('en');
+        $dimensionContentStub->method('getStage')->willReturn('live');
+        $dimensionContentStub->method('getTitle')->willReturn('Fallback Page Title');
+        $dimensionContentStub->method('getExcerptDescription')->willReturn('');
+        $dimensionContentStub->method('getExcerptImage')->willReturn(['id' => 77, 'url' => '/media/77.jpg']);
+        $dimensionContentStub->method('getTemplateData')->willReturn([
+            'title' => 'Fallback Page Title',
+            'headline' => '   ',
+            'summary' => '',
+            'content' => $longHtmlContent,
+            'image' => [],
+        ]);
+
+        $pageStub->method('getDimensionContents')->willReturn(new ArrayCollection([$dimensionContentStub]));
+
+        $resolver = new SuluPageSourceResolver();
+        $result = $resolver->resolvePage($pageStub, 'en');
+
+        $this->assertNotNull($result);
+        $this->assertSame('Fallback Page Title', $result['title']);
+        $this->assertSame('Fallback Page Title', $result['headline']);
+        $this->assertIsString($result['summary']);
+        $this->assertLessThanOrEqual(160, \mb_strlen($result['summary'], 'UTF-8'));
+        $this->assertStringNotContainsString('<p>', $result['summary']);
+        $this->assertStringEndsWith('...', $result['summary']);
+        $this->assertSame(['id' => 77, 'url' => '/media/77.jpg'], $result['image']);
+    }
 }
