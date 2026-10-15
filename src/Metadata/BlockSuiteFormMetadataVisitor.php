@@ -1417,7 +1417,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
             $rootSchema = $rootForm->getSchema();
             foreach ($blockForms as $typeKey => $blockForm) {
-                if (!isset($excludedMap[$typeKey])) {
+                if ('default' !== $typeKey && '' !== $typeKey && $rootKey !== $typeKey) {
                     $rootSchema->addDefinition($typeKey, $blockForm->getSchema());
                 }
             }

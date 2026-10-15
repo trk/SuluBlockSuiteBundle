@@ -276,4 +276,52 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $this->assertInstanceOf(FieldMetadata::class, $hlTarget);
         $this->assertSame('title', $hlTarget->findOption('default_value')?->getValue());
     }
+
+    public function testExcludedTopLevelBlockStillRegistersSchemaDefinitionForNestedReferences(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor();
+
+        $reusableBlockForm = new FormMetadata();
+        $reusableBlockForm->setKey('reusable');
+        $reusableContent = new SectionMetadata('content');
+        $snippetField = new FieldMetadata('snippet');
+        $snippetField->setType('single_reusable_block_selection');
+        $reusableContent->addItem($snippetField);
+        $reusableBlockForm->addItem($reusableContent);
+
+        $sectionBlockForm = new FormMetadata();
+        $sectionBlockForm->setKey('section');
+        $sectionContent = new SectionMetadata('content');
+        $rowsField = new FieldMetadata('rows');
+        $rowsField->setType('block');
+        $sectionContent->addItem($rowsField);
+        $sectionBlockForm->addItem($sectionContent);
+
+        $typedBlockForms = new TypedFormMetadata();
+        $typedBlockForms->addForm('reusable', $reusableBlockForm);
+        $typedBlockForms->addForm('section', $sectionBlockForm);
+
+        $visitor->visitTypedFormMetadata($typedBlockForms, 'block', 'en');
+
+        $snippetForm = new FormMetadata();
+        $snippetForm->setKey('reusable_block');
+        $blocksField = new FieldMetadata('blocks');
+        $blocksField->setType('block');
+        $autoBlocksTag = new TagMetadata();
+        $autoBlocksTag->setName('sulu_block_suite.auto_blocks');
+        $autoBlocksTag->setAttributes(['exclude' => 'reusable,main_content']);
+        $blocksField->addTag($autoBlocksTag);
+        $snippetForm->addItem($blocksField);
+
+        $visitor->visitFormMetadata($snippetForm, 'en');
+
+        $this->assertArrayNotHasKey('reusable', $blocksField->getTypes());
+        $this->assertArrayHasKey('section', $blocksField->getTypes());
+
+        $jsonSchema = $snippetForm->getSchema()->toJsonSchema();
+        $this->assertArrayHasKey('definitions', $jsonSchema);
+        $this->assertIsArray($jsonSchema['definitions']);
+        $this->assertArrayHasKey('section', $jsonSchema['definitions']);
+        $this->assertArrayHasKey('reusable', $jsonSchema['definitions']);
+    }
 }
