@@ -271,4 +271,65 @@ final class PageLayoutProviderTest extends TestCase
         self::assertNull($provider->getLayout('draft_only', 'en'));
         self::assertNull($provider->getLayout('draft-layout-uuid', 'en'));
     }
+
+    public function testGetLayoutResolvesPipeSeparatedFallbackChain(): void
+    {
+        $defaultSnippet = $this->createStub(SnippetInterface::class);
+        $defaultSnippet->method('getUuid')->willReturn('default-uuid');
+
+        $defaultContent = $this->createStub(SnippetDimensionContentInterface::class);
+        $defaultContent->method('getTemplateKey')->willReturn('page_layout');
+        $defaultContent->method('getTitle')->willReturn('Default');
+        $defaultContent->method('getTemplateData')->willReturn([
+            'key' => 'default',
+            'blocks' => [['type' => 'headline', 'title' => 'Default Header']],
+        ]);
+        $defaultSnippet->method('getDimensionContents')->willReturn(new ArrayCollection([$defaultContent]));
+
+        $searchSnippet = $this->createStub(SnippetInterface::class);
+        $searchSnippet->method('getUuid')->willReturn('search-uuid');
+
+        $searchContent = $this->createStub(SnippetDimensionContentInterface::class);
+        $searchContent->method('getTemplateKey')->willReturn('page_layout');
+        $searchContent->method('getTitle')->willReturn('Search');
+        $searchContent->method('getTemplateData')->willReturn([
+            'key' => 'search',
+            'blocks' => [['type' => 'headline', 'title' => 'Search Header']],
+        ]);
+        $searchSnippet->method('getDimensionContents')->willReturn(new ArrayCollection([$searchContent]));
+
+        $repo = $this->createMock(SnippetRepositoryInterface::class);
+        $repo->expects(self::once())
+            ->method('findBy')
+            ->willReturn([$defaultSnippet, $searchSnippet]);
+
+        $provider = new PageLayoutProvider($repo);
+
+        // 1. "search|default" picks "search" when "search" layout exists
+        $searchLayout = $provider->getLayout('search|default', 'en');
+        self::assertNotNull($searchLayout);
+        self::assertSame('search-uuid', $searchLayout['uuid']);
+
+        // 2. "homepage|default" falls back to "default" when "homepage" layout does not exist
+        $homepageFallback = $provider->getLayout('homepage|default', 'en');
+        self::assertNotNull($homepageFallback);
+        self::assertSame('default-uuid', $homepageFallback['uuid']);
+
+        // 3. "error|nonexistent" returns null when neither exists
+        self::assertNull($provider->getLayout('error|nonexistent', 'en'));
+    }
+
+    public function testRenderLayoutReturnsEmptyStringWhenPipeFallbackChainFindsNothing(): void
+    {
+        $repo = $this->createStub(SnippetRepositoryInterface::class);
+        $repo->method('findBy')->willReturn([]);
+
+        $twig = $this->createMock(Environment::class);
+        $twig->expects(self::never())->method('render');
+
+        $provider = new PageLayoutProvider($repo, $twig);
+        self::assertSame('', $provider->renderLayout('search|default', [], 'en'));
+        self::assertSame('', $provider->renderLayout('error|default', [], 'en'));
+        self::assertSame('', $provider->renderLayout('homepage|default', [], 'en'));
+    }
 }

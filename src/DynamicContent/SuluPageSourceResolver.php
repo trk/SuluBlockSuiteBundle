@@ -114,6 +114,17 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             }
         }
 
+        if (isset($context['layout']) && \is_array($context['layout']) && ($context['content'] ?? null) === $context['layout']) {
+            if (isset($context['object']) && $context['object'] instanceof PageDimensionContentInterface) {
+                return $this->normalizePageEntity($context['object']->getResource(), $locale);
+            }
+            if (isset($context['resource']) && $context['resource'] instanceof PageInterface) {
+                return $this->normalizePageEntity($context['resource'], $locale);
+            }
+
+            return null;
+        }
+
         // 2. Standard content context
         if (isset($context['content']) && \is_array($context['content'])) {
             /** @var array<string, mixed> $content */

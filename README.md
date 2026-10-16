@@ -269,10 +269,27 @@ Instead of maintaining hardcoded `<type ref="..."/>` lists across page templates
 
 ---
 
-### 7. Reusable Global Blocks & HTTP Cache Invalidation
+### 7. Reusable Global Blocks, Page Layouts & Fallback Chains (`|`)
 
 - When a `reusable_block` or `page_layout` snippet is rendered on the website, `SingleReusableBlockSelectionPropertyResolver` and `PageLayoutProvider` automatically register the snippet UUID in Sulu's `ReferenceStoreInterface` (`snippet` reference pool).
 - `ReusableBlockCacheInvalidationSubscriber` listens to `SnippetModifiedEvent`, `SnippetWorkflowTransitionAppliedEvent`, and `SnippetRemovedEvent`, automatically invalidating Sulu HTTP cache tags and references.
+- **Pipe-Separated Layout Fallback Chains**: `layout_render()` and `layout_load()` support `|`-delimited fallback chains (e.g. `homepage|default`, `article|default`, `search|default`, `error|default`). The first matching published `page_layout` snippet (or YAML layout) in the chain is rendered; if none of the candidates exist, `layout_render()` returns an empty string `''`:
+  ```twig
+  {# Global Header & Footer layouts with static partial fallback #}
+  {% set header_layout = layout_render(content.header_layout|default('header'), _context) %}
+  {{ header_layout is not empty ? header_layout|raw : include('includes/navbar.html.twig') }}
+
+  {# Page / Search / Error template layout with fallback to 'default' #}
+  {{ layout_render(content.layout|default('search|default'), _context) }}
+  ```
+
+---
+
+### 8. Universal General Controls & `AbstractBlockComponent` Base Class
+
+All blocks automatically inherit universal controls in the `General` tab (`padding`, `margin`, `max_width`, `block_align`, `text_align`, `position`, `z_index`, `animation`, `blend`, `parallax`, `visibility`) and can extend `AbstractBlockComponent`, which provides:
+- Universal class/attribute resolvers: `resolveWrapperClasses()`, `resolvePaddingClasses()`, `resolveBlendModeClasses()`, `resolveParallaxAttributes()`, `getRootAttributes()`.
+- Safe string/array/class helpers: `$this->fn($value, 'trim', 'strtolower')`, `$this->classes(...)`, `$this->itemString()`, `$this->itemInt()`, `$this->itemBool()`, `$this->itemArray()`, `$this->itemProp()`.
 
 ---
 
@@ -288,8 +305,8 @@ Complete translations are bundled for **6 languages**: `en`, `tr`, `de`, `ru`, `
 # Run PHPUnit 12 test suite
 ../../vendor/bin/phpunit
 
-# Run PHPStan static analysis at level max
-../../vendor/bin/phpstan analyse --debug -c phpstan.neon
+# Run PHPStan static analysis at level max (from project root)
+../../vendor/bin/phpstan analyse packages/sulu-block-suite-bundle --debug --memory-limit=1G
 ```
 
 ---

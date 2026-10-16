@@ -28,6 +28,11 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
      */
     private array $layoutsDirectories;
 
+    /**
+     * @var array<string, list<SnippetInterface>>
+     */
+    private array $liveSnippetsByLocale = [];
+
     private int $renderDepth = 0;
 
     /**
@@ -51,6 +56,22 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
 
     public function getLayout(string $identifier, ?string $locale = null): ?array
     {
+        if (\str_contains($identifier, '|')) {
+            foreach (\explode('|', $identifier) as $candidate) {
+                $candidate = \trim($candidate);
+                if ('' === $candidate) {
+                    continue;
+                }
+
+                $resolved = $this->getLayout($candidate, $locale);
+                if (null !== $resolved) {
+                    return $resolved;
+                }
+            }
+
+            return null;
+        }
+
         $trimId = \trim($identifier);
         if ('' === $trimId) {
             return null;
@@ -68,18 +89,26 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
         // 1. Try finding in Sulu snippet repository
         if (null !== $this->snippetRepository) {
             try {
-                /** @var iterable<SnippetInterface> $snippets */
-                $snippets = $this->snippetRepository->findBy(
-                    [
-                        'templateKeys' => ['page_layout'],
-                        'locale' => $resolvedLocale,
-                        'stage' => DimensionContentInterface::STAGE_LIVE,
-                    ],
-                    ['title' => 'asc'],
-                    [SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => []],
-                );
+                if (!isset($this->liveSnippetsByLocale[$resolvedLocale])) {
+                    /** @var iterable<SnippetInterface> $fetched */
+                    $fetched = $this->snippetRepository->findBy(
+                        [
+                            'templateKeys' => ['page_layout'],
+                            'locale' => $resolvedLocale,
+                            'stage' => DimensionContentInterface::STAGE_LIVE,
+                        ],
+                        ['title' => 'asc'],
+                        [SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => []],
+                    );
 
-                foreach ($snippets as $snippet) {
+                    $list = [];
+                    foreach ($fetched as $item) {
+                        $list[] = $item;
+                    }
+                    $this->liveSnippetsByLocale[$resolvedLocale] = $list;
+                }
+
+                foreach ($this->liveSnippetsByLocale[$resolvedLocale] as $snippet) {
                     $uuid = $snippet->getUuid();
                     if ($uuid === $trimId) {
                         $matched = $this->extractSnippetData($snippet, null, $resolvedLocale);
@@ -142,7 +171,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
 
     public function renderLayout(string|array|null $layout, array $context = [], ?string $locale = null): string
     {
-        if (null === $layout || '' === $layout || $this->renderDepth >= self::MAX_RENDER_DEPTH) {
+        if (null === $layout || '' === $layout || [] === $layout || $this->renderDepth >= self::MAX_RENDER_DEPTH) {
             return '';
         }
 
@@ -163,11 +192,14 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
             if (!isset($layoutData['blocks'])) {
                 $layoutId = $layoutData['id'] ?? ($layoutData['uuid'] ?? null);
                 if (\is_string($layoutId) && '' !== $layoutId) {
-                    $loadedLayout = $this->getLayout($layoutId, $resolvedLocale);
-                    if (null !== $loadedLayout) {
-                        $layoutData = $loadedLayout;
-                    }
+                    $layoutData = $this->getLayout($layoutId, $resolvedLocale);
+                } else {
+                    $layoutData = null;
                 }
+            }
+
+            if (null === $layoutData && isset($context['default_layout']) && \is_string($context['default_layout']) && '' !== $context['default_layout']) {
+                $layoutData = $this->getLayout($context['default_layout'], $resolvedLocale);
             }
         }
 
@@ -176,14 +208,14 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
         }
 
         $layoutKey = null;
-        if (\is_string($layout)) {
-            $layoutKey = \strtolower(\trim($layout));
-        } elseif (isset($layoutData['uuid']) && \is_string($layoutData['uuid']) && '' !== $layoutData['uuid']) {
+        if (isset($layoutData['uuid']) && \is_string($layoutData['uuid']) && '' !== $layoutData['uuid']) {
             $layoutKey = $layoutData['uuid'];
         } elseif (isset($layoutData['id']) && \is_string($layoutData['id']) && '' !== $layoutData['id']) {
             $layoutKey = $layoutData['id'];
         } elseif (isset($layoutData['key']) && \is_string($layoutData['key']) && '' !== $layoutData['key']) {
             $layoutKey = \strtolower(\trim($layoutData['key']));
+        } elseif (\is_string($layout)) {
+            $layoutKey = \strtolower(\trim($layout));
         }
 
         if (null !== $layoutKey && isset($this->activeLayouts[$layoutKey])) {
@@ -217,9 +249,14 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
                 $template = '@SuluBlockSuite/snippets/page_layout.html.twig';
             }
 
+            $contextPage = \array_key_exists('page', $context)
+                ? $context['page']
+                : ($context['content'] ?? null);
+
             return $this->twig->render(
                 $template,
                 \array_merge($context, [
+                    'page' => $contextPage,
                     'content' => $layoutData,
                     'layout' => $layoutData,
                     'blocks' => $blocks,

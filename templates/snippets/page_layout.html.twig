@@ -14,13 +14,3 @@
         {% endif %}
     {% endfor %}
 {% endif %}
-
-{% if page_blocks|default([])|length > 0 %}
-    {{ sulu_blocks_render(page_blocks, _context|merge({
-        content: page|default(_context.content|default([])),
-        resource: resource|default(_context.resource|default(null)),
-        object: object|default(_context.object|default(null)),
-        view: view|default(_context.view|default(null)),
-        extension: extension|default(_context.extension|default(null)),
-    })) }}
-{% endif %}
