@@ -470,6 +470,211 @@
                     </params>
                 </property>
 
+                <property name="padding" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Padding</title>
+                        <title lang="tr">İç Boşluk</title>
+                        <title lang="de">Innenabstand</title>
+                        <title lang="ru">Внутренний отступ</title>
+                        <title lang="es">Relleno</title>
+                        <title lang="fr">Espacement Interne</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="none">
+                                <meta>
+                                    <title lang="en">None</title>
+                                    <title lang="tr">Yok</title>
+                                    <title lang="de">Keine</title>
+                                    <title lang="ru">Нет</title>
+                                    <title lang="es">Ninguno</title>
+                                    <title lang="fr">Aucun</title>
+                                </meta>
+                            </param>
+                            <param name="xs">
+                                <meta>
+                                    <title lang="en">Extra Small</title>
+                                    <title lang="tr">Çok Küçük</title>
+                                    <title lang="de">Extra Klein</title>
+                                    <title lang="ru">Очень малый</title>
+                                    <title lang="es">Extra Pequeño</title>
+                                    <title lang="fr">Très Petit</title>
+                                </meta>
+                            </param>
+                            <param name="sm">
+                                <meta>
+                                    <title lang="en">Small</title>
+                                    <title lang="tr">Küçük</title>
+                                    <title lang="de">Klein</title>
+                                    <title lang="ru">Малый</title>
+                                    <title lang="es">Pequeño</title>
+                                    <title lang="fr">Petit</title>
+                                </meta>
+                            </param>
+                            <param name="md">
+                                <meta>
+                                    <title lang="en">Medium</title>
+                                    <title lang="tr">Orta</title>
+                                    <title lang="de">Mittel</title>
+                                    <title lang="ru">Средний</title>
+                                    <title lang="es">Mediano</title>
+                                    <title lang="fr">Moyen</title>
+                                </meta>
+                            </param>
+                            <param name="lg">
+                                <meta>
+                                    <title lang="en">Large</title>
+                                    <title lang="tr">Büyük</title>
+                                    <title lang="de">Groß</title>
+                                    <title lang="ru">Большой</title>
+                                    <title lang="es">Grande</title>
+                                    <title lang="fr">Grand</title>
+                                </meta>
+                            </param>
+                            <param name="xl">
+                                <meta>
+                                    <title lang="en">Extra Large</title>
+                                    <title lang="tr">Çok Büyük</title>
+                                    <title lang="de">Extra Groß</title>
+                                    <title lang="ru">Очень большой</title>
+                                    <title lang="es">Extra Grande</title>
+                                    <title lang="fr">Très Grand</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="blend" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Blend Mode</title>
+                        <title lang="tr">Karışım Modu</title>
+                        <title lang="de">Mischmodus</title>
+                        <title lang="ru">Режим наложения</title>
+                        <title lang="es">Modo de Fusión</title>
+                        <title lang="fr">Mode de Fusion</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="normal">
+                                <meta>
+                                    <title lang="en">Normal</title>
+                                    <title lang="tr">Normal</title>
+                                    <title lang="de">Normal</title>
+                                    <title lang="ru">Обычный</title>
+                                    <title lang="es">Normal</title>
+                                    <title lang="fr">Normal</title>
+                                </meta>
+                            </param>
+                            <param name="multiply">
+                                <meta>
+                                    <title lang="en">Multiply</title>
+                                    <title lang="tr">Çoğalt (Multiply)</title>
+                                    <title lang="de">Multiplizieren</title>
+                                    <title lang="ru">Умножение</title>
+                                    <title lang="es">Multiplicar</title>
+                                    <title lang="fr">Produit</title>
+                                </meta>
+                            </param>
+                            <param name="screen">
+                                <meta>
+                                    <title lang="en">Screen</title>
+                                    <title lang="tr">Ekran (Screen)</title>
+                                    <title lang="de">Negativ multiplizieren</title>
+                                    <title lang="ru">Экран</title>
+                                    <title lang="es">Trama</title>
+                                    <title lang="fr">Superposition</title>
+                                </meta>
+                            </param>
+                            <param name="overlay">
+                                <meta>
+                                    <title lang="en">Overlay</title>
+                                    <title lang="tr">Kaplama (Overlay)</title>
+                                    <title lang="de">Ineinanderkopieren</title>
+                                    <title lang="ru">Перекрытие</title>
+                                    <title lang="es">Superponer</title>
+                                    <title lang="fr">Incrustation</title>
+                                </meta>
+                            </param>
+                            <param name="darken">
+                                <meta>
+                                    <title lang="en">Darken</title>
+                                    <title lang="tr">Koyulaştır (Darken)</title>
+                                    <title lang="de">Abdunkeln</title>
+                                    <title lang="ru">Затемнение</title>
+                                    <title lang="es">Oscurecer</title>
+                                    <title lang="fr">Obscurcir</title>
+                                </meta>
+                            </param>
+                            <param name="lighten">
+                                <meta>
+                                    <title lang="en">Lighten</title>
+                                    <title lang="tr">Aydınlat (Lighten)</title>
+                                    <title lang="de">Aufhellen</title>
+                                    <title lang="ru">Осветление</title>
+                                    <title lang="es">Aclarar</title>
+                                    <title lang="fr">Éclaircir</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="parallax" type="single_select" colspan="6" mandatory="false">
+                    <meta>
+                        <title lang="en">Parallax Effect</title>
+                        <title lang="tr">Paralaks Efekti</title>
+                        <title lang="de">Parallax-Effekt</title>
+                        <title lang="ru">Эффект параллакса</title>
+                        <title lang="es">Efecto Parallax</title>
+                        <title lang="fr">Effet Parallaxe</title>
+                    </meta>
+                    <params>
+                        <param name="values" type="collection">
+                            <param name="none">
+                                <meta>
+                                    <title lang="en">None</title>
+                                    <title lang="tr">Yok</title>
+                                    <title lang="de">Keine</title>
+                                    <title lang="ru">Нет</title>
+                                    <title lang="es">Ninguno</title>
+                                    <title lang="fr">Aucun</title>
+                                </meta>
+                            </param>
+                            <param name="subtle">
+                                <meta>
+                                    <title lang="en">Subtle</title>
+                                    <title lang="tr">Hafif</title>
+                                    <title lang="de">Dezent</title>
+                                    <title lang="ru">Слабый</title>
+                                    <title lang="es">Sutil</title>
+                                    <title lang="fr">Subtil</title>
+                                </meta>
+                            </param>
+                            <param name="medium">
+                                <meta>
+                                    <title lang="en">Medium</title>
+                                    <title lang="tr">Orta</title>
+                                    <title lang="de">Mittel</title>
+                                    <title lang="ru">Средний</title>
+                                    <title lang="es">Medio</title>
+                                    <title lang="fr">Moyen</title>
+                                </meta>
+                            </param>
+                            <param name="strong">
+                                <meta>
+                                    <title lang="en">Strong</title>
+                                    <title lang="tr">Güçlü</title>
+                                    <title lang="de">Stark</title>
+                                    <title lang="ru">Сильный</title>
+                                    <title lang="es">Fuerte</title>
+                                    <title lang="fr">Fort</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
                 <property name="visibility" type="single_select" colspan="6" mandatory="false">
                     <meta>
                         <title lang="en">Visibility</title>

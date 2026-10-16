@@ -281,6 +281,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             if (!isset($excludedTabs['general'])) {
                 $generalSection = $this->loadSharedSection('block_suite_general', 'general');
                 if (null !== $generalSection) {
+                    $generalSection = $this->filterDuplicateSharedFields($generalSection, $nonContentSections);
                     if (isset($nonContentSections['general'])) {
                         $nonContentSections['general'] = $this->mergeSections($nonContentSections['general'], $generalSection);
                     } else {
@@ -528,6 +529,71 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         }
 
         return $merged;
+    }
+
+    /**
+     * @param array<string, SectionMetadata> $nonContentSections
+     */
+    private function filterDuplicateSharedFields(SectionMetadata $sharedSection, array $nonContentSections): SectionMetadata
+    {
+        /** @var array<string, true> $existingFieldNames */
+        $existingFieldNames = [];
+        foreach ($nonContentSections as $sectionName => $section) {
+            if ($sectionName === $sharedSection->getName()) {
+                continue;
+            }
+            foreach ($this->collectSectionFieldNames($section) as $fieldName) {
+                $existingFieldNames[$fieldName] = true;
+            }
+        }
+
+        if ([] === $existingFieldNames) {
+            return $sharedSection;
+        }
+
+        $filtered = new SectionMetadata($sharedSection->getName());
+        $filtered->setLabels($sharedSection->getLabels());
+        $filtered->setDescriptions($sharedSection->getDescriptions());
+        $filtered->setColSpan($sharedSection->getColSpan());
+        $filtered->setDisabledCondition($sharedSection->getDisabledCondition());
+        $filtered->setVisibleCondition($sharedSection->getVisibleCondition());
+
+        foreach ($sharedSection->getItems() as $item) {
+            if ($item instanceof FieldMetadata) {
+                $rawName = \str_starts_with($item->getName(), 'props/')
+                    ? \substr($item->getName(), 6)
+                    : $item->getName();
+                if (isset($existingFieldNames[$rawName])) {
+                    continue;
+                }
+            }
+
+            $filtered->addItem($item);
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectSectionFieldNames(SectionMetadata $section): array
+    {
+        $names = [];
+        foreach ($section->getItems() as $item) {
+            if ($item instanceof SectionMetadata) {
+                foreach ($this->collectSectionFieldNames($item) as $nestedName) {
+                    $names[] = $nestedName;
+                }
+            } elseif ($item instanceof FieldMetadata) {
+                $rawName = \str_starts_with($item->getName(), 'props/')
+                    ? \substr($item->getName(), 6)
+                    : $item->getName();
+                $names[] = $rawName;
+            }
+        }
+
+        return $names;
     }
 
     private function loadSharedSection(string $formKey, string $sectionName): ?SectionMetadata

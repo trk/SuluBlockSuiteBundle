@@ -156,7 +156,12 @@ final class BlockRenderer
                 $html = $this->injectRootAttributes($html, $attrs);
             }
 
-            if (isset($block['_scoped_css']) && \is_string($block['_scoped_css']) && '' !== \trim($block['_scoped_css'])) {
+            if (
+                isset($block['_scoped_css'])
+                && \is_string($block['_scoped_css'])
+                && '' !== \trim($block['_scoped_css'])
+                && !\str_contains($html, $block['_scoped_css'])
+            ) {
                 $html = '<style>' . $block['_scoped_css'] . '</style>' . $html;
             }
 
@@ -241,7 +246,7 @@ final class BlockRenderer
     private function injectRootAttributes(string $html, array $attributes): string
     {
         return (string) \preg_replace_callback(
-            '/^((?:\s|<!--.*?-->)*<([a-zA-Z][a-zA-Z0-9:-]*))(\s[^>]*?)?(\/?>)/s',
+            '/^((?:\s|<!--.*?-->|<style\b[^>]*>.*?<\/style>)*<([a-zA-Z][a-zA-Z0-9:-]*))(\s[^>]*?)?(\/?>)/is',
             static function (array $matches) use ($attributes): string {
                 $tagStart = $matches[1];
                 $existingAttrs = $matches[3];
