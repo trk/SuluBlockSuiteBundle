@@ -308,25 +308,30 @@ abstract class AbstractBlockComponent
         return $this;
     }
 
-    public function string(string $key, string $default = ''): string
+    public function string(string $key, string $default = '', bool $trim = true, ?string $fn = null): string
     {
         $value = $this->get($key);
-        if (\is_string($value)) {
-            return $value;
-        }
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
+        $resolved = $this->coerceScalarToString($value);
+        if (null === $resolved) {
+            return $default;
         }
 
-        return $default;
+        if ($trim) {
+            $resolved = \trim($resolved);
+        }
+
+        if (null !== $fn) {
+            $resolved = $this->applyStringFunction($resolved, $fn);
+        }
+
+        return '' !== $resolved ? $resolved : $default;
     }
 
-    public function nullableString(string $key): ?string
+    public function nullableString(string $key, ?string $fn = null): ?string
     {
-        $value = $this->string($key, '');
-        $trimmed = \trim($value);
+        $value = $this->string($key, '', true, $fn);
 
-        return '' !== $trimmed ? $trimmed : null;
+        return '' !== $value ? $value : null;
     }
 
     public function int(string $key, int $default = 0): int
@@ -504,22 +509,28 @@ abstract class AbstractBlockComponent
         return $this;
     }
 
-    public function stringProp(string $key, string $default = ''): string
+    public function stringProp(string $key, string $default = '', bool $trim = true, ?string $fn = null): string
     {
         $value = $this->prop($key);
-        if (\is_string($value)) {
-            return '' !== \trim($value) ? \trim($value) : $default;
-        }
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
+        $resolved = $this->coerceScalarToString($value);
+        if (null === $resolved) {
+            return $default;
         }
 
-        return $default;
+        if ($trim) {
+            $resolved = \trim($resolved);
+        }
+
+        if (null !== $fn) {
+            $resolved = $this->applyStringFunction($resolved, $fn);
+        }
+
+        return '' !== $resolved ? $resolved : $default;
     }
 
-    public function nullableStringProp(string $key): ?string
+    public function nullableStringProp(string $key, ?string $fn = null): ?string
     {
-        $value = $this->stringProp($key, '');
+        $value = $this->stringProp($key, '', true, $fn);
 
         return '' !== $value ? $value : null;
     }
@@ -573,6 +584,413 @@ abstract class AbstractBlockComponent
         $value = $this->stringProp($key, $default);
 
         return \in_array($value, $allowed, true) ? $value : $default;
+    }
+
+    // =========================================================================
+    // String, Value, Class & Collection Item Helpers (`$this->{fn}`)
+    // =========================================================================
+
+    public function trim(mixed $value, string $default = '', string $characters = " \n\r\t\v\x00"): string
+    {
+        $str = $this->coerceScalarToString($value);
+        if (null === $str) {
+            return $default;
+        }
+
+        $trimmed = \trim($str, $characters);
+
+        return '' !== $trimmed ? $trimmed : $default;
+    }
+
+    public function ltrim(mixed $value, string $characters = " \n\r\t\v\x00", string $default = ''): string
+    {
+        $str = $this->coerceScalarToString($value);
+        if (null === $str) {
+            return $default;
+        }
+
+        $trimmed = \ltrim($str, $characters);
+
+        return '' !== $trimmed ? $trimmed : $default;
+    }
+
+    public function rtrim(mixed $value, string $characters = " \n\r\t\v\x00", string $default = ''): string
+    {
+        $str = $this->coerceScalarToString($value);
+        if (null === $str) {
+            return $default;
+        }
+
+        $trimmed = \rtrim($str, $characters);
+
+        return '' !== $trimmed ? $trimmed : $default;
+    }
+
+    public function lower(mixed $value, string $default = ''): string
+    {
+        $trimmed = $this->trim($value);
+
+        return '' !== $trimmed ? \strtolower($trimmed) : $default;
+    }
+
+    public function upper(mixed $value, string $default = ''): string
+    {
+        $trimmed = $this->trim($value);
+
+        return '' !== $trimmed ? \strtoupper($trimmed) : $default;
+    }
+
+    public function ucfirst(mixed $value, string $default = ''): string
+    {
+        $trimmed = $this->trim($value);
+
+        return '' !== $trimmed ? \ucfirst($trimmed) : $default;
+    }
+
+    public function slug(mixed $value, string $separator = '-'): string
+    {
+        $trimmed = $this->trim($value);
+        if ('' === $trimmed) {
+            return '';
+        }
+
+        return \strtolower((string) \preg_replace('/[^a-zA-Z0-9_-]/', $separator, $trimmed));
+    }
+
+    /**
+     * Splits a string (or normalizes a list of strings/objects) into trimmed non-empty strings.
+     *
+     * @param non-empty-string $delimiter
+     *
+     * @return list<string>
+     */
+    public function split(
+        mixed $value,
+        string $delimiter = ',',
+        bool $trimItems = true,
+        bool $filterEmpty = true,
+    ): array {
+        if (\is_string($value)) {
+            $rawParts = '' !== $value ? \explode($delimiter, $value) : [];
+        } elseif (\is_array($value)) {
+            $rawParts = $value;
+        } else {
+            return [];
+        }
+
+        $result = [];
+        foreach ($rawParts as $part) {
+            if (\is_array($part) && isset($part['name']) && \is_string($part['name'])) {
+                $str = $part['name'];
+            } else {
+                $str = $this->coerceScalarToString($part);
+            }
+
+            if (null === $str) {
+                continue;
+            }
+
+            if ($trimItems) {
+                $str = \trim($str);
+            }
+
+            if ($filterEmpty && '' === $str) {
+                continue;
+            }
+
+            $result[] = $str;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Joins an iterable of items into a single string, optionally filtering out empty values.
+     *
+     * @param iterable<mixed> $items
+     */
+    public function join(iterable $items, string $glue = ' ', bool $filterEmpty = true): string
+    {
+        $parts = [];
+        foreach ($items as $item) {
+            $str = $this->coerceScalarToString($item);
+            if (null === $str) {
+                continue;
+            }
+
+            $trimmed = \trim($str);
+            if ($filterEmpty && '' === $trimmed) {
+                continue;
+            }
+
+            $parts[] = $trimmed;
+        }
+
+        return \implode($glue, $parts);
+    }
+
+    /**
+     * Joins any combination of CSS class strings, arrays of class strings, or falsy values
+     * into a single whitespace-normalized class string.
+     *
+     * @param string|array<int|string, mixed>|null|false ...$parts
+     */
+    public function classes(string|array|null|false ...$parts): string
+    {
+        return self::joinClasses(...$parts);
+    }
+
+    /**
+     * @param string|array<int|string, mixed>|null|false ...$parts
+     */
+    public static function joinClasses(string|array|null|false ...$parts): string
+    {
+        $tokens = [];
+
+        foreach ($parts as $part) {
+            if (\is_array($part)) {
+                foreach ($part as $nested) {
+                    if (\is_string($nested) || \is_array($nested) || null === $nested || false === $nested) {
+                        $sub = self::joinClasses($nested);
+                        if ('' !== $sub) {
+                            $tokens[] = $sub;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if (!\is_string($part)) {
+                continue;
+            }
+
+            $normalized = \trim((string) \preg_replace('/\s+/', ' ', $part));
+            if ('' !== $normalized) {
+                $tokens[] = $normalized;
+            }
+        }
+
+        return \implode(' ', $tokens);
+    }
+
+    /**
+     * Checks whether `$value` strictly matches one of `$candidates`.
+     *
+     * @param list<mixed> $candidates
+     */
+    public function oneOf(mixed $value, array $candidates): bool
+    {
+        return \in_array($value, $candidates, true);
+    }
+
+    /**
+     * Validates a string against an allowed list (optionally ignoring `'inherit'`), returning `$default` otherwise.
+     *
+     * @param list<string> $allowed
+     */
+    public function matchEnum(mixed $value, array $allowed, string $default, bool $ignoreInherit = true): string
+    {
+        $trimmed = $this->trim($value);
+        if ('' === $trimmed || ($ignoreInherit && 'inherit' === $trimmed)) {
+            return $default;
+        }
+
+        return \in_array($trimmed, $allowed, true) ? $trimmed : $default;
+    }
+
+    public function clamp(int|float $value, int|float $min, int|float $max): int|float
+    {
+        return \max($min, \min($max, $value));
+    }
+
+    public function isNotEmpty(mixed $value): bool
+    {
+        return $this->isNonEmptyValue($value);
+    }
+
+    /**
+     * Reads a key from a collection item array (falling back to camelCase/snake_case and nested `props`).
+     *
+     * @param array<int|string, mixed> $item
+     */
+    public function itemValue(array $item, string $key, mixed $default = null): mixed
+    {
+        if (\array_key_exists($key, $item) && null !== $item[$key]) {
+            return $item[$key];
+        }
+
+        $snake = self::toSnakeCase($key);
+        if ($snake !== $key && \array_key_exists($snake, $item) && null !== $item[$snake]) {
+            return $item[$snake];
+        }
+
+        if (isset($item['props']) && \is_array($item['props'])) {
+            if (\array_key_exists($key, $item['props']) && null !== $item['props'][$key]) {
+                return $item['props'][$key];
+            }
+            if ($snake !== $key && \array_key_exists($snake, $item['props']) && null !== $item['props'][$snake]) {
+                return $item['props'][$snake];
+            }
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $item
+     */
+    public function itemString(
+        array $item,
+        string $key,
+        string $default = '',
+        bool $trim = true,
+        ?string $fn = null,
+    ): string {
+        $raw = $this->itemValue($item, $key);
+        $resolved = $this->coerceScalarToString($raw);
+        if (null === $resolved) {
+            return $default;
+        }
+
+        if ($trim) {
+            $resolved = \trim($resolved);
+        }
+
+        if (null !== $fn) {
+            $resolved = $this->applyStringFunction($resolved, $fn);
+        }
+
+        return '' !== $resolved ? $resolved : $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $item
+     */
+    public function itemNullableString(array $item, string $key, ?string $fn = null): ?string
+    {
+        $val = $this->itemString($item, $key, '', true, $fn);
+
+        return '' !== $val ? $val : null;
+    }
+
+    /**
+     * Reads an item string prop/field, ignoring `'inherit'` or empty strings and falling back to `$default`.
+     *
+     * @param array<int|string, mixed> $item
+     */
+    public function itemInheritedString(
+        array $item,
+        string $key,
+        string $default = '',
+        ?string $fallbackKey = null,
+    ): string {
+        $val = $this->itemString($item, $key);
+        if ('' !== $val && 'inherit' !== $val) {
+            return $val;
+        }
+
+        if (null !== $fallbackKey) {
+            $fallbackVal = $this->itemString($item, $fallbackKey);
+            if ('' !== $fallbackVal && 'inherit' !== $fallbackVal) {
+                return $fallbackVal;
+            }
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $item
+     * @param list<string> $allowed
+     */
+    public function itemEnum(
+        array $item,
+        string $key,
+        array $allowed,
+        string $default,
+        bool $ignoreInherit = true,
+    ): string {
+        return $this->matchEnum($this->itemValue($item, $key), $allowed, $default, $ignoreInherit);
+    }
+
+    /**
+     * @param array<int|string, mixed> $item
+     */
+    public function itemBool(array $item, string $key, bool $default = false): bool
+    {
+        $raw = $this->itemValue($item, $key);
+
+        return null !== $raw ? self::parseBoolean($raw, $default) : $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $item
+     */
+    public function itemInt(array $item, string $key, int $default = 0): int
+    {
+        $raw = $this->itemValue($item, $key);
+        if (\is_int($raw)) {
+            return $raw;
+        }
+        if (\is_numeric($raw)) {
+            return (int) $raw;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $item
+     */
+    public function itemFloat(array $item, string $key, float $default = 0.0): float
+    {
+        $raw = $this->itemValue($item, $key);
+        if (\is_float($raw) || \is_int($raw)) {
+            return (float) $raw;
+        }
+        if (\is_numeric($raw)) {
+            return (float) $raw;
+        }
+
+        return $default;
+    }
+
+    /**
+     * @param array<int|string, mixed> $item
+     *
+     * @return array<int|string, mixed>
+     */
+    public function itemArray(array $item, string $key): array
+    {
+        $raw = $this->itemValue($item, $key);
+
+        return \is_array($raw) ? $raw : [];
+    }
+
+    private function coerceScalarToString(mixed $value): ?string
+    {
+        if (\is_string($value)) {
+            return $value;
+        }
+        if (\is_int($value) || \is_float($value) || $value instanceof \Stringable) {
+            return (string) $value;
+        }
+
+        return null;
+    }
+
+    private function applyStringFunction(string $value, string $fn): string
+    {
+        return match ($fn) {
+            'trim' => $this->trim($value),
+            'ltrim' => $this->ltrim($value),
+            'rtrim' => $this->rtrim($value),
+            'lower', 'strtolower' => $this->lower($value),
+            'upper', 'strtoupper' => $this->upper($value),
+            'ucfirst' => $this->ucfirst($value),
+            'slug' => $this->slug($value),
+            default => $value,
+        };
     }
 
     /**

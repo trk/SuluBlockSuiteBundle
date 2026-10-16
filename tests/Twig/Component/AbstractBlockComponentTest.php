@@ -217,6 +217,69 @@ final class AbstractBlockComponentTest extends TestCase
             $component->initializeBlockComponent(['title' => 'Hi', 'class' => 'w-full', 'data-foo' => 'bar']),
         );
     }
+
+    public function testStringTransformsAndClassAndItemHelpers(): void
+    {
+        $component = new DummyHeadlineComponent();
+        $component->load(
+            data: [
+                'title' => '  Hello World  ',
+                'subtitle' => '   ',
+            ],
+            props: [
+                'tag' => '  H2  ',
+                'custom_id' => ' #MySection_1 ',
+            ],
+        );
+
+        self::assertSame('Hello World', $component->string('title'));
+        self::assertSame('  Hello World  ', $component->string('title', '', trim: false));
+        self::assertSame('hello world', $component->string('title', '', fn: 'lower'));
+        self::assertSame('HELLO WORLD', $component->string('title', '', fn: 'upper'));
+        self::assertSame('hello-world', $component->string('title', '', fn: 'slug'));
+        self::assertNull($component->nullableString('subtitle'));
+        self::assertSame('h2', $component->stringProp('tag', 'h3', fn: 'lower'));
+        self::assertSame('MySection_1', $component->ltrim($component->stringProp('custom_id'), '# '));
+        self::assertSame('Hello', $component->rtrim('Hello///', '/'));
+        self::assertSame('Twitter', $component->ucfirst('twitter'));
+        self::assertSame('web-design-2026', $component->slug(' Web Design 2026 '));
+        self::assertSame(['news', 'tech', 'ai'], $component->split(' news, , tech , ai '));
+        self::assertSame('a / b', $component->join(['a', '', null, '  b  '], ' / '));
+        self::assertSame(
+            'flex items-center gap-2 text-primary',
+            $component->classes('flex', ['items-center', '', null, 'gap-2'], false, '  text-primary  '),
+        );
+        self::assertTrue($component->oneOf('left', ['left', 'right']));
+        self::assertFalse($component->oneOf('center', ['left', 'right']));
+        self::assertSame('left', $component->matchEnum(' left ', ['left', 'right'], 'top'));
+        self::assertSame('top', $component->matchEnum('inherit', ['left', 'right'], 'top'));
+        self::assertSame(20, $component->clamp(25, 1, 20));
+        self::assertSame(0.0, $component->clamp(-5.5, 0.0, 100.0));
+
+        $item = [
+            'title' => '  Item Title  ',
+            'panel_style' => 'inherit',
+            'link_style' => 'outline',
+            'marker_type' => 'pin',
+            'is_active' => 'true',
+            'count' => '42',
+            'x' => '75.5',
+            'nested' => ['url' => 'https://example.com'],
+        ];
+
+        self::assertSame('Item Title', $component->itemString($item, 'title'));
+        self::assertSame('  Item Title  ', $component->itemString($item, 'title', '', trim: false));
+        self::assertSame('item title', $component->itemString($item, 'title', '', fn: 'lower'));
+        self::assertNull($component->itemNullableString($item, 'missing'));
+        self::assertSame('bordered', $component->itemInheritedString($item, 'panel_style', 'bordered'));
+        self::assertSame('outline', $component->itemInheritedString($item, 'link_style', 'primary'));
+        self::assertSame('pin', $component->itemEnum($item, 'marker_type', ['pulse', 'pin'], 'pulse'));
+        self::assertSame('pulse', $component->itemEnum($item, 'panel_style', ['pulse', 'pin'], 'pulse'));
+        self::assertTrue($component->itemBool($item, 'is_active'));
+        self::assertSame(42, $component->itemInt($item, 'count'));
+        self::assertSame(75.5, $component->itemFloat($item, 'x'));
+        self::assertSame(['url' => 'https://example.com'], $component->itemArray($item, 'nested'));
+    }
 }
 
 final class DummyHeadlineComponent extends AbstractBlockComponent
