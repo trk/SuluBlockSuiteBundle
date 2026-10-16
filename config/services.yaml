@@ -87,6 +87,9 @@ services:
             $presetProvider: '@?Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
         tags: ['kernel.event_subscriber']
 
+    Totoglu\SuluBlockSuiteBundle\EventSubscriber\BlockComponentPreRenderSubscriber:
+        tags: ['kernel.event_subscriber']
+
     Totoglu\SuluBlockSuiteBundle\Content\Type\HotspotPickerPropertyResolver:
         tags: ['sulu.content.property_resolver']
 
