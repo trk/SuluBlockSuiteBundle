@@ -569,7 +569,7 @@
                             <param name="multiply">
                                 <meta>
                                     <title lang="en">Multiply</title>
-                                    <title lang="tr">Çoğalt (Multiply)</title>
+                                    <title lang="tr">Çoğalt</title>
                                     <title lang="de">Multiplizieren</title>
                                     <title lang="ru">Умножение</title>
                                     <title lang="es">Multiplicar</title>
@@ -579,7 +579,7 @@
                             <param name="screen">
                                 <meta>
                                     <title lang="en">Screen</title>
-                                    <title lang="tr">Ekran (Screen)</title>
+                                    <title lang="tr">Ekran</title>
                                     <title lang="de">Negativ multiplizieren</title>
                                     <title lang="ru">Экран</title>
                                     <title lang="es">Trama</title>
@@ -589,7 +589,7 @@
                             <param name="overlay">
                                 <meta>
                                     <title lang="en">Overlay</title>
-                                    <title lang="tr">Kaplama (Overlay)</title>
+                                    <title lang="tr">Kaplama</title>
                                     <title lang="de">Ineinanderkopieren</title>
                                     <title lang="ru">Перекрытие</title>
                                     <title lang="es">Superponer</title>
@@ -599,7 +599,7 @@
                             <param name="darken">
                                 <meta>
                                     <title lang="en">Darken</title>
-                                    <title lang="tr">Koyulaştır (Darken)</title>
+                                    <title lang="tr">Koyulaştır</title>
                                     <title lang="de">Abdunkeln</title>
                                     <title lang="ru">Затемнение</title>
                                     <title lang="es">Oscurecer</title>
@@ -609,7 +609,7 @@
                             <param name="lighten">
                                 <meta>
                                     <title lang="en">Lighten</title>
-                                    <title lang="tr">Aydınlat (Lighten)</title>
+                                    <title lang="tr">Aydınlat</title>
                                     <title lang="de">Aufhellen</title>
                                     <title lang="ru">Осветление</title>
                                     <title lang="es">Aclarar</title>

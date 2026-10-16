@@ -273,6 +273,18 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $hlTarget = $hlMapping->getTypes()['field_map']->getItems()['target_field'];
         $this->assertInstanceOf(FieldMetadata::class, $hlTarget);
         $this->assertSame('title', $hlTarget->findOption('default_value')?->getValue());
+
+        $hlTargetValues = $hlTarget->findOption('values')?->getValue();
+        $this->assertIsArray($hlTargetValues);
+        $this->assertNotEmpty($hlTargetValues);
+        $firstTargetOption = $hlTargetValues[0];
+        foreach (['en', 'tr', 'de', 'ru', 'es', 'fr'] as $lang) {
+            $title = $firstTargetOption->getTitle($lang);
+            $this->assertIsString($title);
+            $this->assertNotSame('', $title);
+            $this->assertStringNotContainsString('(title)', $title);
+        }
+        $this->assertSame('Başlık', $firstTargetOption->getTitle('tr'));
     }
 
     public function testExcludedTopLevelBlockStillRegistersSchemaDefinitionForNestedReferences(): void

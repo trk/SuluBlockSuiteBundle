@@ -178,13 +178,14 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
         /** @var list<OptionMetadata> $options */
         $options = [];
+        $allLocales = \array_values(\array_unique(['en', 'tr', 'de', 'ru', 'es', 'fr', $locale]));
         foreach ($blockTypes as $blockType) {
-            $title = $this->resolveBlockTitle($blockType, $locale);
-
             $option = new OptionMetadata();
             $option->setName($blockType);
             $option->setValue($blockType);
-            $option->setTitle($title, $locale);
+            foreach ($allLocales as $loc) {
+                $option->setTitle($this->resolveBlockTitle($blockType, $loc), $loc);
+            }
 
             $options[] = $option;
         }
@@ -830,10 +831,18 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $registry = $this->dynamicContentHydrator instanceof DynamicContentHydrator
             ? $this->dynamicContentHydrator->getRegistry()
             : new DynamicContentSourceRegistry();
+        $allLocales = \array_values(\array_unique(['en', 'tr', 'de', 'ru', 'es', 'fr', $locale]));
 
         // 1. Populate dynamic_source options
         $sourceField = $items['dynamic_source'] ?? null;
         if ($sourceField instanceof FieldMetadata) {
+            $sourceOptionsByLocale = [];
+            foreach ($allLocales as $loc) {
+                foreach ($registry->getSourceDescriptors($loc) as $desc) {
+                    $sourceOptionsByLocale[$desc['key']][$loc] = $desc['label'];
+                }
+            }
+
             $sourceOptions = $registry->getSourceDescriptors($locale);
             $values = [];
             foreach ($sourceOptions as $src) {
@@ -843,7 +852,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 $opt = new OptionMetadata();
                 $opt->setName($src['key']);
                 $opt->setValue($src['key']);
-                $opt->setTitle($src['label'], $locale);
+                foreach ($allLocales as $loc) {
+                    $opt->setTitle($sourceOptionsByLocale[$src['key']][$loc] ?? $src['label'], $loc);
+                }
                 $values[] = $opt;
             }
             $valuesCollection = new OptionMetadata();
@@ -870,7 +881,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                         $opt = new OptionMetadata();
                         $opt->setName($tf['name']);
                         $opt->setValue($tf['name']);
-                        $opt->setTitle($tf['label'] . ' (' . $tf['name'] . ')', $locale);
+                        foreach ($allLocales as $loc) {
+                            $opt->setTitle($tf['titles'][$loc] ?? $tf['label'], $loc);
+                        }
                         $targetOpts[] = $opt;
                     }
                     $targetCollection = new OptionMetadata();
@@ -894,7 +907,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                         $opt = new OptionMetadata();
                         $opt->setName($sf['name']);
                         $opt->setValue($sf['name']);
-                        $opt->setTitle($sf['label'], $locale);
+                        foreach ($allLocales as $loc) {
+                            $opt->setTitle($sf['titles'][$loc] ?? $sf['label'], $loc);
+                        }
                         $sourceOpts[] = $opt;
                     }
                     $sourceCollection = new OptionMetadata();
@@ -921,7 +936,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 $opt = new OptionMetadata();
                 $opt->setName($sf['name']);
                 $opt->setValue($sf['name']);
-                $opt->setTitle($sf['label'], $locale);
+                foreach ($allLocales as $loc) {
+                    $opt->setTitle($sf['titles'][$loc] ?? $sf['label'], $loc);
+                }
                 $condOpts[] = $opt;
             }
             $condCollection = new OptionMetadata();
@@ -1000,11 +1017,12 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     }
 
     /**
-     * @return list<array{name: string, label: string}>
+     * @return list<array{name: string, label: string, titles: array<string, string>}>
      */
     private function discoverBlockTargetFields(SectionMetadata $contentSection, string $locale): array
     {
-        /** @var array<string, array{name: string, label: string}> $fieldsByName */
+        $allLocales = \array_values(\array_unique(['en', 'tr', 'de', 'ru', 'es', 'fr', $locale]));
+        /** @var array<string, array{name: string, label: string, titles: array<string, string>}> $fieldsByName */
         $fieldsByName = [];
 
         foreach ($this->collectContentFieldMetadata($contentSection->getItems()) as $field) {
@@ -1019,10 +1037,16 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                         if (isset(self::EXCLUDED_TARGET_FIELDS[$childName]) || 'block' === $childType || \str_starts_with($childName, 'props/')) {
                             continue;
                         }
-                        $label = $childField->getLabel($locale) ?? $childField->getLabel('en') ?? \ucwords(\str_replace(['_', '-'], ' ', $childName));
+                        $titles = [];
+                        foreach ($allLocales as $loc) {
+                            $titles[$loc] = $childField->getLabel($loc)
+                                ?? \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($childName, $loc);
+                        }
+                        $label = $titles[$locale] ?? $titles['en'];
                         $fieldsByName[$childName] ??= [
                             'name' => $childName,
                             'label' => $label,
+                            'titles' => $titles,
                         ];
                     }
                 }
@@ -1034,22 +1058,35 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 continue;
             }
 
-            $label = $field->getLabel($locale) ?? $field->getLabel('en') ?? \ucwords(\str_replace(['_', '-'], ' ', $fieldName));
+            $titles = [];
+            foreach ($allLocales as $loc) {
+                $titles[$loc] = $field->getLabel($loc)
+                    ?? \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fieldName, $loc);
+            }
+            $label = $titles[$locale] ?? $titles['en'];
             $fieldsByName[$fieldName] = [
                 'name' => $fieldName,
                 'label' => $label,
+                'titles' => $titles,
             ];
         }
 
         if ([] === $fieldsByName) {
-            return [
-                ['name' => 'title', 'label' => 'Title'],
-                ['name' => 'subtitle', 'label' => 'Subtitle'],
-                ['name' => 'content', 'label' => 'Content'],
-                ['name' => 'image', 'label' => 'Image'],
-                ['name' => 'link', 'label' => 'Link'],
-                ['name' => 'icon', 'label' => 'Icon'],
-            ];
+            $fallbackKeys = ['title', 'subtitle', 'content', 'image', 'link', 'icon'];
+            $fallback = [];
+            foreach ($fallbackKeys as $fKey) {
+                $titles = [];
+                foreach ($allLocales as $loc) {
+                    $titles[$loc] = \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fKey, $loc);
+                }
+                $fallback[] = [
+                    'name' => $fKey,
+                    'label' => $titles[$locale] ?? $titles['en'],
+                    'titles' => $titles,
+                ];
+            }
+
+            return $fallback;
         }
 
         return \array_values($fieldsByName);
@@ -1088,36 +1125,47 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     }
 
     /**
-     * @return list<array{name: string, label: string}>
+     * @return list<array{name: string, label: string, titles: array<string, string>}>
      */
     private function discoverAllSourceFields(DynamicContentSourceRegistry $registry, string $locale): array
     {
-        /** @var array<string, array{name: string, label: string}> $fieldsByName */
+        $allLocales = \array_values(\array_unique(['en', 'tr', 'de', 'ru', 'es', 'fr', $locale]));
+        /** @var array<string, array{name: string, label: string, titles: array<string, string>}> $fieldsByName */
         $fieldsByName = [];
 
         foreach ($registry->getProviders() as $provider) {
+            $byLoc = [];
+            foreach ($allLocales as $loc) {
+                foreach ($provider->getSourceFields($loc) as $field) {
+                    $byLoc[$field['name']][$loc] = $field['label'];
+                }
+            }
             foreach ($provider->getSourceFields($locale) as $field) {
                 $name = $field['name'];
                 $fieldsByName[$name] ??= [
                     'name' => $name,
                     'label' => $field['label'],
+                    'titles' => $byLoc[$name] ?? [$locale => $field['label']],
                 ];
             }
         }
 
         if ([] === $fieldsByName) {
-            return [
-                ['name' => 'title', 'label' => 'Title'],
-                ['name' => 'headline', 'label' => 'Headline'],
-                ['name' => 'subtitle', 'label' => 'Subtitle'],
-                ['name' => 'summary', 'label' => 'Summary'],
-                ['name' => 'description', 'label' => 'Description'],
-                ['name' => 'image', 'label' => 'Image'],
-                ['name' => 'url', 'label' => 'URL'],
-                ['name' => 'link', 'label' => 'Link'],
-                ['name' => 'badge', 'label' => 'Badge'],
-                ['name' => 'date', 'label' => 'Publish Date'],
-            ];
+            $fallbackKeys = ['title', 'headline', 'subtitle', 'summary', 'description', 'image', 'url', 'link', 'badge', 'date'];
+            $fallback = [];
+            foreach ($fallbackKeys as $fKey) {
+                $titles = [];
+                foreach ($allLocales as $loc) {
+                    $titles[$loc] = \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fKey, $loc);
+                }
+                $fallback[] = [
+                    'name' => $fKey,
+                    'label' => $titles[$locale] ?? $titles['en'],
+                    'titles' => $titles,
+                ];
+            }
+
+            return $fallback;
         }
 
         return \array_values($fieldsByName);

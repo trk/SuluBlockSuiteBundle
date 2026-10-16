@@ -97,16 +97,16 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
     public function getSourceFields(string $locale = 'en'): array
     {
         return [
-            ['name' => 'image', 'label' => 'Media Image', 'type' => 'single_media_selection'],
-            ['name' => 'title', 'label' => 'Media Title', 'type' => 'text_line'],
-            ['name' => 'headline', 'label' => 'Headline', 'type' => 'text_line'],
-            ['name' => 'description', 'label' => 'Media Description', 'type' => 'text_area'],
-            ['name' => 'summary', 'label' => 'Summary', 'type' => 'text_area'],
-            ['name' => 'caption', 'label' => 'Media Caption', 'type' => 'text_line'],
-            ['name' => 'url', 'label' => 'Media Direct URL', 'type' => 'url'],
-            ['name' => 'link', 'label' => 'Media Link', 'type' => 'link'],
-            ['name' => 'copyright', 'label' => 'Copyright', 'type' => 'text_line'],
-            ['name' => 'credits', 'label' => 'Credits', 'type' => 'text_line'],
+            ['name' => 'image', 'label' => $this->translateFieldLabel('media_image', $locale), 'type' => 'single_media_selection'],
+            ['name' => 'title', 'label' => $this->translateFieldLabel('media_title', $locale), 'type' => 'text_line'],
+            ['name' => 'headline', 'label' => $this->translateFieldLabel('headline', $locale), 'type' => 'text_line'],
+            ['name' => 'description', 'label' => $this->translateFieldLabel('media_description', $locale), 'type' => 'text_area'],
+            ['name' => 'summary', 'label' => $this->translateFieldLabel('summary', $locale), 'type' => 'text_area'],
+            ['name' => 'caption', 'label' => $this->translateFieldLabel('media_caption', $locale), 'type' => 'text_line'],
+            ['name' => 'url', 'label' => $this->translateFieldLabel('media_url', $locale), 'type' => 'url'],
+            ['name' => 'link', 'label' => $this->translateFieldLabel('media_link', $locale), 'type' => 'link'],
+            ['name' => 'copyright', 'label' => $this->translateFieldLabel('copyright', $locale), 'type' => 'text_line'],
+            ['name' => 'credits', 'label' => $this->translateFieldLabel('credits', $locale), 'type' => 'text_line'],
         ];
     }
 

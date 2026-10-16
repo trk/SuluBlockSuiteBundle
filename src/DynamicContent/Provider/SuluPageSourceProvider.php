@@ -183,20 +183,20 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
     public function getSourceFields(string $locale = 'en'): array
     {
         return [
-            ['name' => 'title', 'label' => 'Title', 'type' => 'string'],
-            ['name' => 'headline', 'label' => 'Headline', 'type' => 'string'],
-            ['name' => 'subtitle', 'label' => 'Subtitle', 'type' => 'string'],
-            ['name' => 'summary', 'label' => 'Summary', 'type' => 'text'],
-            ['name' => 'description', 'label' => 'Description', 'type' => 'text'],
-            ['name' => 'content', 'label' => 'Content', 'type' => 'text'],
-            ['name' => 'image', 'label' => 'Image', 'type' => 'media'],
-            ['name' => 'url', 'label' => 'Page URL', 'type' => 'link'],
-            ['name' => 'link', 'label' => 'Page Link', 'type' => 'link'],
-            ['name' => 'badge', 'label' => 'Badge', 'type' => 'string'],
-            ['name' => 'tags', 'label' => 'Tags', 'type' => 'array'],
-            ['name' => 'template', 'label' => 'Template Key', 'type' => 'string'],
-            ['name' => 'date', 'label' => 'Publish Date', 'type' => 'date'],
-            ['name' => 'author', 'label' => 'Author', 'type' => 'string'],
+            ['name' => 'title', 'label' => $this->translateFieldLabel('title', $locale), 'type' => 'string'],
+            ['name' => 'headline', 'label' => $this->translateFieldLabel('headline', $locale), 'type' => 'string'],
+            ['name' => 'subtitle', 'label' => $this->translateFieldLabel('subtitle', $locale), 'type' => 'string'],
+            ['name' => 'summary', 'label' => $this->translateFieldLabel('summary', $locale), 'type' => 'text'],
+            ['name' => 'description', 'label' => $this->translateFieldLabel('description', $locale), 'type' => 'text'],
+            ['name' => 'content', 'label' => $this->translateFieldLabel('content', $locale), 'type' => 'text'],
+            ['name' => 'image', 'label' => $this->translateFieldLabel('image', $locale), 'type' => 'media'],
+            ['name' => 'url', 'label' => $this->translateFieldLabel('page_url', $locale), 'type' => 'link'],
+            ['name' => 'link', 'label' => $this->translateFieldLabel('page_link', $locale), 'type' => 'link'],
+            ['name' => 'badge', 'label' => $this->translateFieldLabel('badge', $locale), 'type' => 'string'],
+            ['name' => 'tags', 'label' => $this->translateFieldLabel('tags', $locale), 'type' => 'array'],
+            ['name' => 'template', 'label' => $this->translateFieldLabel('template', $locale), 'type' => 'string'],
+            ['name' => 'date', 'label' => $this->translateFieldLabel('date', $locale), 'type' => 'date'],
+            ['name' => 'author', 'label' => $this->translateFieldLabel('author', $locale), 'type' => 'string'],
         ];
     }
 

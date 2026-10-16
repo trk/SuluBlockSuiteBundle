@@ -56,7 +56,7 @@ final class BlockTargetFieldMetadataResolver
             return [
                 'multiple' => false,
                 'default_item_type' => null,
-                'fields' => $this->getDefaultFallbackFields(),
+                'fields' => $this->getDefaultFallbackFields($locale),
             ];
         }
 
@@ -128,7 +128,7 @@ final class BlockTargetFieldMetadataResolver
         }
 
         $fields = [] === $fieldsByName
-            ? $this->getDefaultFallbackFields()
+            ? $this->getDefaultFallbackFields($locale)
             : \array_values($fieldsByName);
 
         return [
@@ -215,14 +215,14 @@ final class BlockTargetFieldMetadataResolver
     /**
      * @return list<array{name: string, label: string, type: string}>
      */
-    private function getDefaultFallbackFields(): array
+    private function getDefaultFallbackFields(string $locale = 'en'): array
     {
         return [
-            ['name' => 'title', 'label' => 'Title', 'type' => 'string'],
-            ['name' => 'content', 'label' => 'Content', 'type' => 'text'],
-            ['name' => 'image', 'label' => 'Image', 'type' => 'media'],
-            ['name' => 'link', 'label' => 'Link', 'type' => 'link'],
-            ['name' => 'icon', 'label' => 'Icon', 'type' => 'icon'],
+            ['name' => 'title', 'label' => \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel('title', $locale), 'type' => 'string'],
+            ['name' => 'content', 'label' => \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel('content', $locale), 'type' => 'text'],
+            ['name' => 'image', 'label' => \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel('image', $locale), 'type' => 'media'],
+            ['name' => 'link', 'label' => \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel('link', $locale), 'type' => 'link'],
+            ['name' => 'icon', 'label' => \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel('icon', $locale), 'type' => 'icon'],
         ];
     }
 }

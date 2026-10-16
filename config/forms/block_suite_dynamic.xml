@@ -25,18 +25,22 @@
                         <title lang="fr">Source de Contenu Dynamique</title>
                         <info_text lang="en">Select where the content for this block will be pulled from.</info_text>
                         <info_text lang="tr">Bu bloğun içeriğinin nereden çekileceğini seçin.</info_text>
+                        <info_text lang="de">Wählen Sie aus, woher der Inhalt für diesen Block bezogen werden soll.</info_text>
+                        <info_text lang="ru">Выберите источник данных для этого блока.</info_text>
+                        <info_text lang="es">Seleccione de dónde se obtendrá el contenido para este bloque.</info_text>
+                        <info_text lang="fr">Sélectionnez d'où proviendra le contenu de ce bloc.</info_text>
                     </meta>
                     <params>
                         <param name="default_value" value="none"/>
                         <param name="values" type="collection">
                             <param name="none">
                                 <meta>
-                                    <title lang="en">None (Static Content)</title>
-                                    <title lang="tr">Yok (Statik İçerik)</title>
-                                    <title lang="de">Keine (Statischer Inhalt)</title>
-                                    <title lang="ru">Нет (Статический контент)</title>
-                                    <title lang="es">Ninguno (Contenido Estático)</title>
-                                    <title lang="fr">Aucun (Contenu Statique)</title>
+                                    <title lang="en">None</title>
+                                    <title lang="tr">Yok</title>
+                                    <title lang="de">Keine</title>
+                                    <title lang="ru">Нет</title>
+                                    <title lang="es">Ninguno</title>
+                                    <title lang="fr">Aucun</title>
                                 </meta>
                             </param>
                         </param>
@@ -182,8 +186,8 @@
                           visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection'">
                     <meta>
                         <title lang="en">Offset</title>
-                        <title lang="tr">Başlangıç (Offset)</title>
-                        <title lang="de">Offset</title>
+                        <title lang="tr">Başlangıç</title>
+                        <title lang="de">Versatz</title>
                         <title lang="ru">Смещение</title>
                         <title lang="es">Desplazamiento</title>
                         <title lang="fr">Décalage</title>
@@ -263,21 +267,21 @@
                             <param name="desc">
                                 <meta>
                                     <title lang="en">Descending</title>
-                                    <title lang="tr">Azalan (DESC)</title>
-                                    <title lang="de">Absteigend (DESC)</title>
-                                    <title lang="ru">По убыванию (DESC)</title>
-                                    <title lang="es">Descendente (DESC)</title>
-                                    <title lang="fr">Décroissant (DESC)</title>
+                                    <title lang="tr">Azalan</title>
+                                    <title lang="de">Absteigend</title>
+                                    <title lang="ru">По убыванию</title>
+                                    <title lang="es">Descendente</title>
+                                    <title lang="fr">Décroissant</title>
                                 </meta>
                             </param>
                             <param name="asc">
                                 <meta>
                                     <title lang="en">Ascending</title>
-                                    <title lang="tr">Artan (ASC)</title>
-                                    <title lang="de">Aufsteigend (ASC)</title>
-                                    <title lang="ru">По возрастанию (ASC)</title>
-                                    <title lang="es">Ascendente (ASC)</title>
-                                    <title lang="fr">Croissant (ASC)</title>
+                                    <title lang="tr">Artan</title>
+                                    <title lang="de">Aufsteigend</title>
+                                    <title lang="ru">По возрастанию</title>
+                                    <title lang="es">Ascendente</title>
+                                    <title lang="fr">Croissant</title>
                                 </meta>
                             </param>
                         </param>
@@ -287,12 +291,18 @@
                 <property name="dynamic_template_keys" type="text_line" colspan="4" mandatory="false"
                           visibleCondition="__parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles'">
                     <meta>
-                        <title lang="en">Template Filter (comma-separated)</title>
-                        <title lang="tr">Şablon Filtresi (virgülle ayrılmış)</title>
-                        <title lang="de">Template-Filter (kommagetrennt)</title>
-                        <title lang="ru">Фильтр шаблонов (через запятую)</title>
-                        <title lang="es">Filtro de Plantilla (separado por comas)</title>
-                        <title lang="fr">Filtre de Modèle (séparé par des virgules)</title>
+                        <title lang="en">Template Filter</title>
+                        <title lang="tr">Şablon Filtresi</title>
+                        <title lang="de">Template-Filter</title>
+                        <title lang="ru">Фильтр шаблонов</title>
+                        <title lang="es">Filtro de Plantilla</title>
+                        <title lang="fr">Filtre de Modèle</title>
+                        <info_text lang="en">Comma-separated template keys.</info_text>
+                        <info_text lang="tr">Virgülle ayrılmış şablon anahtarları.</info_text>
+                        <info_text lang="de">Kommagetrennte Vorlagenschlüssel.</info_text>
+                        <info_text lang="ru">Ключи шаблонов через запятую.</info_text>
+                        <info_text lang="es">Claves de plantilla separadas por comas.</info_text>
+                        <info_text lang="fr">Clés de modèle séparées par des virgules.</info_text>
                     </meta>
                 </property>
 

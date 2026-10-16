@@ -97,17 +97,17 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
     public function getSourceFields(string $locale = 'en'): array
     {
         return [
-            ['name' => 'title', 'label' => 'Title', 'type' => 'text_line'],
-            ['name' => 'headline', 'label' => 'Headline', 'type' => 'text_line'],
-            ['name' => 'summary', 'label' => 'Summary', 'type' => 'text_area'],
-            ['name' => 'description', 'label' => 'Description', 'type' => 'text_editor'],
-            ['name' => 'content', 'label' => 'Content', 'type' => 'text_editor'],
-            ['name' => 'image', 'label' => 'Image', 'type' => 'single_media_selection'],
-            ['name' => 'url', 'label' => 'URL', 'type' => 'url'],
-            ['name' => 'link', 'label' => 'Link', 'type' => 'link'],
-            ['name' => 'authored', 'label' => 'Authored Date', 'type' => 'datetime'],
-            ['name' => 'badge', 'label' => 'Badge', 'type' => 'text_line'],
-            ['name' => 'template', 'label' => 'Template Key', 'type' => 'text_line'],
+            ['name' => 'title', 'label' => $this->translateFieldLabel('title', $locale), 'type' => 'text_line'],
+            ['name' => 'headline', 'label' => $this->translateFieldLabel('headline', $locale), 'type' => 'text_line'],
+            ['name' => 'summary', 'label' => $this->translateFieldLabel('summary', $locale), 'type' => 'text_area'],
+            ['name' => 'description', 'label' => $this->translateFieldLabel('description', $locale), 'type' => 'text_editor'],
+            ['name' => 'content', 'label' => $this->translateFieldLabel('content', $locale), 'type' => 'text_editor'],
+            ['name' => 'image', 'label' => $this->translateFieldLabel('image', $locale), 'type' => 'single_media_selection'],
+            ['name' => 'url', 'label' => $this->translateFieldLabel('url', $locale), 'type' => 'url'],
+            ['name' => 'link', 'label' => $this->translateFieldLabel('link', $locale), 'type' => 'link'],
+            ['name' => 'authored', 'label' => $this->translateFieldLabel('authored', $locale), 'type' => 'datetime'],
+            ['name' => 'badge', 'label' => $this->translateFieldLabel('badge', $locale), 'type' => 'text_line'],
+            ['name' => 'template', 'label' => $this->translateFieldLabel('template', $locale), 'type' => 'text_line'],
         ];
     }
 

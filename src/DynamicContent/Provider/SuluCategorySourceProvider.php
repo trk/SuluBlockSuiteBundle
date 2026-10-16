@@ -97,13 +97,13 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
     public function getSourceFields(string $locale = 'en'): array
     {
         return [
-            ['name' => 'title', 'label' => 'Category Name', 'type' => 'text_line'],
-            ['name' => 'headline', 'label' => 'Headline', 'type' => 'text_line'],
-            ['name' => 'description', 'label' => 'Category Description', 'type' => 'text_area'],
-            ['name' => 'summary', 'label' => 'Summary', 'type' => 'text_area'],
-            ['name' => 'key', 'label' => 'Category Key', 'type' => 'text_line'],
-            ['name' => 'badge', 'label' => 'Badge', 'type' => 'text_line'],
-            ['name' => 'image', 'label' => 'Category Media', 'type' => 'single_media_selection'],
+            ['name' => 'title', 'label' => $this->translateFieldLabel('category_title', $locale), 'type' => 'text_line'],
+            ['name' => 'headline', 'label' => $this->translateFieldLabel('headline', $locale), 'type' => 'text_line'],
+            ['name' => 'description', 'label' => $this->translateFieldLabel('category_description', $locale), 'type' => 'text_area'],
+            ['name' => 'summary', 'label' => $this->translateFieldLabel('summary', $locale), 'type' => 'text_area'],
+            ['name' => 'key', 'label' => $this->translateFieldLabel('category_key', $locale), 'type' => 'text_line'],
+            ['name' => 'badge', 'label' => $this->translateFieldLabel('badge', $locale), 'type' => 'text_line'],
+            ['name' => 'image', 'label' => $this->translateFieldLabel('category_image', $locale), 'type' => 'single_media_selection'],
         ];
     }
 
