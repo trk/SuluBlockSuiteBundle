@@ -44,6 +44,24 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         'snippet' => true,
     ];
 
+    private const DEFAULT_PREVIEW_EXCLUDED_FIELDS = [
+        'preset',
+        '_preset',
+        'dynamic_source',
+        'dynamic_mapping',
+        'image_url',
+        'video_url',
+        'link_title',
+    ];
+
+    private const DEFAULT_PREVIEW_PRIMARY_TEXT_FIELDS = [
+        'title',
+        'text',
+        'content',
+        'description',
+        'label',
+    ];
+
     /**
      * @var array<string, array<string, FormMetadata>>
      */
@@ -62,7 +80,19 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     private array $presetDirectories;
 
     /**
+     * @var array<string, true>
+     */
+    private array $previewExcludedFieldMap;
+
+    /**
+     * @var array<string, true>
+     */
+    private array $previewPrimaryTextFieldMap;
+
+    /**
      * @param string|array<array-key, string> $presetDirectory
+     * @param list<string> $previewExcludedFields
+     * @param list<string> $previewPrimaryTextFields
      */
     public function __construct(
         string|array $presetDirectory = [],
@@ -73,9 +103,19 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         private readonly ?SchemaMetadataProvider $schemaMetadataProvider = null,
         private readonly ?DynamicContentHydratorInterface $dynamicContentHydrator = null,
         private readonly ?BlockPresetProviderInterface $presetProvider = null,
+        array $previewExcludedFields = [],
+        array $previewPrimaryTextFields = [],
     ) {
         $dirs = \is_array($presetDirectory) ? \array_values($presetDirectory) : [$presetDirectory];
         $this->presetDirectories = \array_values(\array_filter($dirs, static fn (string $dir): bool => '' !== \trim($dir)));
+        $this->previewExcludedFieldMap = \array_fill_keys(
+            \array_values(\array_unique([...self::DEFAULT_PREVIEW_EXCLUDED_FIELDS, ...$previewExcludedFields])),
+            true,
+        );
+        $this->previewPrimaryTextFieldMap = \array_fill_keys(
+            \array_values(\array_unique([...self::DEFAULT_PREVIEW_PRIMARY_TEXT_FIELDS, ...$previewPrimaryTextFields])),
+            true,
+        );
     }
 
     /**
@@ -1254,34 +1294,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             return;
         }
 
-        $excludedFieldNames = [
-            'hover_image' => true,
-            'hover_video' => true,
-            'image_url' => true,
-            'hover_image_url' => true,
-            'video_url' => true,
-            'hover_video_url' => true,
-            'link_title' => true,
-            'aspect_ratio_width' => true,
-            'aspect_ratio_height' => true,
-            'zoom' => true,
-        ];
-
-        $primaryTextNames = [
-            'title' => true,
-            'headline' => true,
-            'override_title' => true,
-            'header_title' => true,
-            'author' => true,
-            'location_query' => true,
-            'target_id' => true,
-            'label' => true,
-            'term' => true,
-        ];
-
         foreach ($fields as $field) {
             $name = $field->getName();
-            if (isset($excludedFieldNames[$name]) || \str_starts_with($name, 'props/')) {
+            if (isset($this->previewExcludedFieldMap[$name]) || \str_starts_with($name, 'props/')) {
                 continue;
             }
 
@@ -1289,7 +1304,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $priority = match ($type) {
                 'single_reusable_block_selection' => 2048,
                 'single_media_selection', 'media_selection' => 'image' === $name ? 2048 : 1900,
-                'text_line' => isset($primaryTextNames[$name]) ? 1024 : 768,
+                'text_line' => isset($this->previewPrimaryTextFieldMap[$name]) ? 1024 : 768,
                 'date', 'datetime', 'time', 'email', 'phone', 'url', 'color', 'smart_content' => 900,
                 'text_editor', 'text_area' => 512,
                 'block' => 256,

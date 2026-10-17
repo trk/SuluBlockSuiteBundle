@@ -118,10 +118,9 @@ export default class HotspotPicker extends React.Component<Props> {
         if (typeof rawMedia === 'object' && rawMedia !== null) {
             if (rawMedia.thumbnails || rawMedia.formats || rawMedia.url) {
                 const thumbs = rawMedia.thumbnails || rawMedia.formats || {};
-                const url = thumbs['col-lg']
-                    || thumbs['col-md']
-                    || thumbs['sulu-400x400']
-                    || thumbs['col-xl']
+                const url = thumbs['sulu-400x400']
+                    || thumbs['sulu-240x']
+                    || thumbs['sulu-100x100']
                     || rawMedia.url
                     || Object.values(thumbs)[0];
 
@@ -161,10 +160,9 @@ export default class HotspotPicker extends React.Component<Props> {
                     return;
                 }
                 const thumbs = response.thumbnails || response.formats || {};
-                const url = thumbs['col-lg']
-                    || thumbs['col-md']
-                    || thumbs['sulu-400x400']
-                    || thumbs['col-xl']
+                const url = thumbs['sulu-400x400']
+                    || thumbs['sulu-240x']
+                    || thumbs['sulu-100x100']
                     || response.url
                     || Object.values(thumbs)[0];
 

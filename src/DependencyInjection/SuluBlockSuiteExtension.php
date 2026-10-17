@@ -98,5 +98,18 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
         $mediaConfig = $config['media'];
         $container->setParameter('sulu_block_suite.media.srcset_formats', $mediaConfig['srcset_formats']);
         SuluDataNormalizer::setDefaultSrcSetFormats($mediaConfig['srcset_formats']);
+
+        /** @var array{excluded_fields: list<scalar|null>, primary_text_fields: list<scalar|null>} $previewTagsConfig */
+        $previewTagsConfig = $config['preview_tags'];
+        $excludedFields = \array_values(\array_unique(\array_filter(
+            \array_map(static fn (mixed $v): string => \is_scalar($v) ? \trim((string) $v) : '', $previewTagsConfig['excluded_fields']),
+            static fn (string $v): bool => '' !== $v,
+        )));
+        $primaryTextFields = \array_values(\array_unique(\array_filter(
+            \array_map(static fn (mixed $v): string => \is_scalar($v) ? \trim((string) $v) : '', $previewTagsConfig['primary_text_fields']),
+            static fn (string $v): bool => '' !== $v,
+        )));
+        $container->setParameter('sulu_block_suite.preview_tags.excluded_fields', $excludedFields);
+        $container->setParameter('sulu_block_suite.preview_tags.primary_text_fields', $primaryTextFields);
     }
 }

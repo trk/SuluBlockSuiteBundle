@@ -84,15 +84,6 @@ export default class PresetGallery extends React.Component<Props> {
         if (props.size) {
             badges.push({id: 'size', label: String(props.size).toUpperCase()});
         }
-        if (props.text_align) {
-            const alignKey = String(props.text_align).toLowerCase();
-            const alignLabel = alignKey === 'center'
-                ? this.t('sulu_block_suite.opt_center', 'Center')
-                : (alignKey === 'right'
-                    ? this.t('sulu_block_suite.opt_right', 'Right')
-                    : this.t('sulu_block_suite.opt_left', 'Left'));
-            badges.push({id: 'align', label: alignLabel});
-        }
         if (props.variant && badges.length < 3) {
             badges.push({id: 'variant', label: String(props.variant)});
         }

@@ -77,9 +77,9 @@ final class DynamicContentTwigExtension extends AbstractExtension
     }
 
     /**
-     * Hydrates the leaf block lists of a nested container block exactly once, e.g. with the path
-     * `['rows', 'columns', 'blocks']` for a `section > rows > columns > blocks` tree. Dynamic blocks
-     * hidden by their display rules (status, display condition, "Hide When Empty") are removed.
+     * Hydrates the leaf block lists of a nested container block exactly once along `$path`
+     * (defaulting to `['blocks']`). Dynamic blocks hidden by their display rules (status,
+     * display condition, "Hide When Empty") are removed.
      *
      * Returns null when the container held at least one leaf block and none of them remains
      * visible, so templates can skip rendering empty containers. Containers without any leaf
@@ -91,7 +91,7 @@ final class DynamicContentTwigExtension extends AbstractExtension
      *
      * @return array<string, mixed>|null
      */
-    public function hydrateBlockTree(?array $block, array|object|null $context = null, array $path = []): ?array
+    public function hydrateBlockTree(?array $block, array|object|null $context = null, array $path = ['blocks']): ?array
     {
         if (null === $block || [] === $path) {
             return $block;
@@ -137,7 +137,7 @@ final class DynamicContentTwigExtension extends AbstractExtension
                 }
             }
 
-            $hydratedBlocks = $this->hydrateBlocks($leafBlocks, \array_merge($context, ['_in_column' => true]));
+            $hydratedBlocks = $this->hydrateBlocks($leafBlocks, \array_merge($context, ['_nested_block' => true]));
             $sourceCount += \count($leafBlocks);
             $visibleCount += \count($hydratedBlocks);
             $node[$key] = $hydratedBlocks;

@@ -91,7 +91,7 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
         }
 
         $groupId = 'reusable_' . (++$this->groupSequence);
-        $isNested = !empty($context['_in_column']) || isset($context['_slot']);
+        $isNested = !empty($context['_nested_block']);
 
         $expanded = $this->expandReusableBlock($block, $locale, $groupId, $isNested, 0);
         if ([] === $expanded) {

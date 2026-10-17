@@ -10,7 +10,7 @@
 {% set inner_blocks = block.blocks|default(snippet.blocks|default(snippet.content.blocks|default([]))) %}
 
 {% if inner_blocks is not empty %}
-    {% if _slot is defined or _in_column|default(false) %}
+    {% if _nested_block|default(false) %}
         {% for inner_block in inner_blocks|hydrate_blocks(_context) %}
             {% if inner_block.type is defined and inner_block.type != 'reusable' %}
                 {{ sulu_block_render(inner_block, _context) }}

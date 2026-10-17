@@ -70,7 +70,6 @@ final class FrameworkAgnosticTest extends TestCase
             'src/DynamicContent/Provider/SuluCategorySourceProvider.php',
             'src/DynamicContent/Provider/SuluMediaCollectionSourceProvider.php',
             'src/DynamicContent/Provider/SuluPageSourceProvider.php',
-            'src/Metadata/BlockSuiteFormMetadataVisitor.php',
             'assets/admin/components/PresetSelection/BlockCollectionBlockPreviewTransformer.js',
             'translations/admin.de.json',
             'translations/admin.en.json',
@@ -106,19 +105,39 @@ final class FrameworkAgnosticTest extends TestCase
         'margin_bottom',
         'padding_top',
         'padding_bottom',
+        'maxwidth',
         'max_width_breakpoint',
         'block_align',
         'block_align_breakpoint',
         'block_align_fallback',
+        'text_align',
         'text_align_breakpoint',
         'text_align_fallback',
         'container_padding_remove',
         'item_animation',
+        'blend',
         'mix_blend_mode',
+        'parallax',
         'parallax_start',
         'parallax_end',
+        'animation',
         'animation_delay',
         'animation_repeat',
+        'hover_image',
+        'hover_video',
+        'location_query',
+        '_in_column',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const PROJECT_IMAGE_FORMATS = [
+        'col-sm',
+        'col-md',
+        'col-lg',
+        'col-xl',
+        'col-2xl',
     ];
 
     /**
@@ -169,19 +188,35 @@ final class FrameworkAgnosticTest extends TestCase
     public function testNoPrelineStylingFieldNamesAppearInCore(): void
     {
         $violations = [];
-        $pattern = '/\b(' . \implode('|', \array_map(static fn (string $f): string => \preg_quote($f, '/'), self::PRELINE_STYLING_FIELDS)) . ')\b/';
+        $pattern = '/(?<![a-zA-Z0-9_-])(' . \implode('|', \array_map(static fn (string $f): string => \preg_quote($f, '/'), self::PRELINE_STYLING_FIELDS)) . ')\b/';
 
         foreach ($this->collectBundleFiles(self::SCAN_DIRECTORIES) as $relativePath => $content) {
-            if (1 === \preg_match_all($pattern, $content, $matches)) {
-                $found = \array_unique($matches[1]);
-                $violations[] = \sprintf('%s contains Preline styling field(s): %s', $relativePath, \implode(', ', $found));
-            } elseif (\preg_match_all($pattern, $content, $matches) > 1) {
+            $scannableContent = \str_ends_with($relativePath, '.scss')
+                ? (string) \preg_replace('/^\s*animation\s*:/m', '', $content)
+                : $content;
+
+            if (\preg_match_all($pattern, $scannableContent, $matches) >= 1) {
                 $found = \array_unique($matches[1]);
                 $violations[] = \sprintf('%s contains Preline styling field(s): %s', $relativePath, \implode(', ', $found));
             }
         }
 
         self::assertSame([], $violations, "Preline styling field names found in Core:\n" . \implode("\n", $violations));
+    }
+
+    public function testNoProjectSpecificImageFormatNamesAppearInCore(): void
+    {
+        $violations = [];
+        $pattern = '/(?<![a-zA-Z0-9_-])(' . \implode('|', \array_map(static fn (string $f): string => \preg_quote($f, '/'), self::PROJECT_IMAGE_FORMATS)) . ')(?![a-zA-Z0-9_-])/';
+
+        foreach ($this->collectBundleFiles(self::SCAN_DIRECTORIES) as $relativePath => $content) {
+            if (\preg_match_all($pattern, $content, $matches) >= 1) {
+                $found = \array_unique($matches[1]);
+                $violations[] = \sprintf('%s contains project-specific image format(s): %s', $relativePath, \implode(', ', $found));
+            }
+        }
+
+        self::assertSame([], $violations, "Project-specific image format names found in Core:\n" . \implode("\n", $violations));
     }
 
     public function testNoPrelineBlockKeysAppearInCore(): void

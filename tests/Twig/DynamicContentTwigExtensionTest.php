@@ -183,6 +183,7 @@ class DynamicContentTwigExtensionTest extends TestCase
         self::assertNotNull($extension->hydrateBlockTree($spacer, [], ['rows', 'columns', 'blocks']));
         self::assertNull($extension->hydrateBlockTree(null, [], ['rows', 'columns', 'blocks']));
         self::assertSame($spacer, $extension->hydrateBlockTree($spacer, []));
+        self::assertSame($spacer, $extension->hydrateBlockTree($spacer, [], []));
     }
 
     /**

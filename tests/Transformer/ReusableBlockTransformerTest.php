@@ -160,7 +160,7 @@ final class ReusableBlockTransformerTest extends TestCase
                     ],
                 ],
             ],
-        ], ['_in_column' => true]);
+        ], ['_nested_block' => true]);
 
         self::assertCount(2, $processed);
         self::assertSame('image', $processed[0]['type']);
@@ -221,7 +221,7 @@ final class ReusableBlockTransformerTest extends TestCase
                     ],
                 ],
             ],
-        ], ['_in_column' => true]);
+        ], ['_nested_block' => true]);
 
         self::assertCount(3, $processed);
         self::assertSame('headline', $processed[0]['type']);

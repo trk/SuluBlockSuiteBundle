@@ -39,6 +39,8 @@ services:
             $schemaMetadataProvider: '@?sulu_admin.schema_metadata_provider'
             $dynamicContentHydrator: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface'
             $presetProvider: '@?Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
+            $previewExcludedFields: '%sulu_block_suite.preview_tags.excluded_fields%'
+            $previewPrimaryTextFields: '%sulu_block_suite.preview_tags.primary_text_fields%'
         tags:
             - { name: 'sulu_admin.form_metadata_visitor', priority: -50 }
             - { name: 'sulu_admin.typed_form_metadata_visitor', priority: -50 }
