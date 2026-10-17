@@ -16,11 +16,11 @@ final class LayoutTwigExtensionTest extends TestCase
         $mockResolver = $this->createMock(LayoutResolverInterface::class);
         $mockResolver->expects($this->once())
             ->method('resolveClasses')
-            ->with(['container_width' => 'full'])
-            ->willReturn(['container' => 'w-full']);
+            ->with(['layout_width' => 'full'])
+            ->willReturn(['layout_width' => 'w-full']);
 
         $extension = new LayoutTwigExtension($mockResolver);
-        $this->assertSame(['container' => 'w-full'], $extension->getClasses(['container_width' => 'full']));
+        $this->assertSame(['layout_width' => 'w-full'], $extension->getClasses(['layout_width' => 'full']));
     }
 
     public function testGetAttributesFormatsHtmlString(): void
@@ -29,14 +29,14 @@ final class LayoutTwigExtensionTest extends TestCase
         $mockResolver->expects($this->once())
             ->method('resolveAttributes')
             ->willReturn([
-                'data-layout-container' => 'boxed',
+                'data-layout-width' => 'boxed',
                 'data-layout-sidebar' => 'left',
             ]);
 
         $extension = new LayoutTwigExtension($mockResolver);
         $html = $extension->getAttributes([]);
 
-        $this->assertStringContainsString('data-layout-container="boxed"', $html);
+        $this->assertStringContainsString('data-layout-width="boxed"', $html);
         $this->assertStringContainsString('data-layout-sidebar="left"', $html);
     }
 
@@ -68,19 +68,5 @@ final class LayoutTwigExtensionTest extends TestCase
         $data = $extension->loadLayout('default', 'en');
 
         $this->assertSame(['title' => 'Default', 'blocks' => []], $data);
-    }
-
-    public function testGetWrapperClassesDelegatesToResolver(): void
-    {
-        $mockResolver = $this->createMock(LayoutResolverInterface::class);
-        $mockResolver->expects($this->once())
-            ->method('resolveWrapperClasses')
-            ->with(['margin_top' => 'md'], 'my-extra-class')
-            ->willReturn('mt-6 my-extra-class');
-
-        $extension = new LayoutTwigExtension($mockResolver);
-        $result = $extension->getWrapperClasses(['margin_top' => 'md'], 'my-extra-class');
-
-        $this->assertSame('mt-6 my-extra-class', $result);
     }
 }

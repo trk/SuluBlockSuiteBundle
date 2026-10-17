@@ -32,17 +32,7 @@ final class LayoutTwigExtension extends AbstractExtension
             new TwigFunction('layout_render', [$this, 'renderLayout'], ['is_safe' => ['html']]),
             new TwigFunction('sulu_reusable_block_load', [$this, 'loadReusableBlock']),
             new TwigFunction('reusable_block_load', [$this, 'loadReusableBlock']),
-            new TwigFunction('sulu_block_suite_wrapper_classes', [$this, 'getWrapperClasses']),
-            new TwigFunction('block_suite_wrapper_classes', [$this, 'getWrapperClasses']),
         ];
-    }
-
-    /**
-     * @param array<string, mixed>|null $props
-     */
-    public function getWrapperClasses(?array $props, string $extraClass = ''): string
-    {
-        return $this->layoutResolver->resolveWrapperClasses($props, $extraClass);
     }
 
     public function getClass(string $group, ?string $value, string $default = ''): string

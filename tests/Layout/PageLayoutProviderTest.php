@@ -37,7 +37,7 @@ final class PageLayoutProviderTest extends TestCase
             'blocks' => [
                 ['type' => 'headline', 'title' => 'Hello World'],
             ],
-            'container_width' => 'boxed',
+            'layout_width' => 'boxed',
         ]);
 
         $snippet->method('getDimensionContents')->willReturn(new ArrayCollection([$content]));

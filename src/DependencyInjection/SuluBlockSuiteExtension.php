@@ -79,10 +79,11 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
         $reusableConfig = $config['reusable_blocks'];
         $container->setParameter('sulu_block_suite.reusable_blocks.enabled', $reusableConfig['enabled']);
 
-        /** @var array{enabled: bool, yaml_dir: string|list<string>, mappings: array<string, array<string, string>>} $layoutConfig */
+        /** @var array{enabled: bool, yaml_dir: string|list<string>, defaults: array<string, scalar|null>, mappings: array<string, array<string, string>>} $layoutConfig */
         $layoutConfig = $config['layout'];
         $container->setParameter('sulu_block_suite.layout.enabled', $layoutConfig['enabled']);
         $container->setParameter('sulu_block_suite.layout.yaml_dir', $layoutConfig['yaml_dir']);
+        $container->setParameter('sulu_block_suite.layout.defaults', $layoutConfig['defaults']);
         $container->setParameter('sulu_block_suite.layout.mappings', $layoutConfig['mappings']);
 
         /** @var array{template_namespaces: string|array<array-key, string>} $renderingConfig */

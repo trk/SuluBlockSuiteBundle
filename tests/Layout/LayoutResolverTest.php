@@ -9,116 +9,142 @@ use Totoglu\SuluBlockSuiteBundle\Layout\LayoutResolver;
 
 final class LayoutResolverTest extends TestCase
 {
-    public function testResolveClassesWithDefaults(): void
+    public function testResolveClassesWithEmptyDefaults(): void
     {
         $resolver = new LayoutResolver();
         $classes = $resolver->resolveClasses(null);
 
-        $this->assertSame(LayoutResolver::DEFAULT_CONTAINER_CLASS, $classes['container']);
-        $this->assertSame(LayoutResolver::DEFAULT_PADDING_CLASS, $classes['padding']);
-        $this->assertSame('none', $classes['sidebar']);
-        $this->assertSame('solid', $classes['header_variant']);
+        self::assertSame([], $classes);
     }
 
-    public function testResolveClassesWithCustomMappings(): void
+    public function testResolveClassesWithConfiguredDefaults(): void
     {
-        $resolver = new LayoutResolver([
-            'container_width' => [
-                'full' => 'w-full',
-                'boxed' => 'container-boxed',
-            ],
-            'content_padding' => [
-                'compact' => 'py-4',
-            ],
-            'background' => [
-                'dark' => 'bg-neutral-900 text-white',
-                'default' => 'bg-white text-gray-900',
-            ],
+        $resolver = new LayoutResolver([], [
+            'sidebar' => 'none',
+            'header_variant' => 'solid',
+            'layout_width' => 'boxed',
+            'layout_spacing' => 'normal',
         ]);
 
-        $classes = $resolver->resolveClasses([
-            'container_width' => 'full',
-            'content_padding' => 'compact',
+        $classes = $resolver->resolveClasses(null);
+
+        self::assertSame('none', $classes['sidebar']);
+        self::assertSame('solid', $classes['header_variant']);
+        self::assertSame('boxed', $classes['layout_width']);
+        self::assertSame('normal', $classes['layout_spacing']);
+
+        $overridden = $resolver->resolveClasses([
             'sidebar' => 'left',
             'header_variant' => 'transparent',
-            'background' => 'dark',
+            'blocks' => [['type' => 'fixture_block']],
+            'title' => 'Ignored Structural Title',
         ]);
 
-        $this->assertSame('w-full', $classes['container']);
-        $this->assertSame('py-4', $classes['padding']);
-        $this->assertSame('left', $classes['sidebar']);
-        $this->assertSame('transparent', $classes['header_variant']);
-        $this->assertSame('bg-neutral-900 text-white', $classes['background']);
+        self::assertSame('left', $overridden['sidebar']);
+        self::assertSame('transparent', $overridden['header_variant']);
+        self::assertSame('boxed', $overridden['layout_width']);
+        self::assertSame('normal', $overridden['layout_spacing']);
+        self::assertArrayNotHasKey('blocks', $overridden);
+        self::assertArrayNotHasKey('title', $overridden);
+    }
+
+    public function testResolveClassesWithCustomMappingsAndDefaults(): void
+    {
+        $resolver = new LayoutResolver(
+            [
+                'layout_width' => [
+                    'full' => 'w-full',
+                    'boxed' => 'container-boxed',
+                ],
+                'layout_spacing' => [
+                    'compact' => 'py-4',
+                    'normal' => 'py-8',
+                ],
+                'surface' => [
+                    'dark' => 'surface-dark',
+                    'default' => 'surface-light',
+                ],
+            ],
+            [
+                'sidebar' => 'none',
+                'header_variant' => 'solid',
+                'layout_width' => 'boxed',
+                'layout_spacing' => 'normal',
+            ],
+        );
+
+        $defaultClasses = $resolver->resolveClasses(null);
+        self::assertSame('container-boxed', $defaultClasses['layout_width']);
+        self::assertSame('py-8', $defaultClasses['layout_spacing']);
+        self::assertSame('none', $defaultClasses['sidebar']);
+        self::assertSame('solid', $defaultClasses['header_variant']);
+        self::assertSame('surface-light', $defaultClasses['surface']);
+
+        $customClasses = $resolver->resolveClasses([
+            'layout_width' => 'full',
+            'layout_spacing' => 'compact',
+            'sidebar' => 'left',
+            'header_variant' => 'transparent',
+            'surface' => 'dark',
+        ]);
+
+        self::assertSame('w-full', $customClasses['layout_width']);
+        self::assertSame('py-4', $customClasses['layout_spacing']);
+        self::assertSame('left', $customClasses['sidebar']);
+        self::assertSame('transparent', $customClasses['header_variant']);
+        self::assertSame('surface-dark', $customClasses['surface']);
     }
 
     public function testResolveClassSingle(): void
     {
-        $resolver = new LayoutResolver([
-            'theme' => [
-                'modern' => 'theme-modern',
-                'default' => 'theme-default',
+        $resolver = new LayoutResolver(
+            [
+                'theme' => [
+                    'modern' => 'theme-modern',
+                    'default' => 'theme-default',
+                ],
+                'density' => [
+                    'compact' => 'density-compact',
+                    'comfortable' => 'density-comfortable',
+                ],
             ],
-        ]);
+            [
+                'density' => 'comfortable',
+            ],
+        );
 
-        $this->assertSame('theme-modern', $resolver->resolveClass('theme', 'modern'));
-        $this->assertSame('theme-default', $resolver->resolveClass('theme', 'non-existing'));
-        $this->assertSame('theme-default', $resolver->resolveClass('theme', null));
-        $this->assertSame('fallback', $resolver->resolveClass('unknown', null, 'fallback'));
+        self::assertSame('theme-modern', $resolver->resolveClass('theme', 'modern'));
+        self::assertSame('theme-default', $resolver->resolveClass('theme', 'non-existing'));
+        self::assertSame('theme-default', $resolver->resolveClass('theme', null));
+        self::assertSame('density-comfortable', $resolver->resolveClass('density', null));
+        self::assertSame('density-comfortable', $resolver->resolveClass('density', 'unknown'));
+        self::assertSame('fallback', $resolver->resolveClass('unknown', null, 'fallback'));
     }
 
     public function testResolveAttributes(): void
     {
-        $resolver = new LayoutResolver();
+        $resolver = new LayoutResolver([], [
+            'sidebar' => 'none',
+        ]);
+
+        self::assertSame(['data-layout-sidebar' => 'none'], $resolver->resolveAttributes(null));
+
         $attrs = $resolver->resolveAttributes([
-            'container_width' => 'boxed',
+            'layout_width' => 'boxed',
             'sidebar' => 'right',
             'header_variant' => 'minimal',
-            'content_padding' => 'compact',
+            'layout_spacing' => 'compact',
             'custom_theme' => 'dark',
+            'title' => 'Ignored',
+            'blocks' => [],
         ]);
 
-        $this->assertSame('boxed', $attrs['data-layout-container-width']);
-        $this->assertSame('right', $attrs['data-layout-sidebar']);
-        $this->assertSame('minimal', $attrs['data-layout-header-variant']);
-        $this->assertSame('compact', $attrs['data-layout-content-padding']);
-        $this->assertSame('dark', $attrs['data-layout-custom-theme']);
-    }
-
-    public function testResolveWrapperClassesWithDefaults(): void
-    {
-        $resolver = new LayoutResolver();
-        $this->assertSame('', $resolver->resolveWrapperClasses(null));
-        $this->assertSame('base-class', $resolver->resolveWrapperClasses(null, 'base-class'));
-
-        $classes = $resolver->resolveWrapperClasses([
-            'custom_class' => 'my-custom-wrapper',
-        ], 'extra-block-class');
-
-        $this->assertSame('extra-block-class my-custom-wrapper', $classes);
-    }
-
-    public function testResolveWrapperClassesWithCustomMappings(): void
-    {
-        $resolver = new LayoutResolver([
-            'margin_top' => ['sm' => 'custom-mt-2', 'md' => 'mt-6'],
-            'margin_bottom' => ['lg' => 'mb-10'],
-            'max_width' => ['full' => 'w-full', 'large' => 'max-w-5xl mx-auto'],
-            'block_align' => ['center' => 'text-center mx-auto'],
-        ]);
-
-        $classes = $resolver->resolveWrapperClasses([
-            'margin_top' => 'md',
-            'margin_bottom' => 'lg',
-            'max_width' => 'large',
-            'block_align' => 'center',
-            'custom_class' => 'my-custom-wrapper',
-        ], 'extra-block-class');
-
-        $this->assertStringContainsString('mt-6', $classes);
-        $this->assertStringContainsString('mb-10', $classes);
-        $this->assertStringContainsString('max-w-5xl mx-auto', $classes);
-        $this->assertStringContainsString('text-center mx-auto', $classes);
-        $this->assertStringContainsString('my-custom-wrapper', $classes);
-        $this->assertStringContainsString('extra-block-class', $classes);
+        self::assertSame('boxed', $attrs['data-layout-layout-width']);
+        self::assertSame('right', $attrs['data-layout-sidebar']);
+        self::assertSame('minimal', $attrs['data-layout-header-variant']);
+        self::assertSame('compact', $attrs['data-layout-layout-spacing']);
+        self::assertSame('dark', $attrs['data-layout-custom-theme']);
+        self::assertArrayNotHasKey('data-layout-title', $attrs);
+        self::assertArrayNotHasKey('data-layout-blocks', $attrs);
     }
 }

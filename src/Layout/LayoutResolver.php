@@ -6,10 +6,9 @@ namespace Totoglu\SuluBlockSuiteBundle\Layout;
 
 final class LayoutResolver implements LayoutResolverInterface
 {
-    public const DEFAULT_CONTAINER_CLASS = '';
-    public const DEFAULT_PADDING_CLASS = '';
-
     public const DEFAULT_MAPPINGS = [];
+
+    private const STRUCTURAL_KEYS = ['blocks', 'title', 'id', 'uuid', 'description', 'key'];
 
     /**
      * @var array<string, array<string, string>>
@@ -17,10 +16,17 @@ final class LayoutResolver implements LayoutResolverInterface
     private array $mappings;
 
     /**
+     * @var array<string, string>
+     */
+    private array $defaults;
+
+    /**
      * @param array<string, array<string, string>> $mappings
+     * @param array<string, scalar|null> $defaults
      */
     public function __construct(
         array $mappings = [],
+        array $defaults = [],
     ) {
         $merged = self::DEFAULT_MAPPINGS;
         foreach ($mappings as $group => $groupMappings) {
@@ -29,31 +35,47 @@ final class LayoutResolver implements LayoutResolverInterface
             }
         }
         $this->mappings = $merged;
+
+        $normalizedDefaults = [];
+        foreach ($defaults as $key => $value) {
+            if (null !== $value) {
+                $normalizedDefaults[(string) $key] = (string) $value;
+            }
+        }
+        $this->defaults = $normalizedDefaults;
     }
 
     public function resolveClasses(?array $layoutData): array
     {
-        $classes = [
-            'container' => $this->resolveContainerClass($layoutData),
-            'padding' => $this->resolvePaddingClass($layoutData),
-        ];
+        $classes = [];
+        $merged = \array_merge($this->defaults, $layoutData ?? []);
 
-        $sidebar = isset($layoutData['sidebar']) && \is_scalar($layoutData['sidebar'])
-            ? (string) $layoutData['sidebar']
-            : 'none';
-        $classes['sidebar'] = $sidebar;
+        foreach ($merged as $group => $rawValue) {
+            $groupKey = (string) $group;
+            if (\in_array($groupKey, self::STRUCTURAL_KEYS, true)) {
+                continue;
+            }
+            if (!\is_scalar($rawValue) && null !== $rawValue) {
+                continue;
+            }
 
-        $headerVariant = isset($layoutData['header_variant']) && \is_scalar($layoutData['header_variant'])
-            ? (string) $layoutData['header_variant']
-            : 'solid';
-        $classes['header_variant'] = $headerVariant;
+            $val = null !== $rawValue && '' !== (string) $rawValue
+                ? (string) $rawValue
+                : ($this->defaults[$groupKey] ?? null);
+
+            if (isset($this->mappings[$groupKey])) {
+                $classes[$groupKey] = $this->resolveClass($groupKey, $val);
+            } elseif (null !== $val) {
+                $classes[$groupKey] = $val;
+            }
+        }
 
         // Dynamically resolve any other configured mapping groups
         foreach ($this->mappings as $group => $options) {
             if (!\array_key_exists($group, $classes)) {
                 $val = isset($layoutData[$group]) && \is_scalar($layoutData[$group])
                     ? (string) $layoutData[$group]
-                    : null;
+                    : ($this->defaults[$group] ?? null);
                 $classes[$group] = $this->resolveClass($group, $val);
             }
         }
@@ -63,95 +85,40 @@ final class LayoutResolver implements LayoutResolverInterface
 
     public function resolveClass(string $group, ?string $value, string $default = ''): string
     {
-        if (null === $value || '' === $value) {
+        $effectiveValue = (null !== $value && '' !== $value)
+            ? $value
+            : ($this->defaults[$group] ?? null);
+
+        if (null === $effectiveValue || '' === $effectiveValue) {
             return $this->mappings[$group]['default'] ?? $default;
         }
 
-        return $this->mappings[$group][$value]
-            ?? $this->mappings[$group]['default']
-            ?? $default;
-    }
-
-    public function resolveContainerClass(?array $layoutData): string
-    {
-        $key = isset($layoutData['container_width']) && \is_scalar($layoutData['container_width'])
-            ? (string) $layoutData['container_width']
-            : 'boxed';
-
-        return $this->mappings['container_width'][$key]
-            ?? $this->mappings['container_width']['boxed']
-            ?? $this->mappings['container_width']['default']
-            ?? self::DEFAULT_CONTAINER_CLASS;
-    }
-
-    public function resolvePaddingClass(?array $layoutData): string
-    {
-        $key = isset($layoutData['content_padding']) && \is_scalar($layoutData['content_padding'])
-            ? (string) $layoutData['content_padding']
-            : 'normal';
-
-        return $this->mappings['content_padding'][$key]
-            ?? $this->mappings['content_padding']['normal']
-            ?? $this->mappings['content_padding']['default']
-            ?? self::DEFAULT_PADDING_CLASS;
-    }
-
-    public function resolveWrapperClasses(?array $props, string $extraClass = ''): string
-    {
-        $classes = [];
-        if ('' !== $extraClass) {
-            $classes[] = $extraClass;
+        if (isset($this->mappings[$group][$effectiveValue])) {
+            return $this->mappings[$group][$effectiveValue];
         }
 
-        if (null === $props) {
-            return \trim($extraClass);
+        $defaultKey = $this->defaults[$group] ?? null;
+        if (null !== $defaultKey && '' !== $defaultKey && isset($this->mappings[$group][$defaultKey])) {
+            return $this->mappings[$group][$defaultKey];
         }
 
-        $mt = isset($props['margin_top']) && \is_scalar($props['margin_top']) ? (string) $props['margin_top'] : null;
-        $mtClass = $this->resolveClass('margin_top', $mt);
-        if ('' !== $mtClass) {
-            $classes[] = $mtClass;
-        }
-
-        $mb = isset($props['margin_bottom']) && \is_scalar($props['margin_bottom']) ? (string) $props['margin_bottom'] : null;
-        $mbClass = $this->resolveClass('margin_bottom', $mb);
-        if ('' !== $mbClass) {
-            $classes[] = $mbClass;
-        }
-
-        $mw = isset($props['max_width']) && \is_scalar($props['max_width']) ? (string) $props['max_width'] : null;
-        $mwClass = $this->resolveClass('max_width', $mw);
-        if ('' !== $mwClass) {
-            $classes[] = $mwClass;
-        }
-
-        $align = isset($props['block_align']) && \is_scalar($props['block_align']) ? (string) $props['block_align'] : null;
-        $alignClass = $this->resolveClass('block_align', $align);
-        if ('' !== $alignClass) {
-            $classes[] = $alignClass;
-        }
-
-        $customClass = isset($props['custom_class']) && \is_scalar($props['custom_class']) ? \trim((string) $props['custom_class']) : '';
-        if ('' !== $customClass) {
-            $classes[] = $customClass;
-        }
-
-        return \trim(\implode(' ', \array_filter($classes)));
+        return $this->mappings[$group]['default'] ?? $default;
     }
 
     public function resolveAttributes(?array $layoutData): array
     {
-        if (null === $layoutData) {
+        if (null === $layoutData && [] === $this->defaults) {
             return [];
         }
 
+        $merged = \array_merge($this->defaults, $layoutData ?? []);
         $attributes = [];
-        foreach ($layoutData as $key => $value) {
+        foreach ($merged as $key => $value) {
             $keyStr = (string) $key;
             if (1 !== \preg_match('/^[a-zA-Z0-9_-]+$/', $keyStr)) {
                 continue;
             }
-            if (\is_scalar($value) && '' !== (string) $value && !\in_array($keyStr, ['blocks', 'title', 'id', 'uuid', 'description'], true)) {
+            if (\is_scalar($value) && '' !== (string) $value && !\in_array($keyStr, self::STRUCTURAL_KEYS, true)) {
                 $attrName = 'data-layout-' . \str_replace('_', '-', $keyStr);
                 $attributes[$attrName] = (string) $value;
             }
