@@ -91,6 +91,8 @@ final class SuluDataNormalizerTest extends TestCase
             }
         };
         $this->assertSame('/media/obj.jpg', SuluDataNormalizer::resolveImageUrl($mediaObj));
+        $this->assertNull(SuluDataNormalizer::resolveImageUrl(['id' => 42]));
+        $this->assertSame('#', SuluDataNormalizer::resolveUrl('java&#x09;script:alert(1)'));
     }
 
     public function testResolveSrcSetBuildsSortedResponsiveSources(): void
@@ -103,6 +105,7 @@ final class SuluDataNormalizerTest extends TestCase
                 'col-lg' => '/media/960.webp',
                 'sulu-400x400' => '/media/400.webp',
                 'col-md' => '/media/640.webp',
+                'col-xl' => 'javascript:alert(1)',
             ],
         ];
 

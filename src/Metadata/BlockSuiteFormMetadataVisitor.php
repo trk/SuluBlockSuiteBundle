@@ -37,28 +37,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     public const TABS_TAG = 'sulu_block_suite.tabs';
     public const TABS_SECTION_NAME = '__tabs';
 
-    private const NON_DYNAMIC_BLOCKS = [
-        'reusable' => true,
-        'spacer' => true,
-        'section' => true,
-        'row' => true,
-        'row_item' => true,
-        'column' => true,
-        'column_item' => true,
-        'divider' => true,
-        'icon' => true,
-        'html' => true,
-        'code' => true,
-        'breadcrumbs' => true,
-        'scroll_to' => true,
-        'countdown' => true,
-        'social' => true,
-        'popover' => true,
-        'map' => true,
-        'action-block-empty' => true,
-        'action-blocks' => true,
-    ];
-
     private const EXCLUDED_TARGET_FIELDS = [
         'props' => true,
         'dynamic_source' => true,
@@ -69,7 +47,17 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         'items' => true,
         'columns' => true,
         'blocks' => true,
-        'action-blocks' => true,
+    ];
+
+    /**
+     * Optional shared `general` tab fields that are omitted by default unless opted into via
+     * `<tag name="sulu_block_suite.tabs" include_fields="..."/>`.
+     *
+     * @var array<string, true>
+     */
+    private const OPT_IN_GENERAL_FIELDS = [
+        'item_animation' => true,
+        'container_padding_remove' => true,
     ];
 
     /**
@@ -120,7 +108,14 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                     $blockForms[$formKey] = $form;
                 }
             }
-            $this->registeredBlocksCache[$locale] = $blockForms;
+            $sortedBlockForms = $this->sortBlockFormsAlphabetically($blockForms, $locale);
+            foreach (\array_keys($blockForms) as $formKey) {
+                $formMetadata->removeForm($formKey);
+            }
+            foreach ($sortedBlockForms as $formKey => $form) {
+                $formMetadata->addForm($formKey, $form);
+            }
+            $this->registeredBlocksCache[$locale] = $sortedBlockForms;
         }
 
         foreach ($formMetadata->getForms() as $form) {
@@ -190,6 +185,14 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $options[] = $option;
         }
 
+        \usort(
+            $options,
+            static fn (OptionMetadata $a, OptionMetadata $b): int => \strnatcasecmp(
+                $a->getTitle($locale) ?? (string) $a->getName(),
+                $b->getTitle($locale) ?? (string) $b->getName(),
+            ),
+        );
+
         $valuesOption = new OptionMetadata();
         $valuesOption->setName('values');
         $valuesOption->setType(OptionMetadata::TYPE_COLLECTION);
@@ -237,6 +240,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             ? \array_fill_keys(\array_map('trim', \explode(',', $excludeTabsAttr)), true)
             : [];
 
+        $excludedFields = $this->resolveExcludedGeneralFields($tabsTag);
+        $textAlignMode = $tabsTag?->getAttribute('text_align');
+
         $contentSection = new SectionMetadata('content');
         $contentSection->setLabels([
             'en' => 'Content',
@@ -282,7 +288,10 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             if (!isset($excludedTabs['general'])) {
                 $generalSection = $this->loadSharedSection('block_suite_general', 'general');
                 if (null !== $generalSection) {
-                    $generalSection = $this->filterDuplicateSharedFields($generalSection, $nonContentSections);
+                    $generalSection = $this->filterDuplicateSharedFields($generalSection, $nonContentSections, $excludedFields);
+                    if ('standard' === $textAlignMode) {
+                        $this->stripJustifyFromTextAlignFields($generalSection);
+                    }
                     if (isset($nonContentSections['general'])) {
                         $nonContentSections['general'] = $this->mergeSections($nonContentSections['general'], $generalSection);
                     } else {
@@ -291,7 +300,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 }
             }
 
-            if (!isset(self::NON_DYNAMIC_BLOCKS[$blockKey]) && !isset($excludedTabs['dynamic_content'])) {
+            if (!isset($excludedTabs['dynamic_content'])) {
                 $dynamicSection = $this->loadSharedSection('block_suite_dynamic', 'dynamic_content');
                 if (null !== $dynamicSection) {
                     $this->populateDynamicSectionOptions($dynamicSection, $blockForm, $contentSection, $locale);
@@ -306,7 +315,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             if (!isset($excludedTabs['advanced'])) {
                 $advancedSection = $this->loadSharedSection('block_suite_advanced', 'advanced');
                 if (null !== $advancedSection) {
-                    $this->populatePresetSectionOptions($advancedSection, $blockKey);
+                    $this->populatePresetSectionOptions($advancedSection, $blockKey, $locale);
                     if (isset($nonContentSections['advanced'])) {
                         $nonContentSections['advanced'] = $this->mergeSections($nonContentSections['advanced'], $advancedSection);
                     } else {
@@ -534,11 +543,12 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
     /**
      * @param array<string, SectionMetadata> $nonContentSections
+     * @param array<string, true> $excludedFields
      */
-    private function filterDuplicateSharedFields(SectionMetadata $sharedSection, array $nonContentSections): SectionMetadata
+    private function filterDuplicateSharedFields(SectionMetadata $sharedSection, array $nonContentSections, array $excludedFields = []): SectionMetadata
     {
         /** @var array<string, true> $existingFieldNames */
-        $existingFieldNames = [];
+        $existingFieldNames = $excludedFields;
         foreach ($nonContentSections as $sectionName => $section) {
             if ($sectionName === $sharedSection->getName()) {
                 continue;
@@ -573,6 +583,78 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         }
 
         return $filtered;
+    }
+
+    /**
+     * Resolves the set of `general` tab fields to exclude based on `<tag name="sulu_block_suite.tabs" .../>`.
+     *
+     * @return array<string, true>
+     */
+    private function resolveExcludedGeneralFields(?TagMetadata $tabsTag): array
+    {
+        /** @var array<string, true> $excluded */
+        $excluded = self::OPT_IN_GENERAL_FIELDS;
+
+        $includeFieldsAttr = $tabsTag?->getAttribute('include_fields');
+        if (\is_string($includeFieldsAttr) && '' !== \trim($includeFieldsAttr)) {
+            foreach (\array_map('trim', \explode(',', $includeFieldsAttr)) as $fieldName) {
+                if ('' !== $fieldName) {
+                    unset($excluded[$fieldName]);
+                }
+            }
+        }
+
+        $excludeFieldsAttr = $tabsTag?->getAttribute('exclude_fields');
+        if (\is_string($excludeFieldsAttr) && '' !== \trim($excludeFieldsAttr)) {
+            foreach (\array_map('trim', \explode(',', $excludeFieldsAttr)) as $fieldName) {
+                if ('' !== $fieldName) {
+                    $excluded[$fieldName] = true;
+                }
+            }
+        }
+
+        return $excluded;
+    }
+
+    /**
+     * Strips the `justify` option from `text_align` and `text_align_fallback` when
+     * `<tag name="sulu_block_suite.tabs" text_align="standard"/>` is configured.
+     */
+    private function stripJustifyFromTextAlignFields(SectionMetadata $generalSection): void
+    {
+        $items = $generalSection->getItems();
+
+        foreach (['text_align', 'text_align_fallback'] as $fieldName) {
+            $field = $items[$fieldName] ?? null;
+            if (!$field instanceof FieldMetadata) {
+                continue;
+            }
+
+            $valuesOption = $field->findOption('values');
+            if (!$valuesOption instanceof OptionMetadata || !\is_array($valuesOption->getValue())) {
+                continue;
+            }
+
+            $filteredOptions = [];
+            foreach ($valuesOption->getValue() as $opt) {
+                $optVal = $opt->getName() ?? $opt->getValue();
+                if ('justify' === $optVal) {
+                    continue;
+                }
+                $filteredOptions[] = $opt;
+            }
+            $valuesOption->setValue($filteredOptions);
+        }
+
+        $breakpointField = $items['text_align_breakpoint'] ?? null;
+        if ($breakpointField instanceof FieldMetadata) {
+            $breakpointField->setVisibleCondition("text_align && text_align != 'none'");
+        }
+
+        $fallbackField = $items['text_align_fallback'] ?? null;
+        if ($fallbackField instanceof FieldMetadata) {
+            $fallbackField->setVisibleCondition("text_align && text_align != 'none' && text_align_breakpoint");
+        }
     }
 
     /**
@@ -658,8 +740,13 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
      */
     private function parseSectionFromXmlFile(string $xmlPath, string $sectionName): ?SectionMetadata
     {
-        $xml = @\simplexml_load_file($xmlPath);
-        if (false === $xml || !isset($xml->properties)) {
+        $dom = new \DOMDocument();
+        if (false === @$dom->load($xmlPath)) {
+            return null;
+        }
+        @$dom->xinclude();
+        $xml = \simplexml_import_dom($dom);
+        if (null === $xml || !isset($xml->properties)) {
             return null;
         }
 
@@ -727,6 +814,12 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $field->setDisabledCondition((string) $node['disabledCondition']);
         }
 
+        if (isset($node->tag)) {
+            foreach ($node->tag as $tagNode) {
+                $field->addTag($this->parseXmlTagNode($tagNode));
+            }
+        }
+
         if (isset($node->params)) {
             foreach ($node->params->param as $paramNode) {
                 $field->addOption($this->parseXmlParamNode($paramNode));
@@ -742,6 +835,11 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 $typeForm = new FormMetadata();
                 $typeForm->setKey($typeName);
                 $typeForm->setTitles($this->extractXmlTitles($typeNode->meta ?? null));
+                if (isset($typeNode->tag)) {
+                    foreach ($typeNode->tag as $tagNode) {
+                        $typeForm->addTag($this->parseXmlTagNode($tagNode));
+                    }
+                }
                 if (isset($typeNode->properties)) {
                     foreach ($typeNode->properties->children() as $subNode) {
                         $subTag = $subNode->getName();
@@ -758,6 +856,26 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         }
 
         return $field;
+    }
+
+    private function parseXmlTagNode(\SimpleXMLElement $tagNode): TagMetadata
+    {
+        $tag = new TagMetadata();
+        $tag->setName((string) ($tagNode['name'] ?? ''));
+        if (isset($tagNode['priority'])) {
+            $tag->setPriority((int) $tagNode['priority']);
+        }
+
+        $attributes = [];
+        foreach ($tagNode->attributes() as $attrName => $attrVal) {
+            if ('name' === $attrName || 'priority' === $attrName) {
+                continue;
+            }
+            $attributes[$attrName] = (string) $attrVal;
+        }
+        $tag->setAttributes($attributes);
+
+        return $tag;
     }
 
     private function parseXmlParamNode(\SimpleXMLElement $paramNode): OptionMetadata
@@ -947,9 +1065,74 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $condCollection->setValue($condOpts);
             $conditionField->addOption($condCollection);
         }
+
+        // 5. Dynamically extend visibleCondition on pagination/sort/filter fields for registered multi-item sources
+        $descriptors = $registry->getSourceDescriptors($locale);
+        $limitSourceKeys = [];
+        $sortSourceKeys = [];
+        $templateFilterSourceKeys = [];
+        $tagFilterSourceKeys = [];
+        $categoryFilterSourceKeys = [];
+
+        foreach ($descriptors as $desc) {
+            if (!$desc['multi_item'] || 'none' === $desc['key']) {
+                continue;
+            }
+
+            $key = $desc['key'];
+            $fieldNames = \array_column($desc['config_fields'], 'name');
+            $limitSourceKeys[] = $key;
+
+            if (\in_array('sort_by', $fieldNames, true) || \in_array($key, ['page_selection', 'page_children', 'sibling_pages', 'custom_query', 'sulu_articles'], true)) {
+                $sortSourceKeys[] = $key;
+            }
+            if (\in_array('template_keys', $fieldNames, true) || \in_array($key, ['page_children', 'sibling_pages', 'custom_query', 'sulu_articles'], true)) {
+                $templateFilterSourceKeys[] = $key;
+            }
+            if (\in_array('tag_names', $fieldNames, true) || \in_array($key, ['page_children', 'sibling_pages', 'custom_query', 'sulu_articles'], true)) {
+                $tagFilterSourceKeys[] = $key;
+            }
+            if (\in_array('category_keys', $fieldNames, true) || \in_array($key, ['page_children', 'sibling_pages', 'custom_query', 'sulu_articles'], true)) {
+                $categoryFilterSourceKeys[] = $key;
+            }
+        }
+
+        $buildSourceVisibleCondition = static function (array $keys): ?string {
+            $clauses = [];
+            foreach ($keys as $k) {
+                if (\is_string($k) && '' !== $k) {
+                    $clauses[$k] = "__parent.dynamic_source == '{$k}'";
+                }
+            }
+            if ([] === $clauses) {
+                return null;
+            }
+
+            return \implode(' or ', \array_values($clauses));
+        };
+
+        $conditionMap = [
+            'dynamic_limit' => $buildSourceVisibleCondition($limitSourceKeys),
+            'dynamic_offset' => $buildSourceVisibleCondition($limitSourceKeys),
+            'dynamic_sort_by' => $buildSourceVisibleCondition($sortSourceKeys),
+            'dynamic_sort_order' => $buildSourceVisibleCondition($sortSourceKeys),
+            'dynamic_template_keys' => $buildSourceVisibleCondition($templateFilterSourceKeys),
+            'dynamic_tag_names' => $buildSourceVisibleCondition($tagFilterSourceKeys),
+            'dynamic_category_keys' => $buildSourceVisibleCondition($categoryFilterSourceKeys),
+        ];
+
+        foreach ($conditionMap as $fieldName => $conditionExpr) {
+            if (null === $conditionExpr) {
+                continue;
+            }
+            $fieldMeta = $items[$fieldName] ?? null;
+            if ($fieldMeta instanceof FieldMetadata) {
+                $fieldMeta->setVisibleCondition($conditionExpr);
+            }
+        }
     }
 
-    private function populatePresetSectionOptions(SectionMetadata $advancedSection, string $blockKey): void
+    private function populatePresetSectionOptions(SectionMetadata $advancedSection, string $blockKey, string $locale = 'en'): void
     {
         $presetField = $advancedSection->getItems()['preset'] ?? null;
         if (!$presetField instanceof FieldMetadata) {
@@ -963,8 +1146,8 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
         $presetsJson = null;
         if (null !== $this->presetProvider) {
-            $presets = $this->presetProvider->getPresets($blockKey);
-            $presetsJson = (string) \json_encode($presets);
+            $presets = $this->presetProvider->getPresets($blockKey, $locale);
+            $presetsJson = \json_encode($presets, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE);
             $presetsJsonOption = new OptionMetadata();
             $presetsJsonOption->setName('presets_json');
             $presetsJsonOption->setValue($presetsJson);
@@ -1173,8 +1356,8 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
     /**
      * Recursively traverses form items (sections, inline block types, and block fields)
-     * to enhance inline structural blocks (`row_item`, `column_item`) with tabs and populate
-     * any `<block>` field carrying `<tag name="sulu_block_suite.auto_blocks" .../>`.
+     * to enhance inline sub-types with tabs and populate any `<block>` field carrying
+     * `<tag name="sulu_block_suite.auto_blocks" .../>`.
      *
      * @param array<array-key, ItemMetadata> $items
      * @param list<string> $ancestorKeys
@@ -1200,17 +1383,20 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 continue;
             }
 
-            // First traverse inline sub-types (e.g. rows -> row_item -> columns -> column_item, or items -> card/button/badge)
+            // First traverse inline sub-types
+            $fieldTabsTag = $this->findFieldTag($item, self::TABS_TAG);
             $existingTypes = $item->getTypes();
             foreach ($existingTypes as $typeKey => $typeForm) {
                 $formObjectId = \spl_object_id($typeForm);
                 if (\is_string($typeKey) && !$typeForm->hasTag('sulu.global_block') && !isset($visitedFormIds[$formObjectId])) {
+                    if (null !== $fieldTabsTag && !$typeForm->hasTag(self::TABS_TAG)) {
+                        $typeForm->addTag(clone $fieldTabsTag);
+                    }
+
                     if ($this->shouldEnhanceInlineTypeWithTabs($typeForm)) {
                         $tabsTag = $typeForm->findTag(self::TABS_TAG);
                         $sharedAttr = $tabsTag?->getAttribute('shared');
-                        $includeShared = \in_array($typeKey, ['row_item', 'column_item'], true)
-                            || 'true' === $sharedAttr
-                            || true === $sharedAttr;
+                        $includeShared = 'true' === $sharedAttr || true === $sharedAttr;
                         $namespaceAttr = $tabsTag?->getAttribute('namespace_props');
                         $namespaceProps = null !== $namespaceAttr
                             ? ('true' === $namespaceAttr || true === $namespaceAttr)
@@ -1243,6 +1429,12 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             }
 
             $attributes = $autoBlocksTag->getAttributes();
+            $includeAttr = isset($attributes['include']) && \is_string($attributes['include']) ? $attributes['include'] : '';
+            $includedTypes = \array_values(\array_filter(
+                \array_map('trim', \explode(',', $includeAttr)),
+                static fn (string $val): bool => '' !== $val,
+            ));
+
             $excludeAttr = isset($attributes['exclude']) && \is_string($attributes['exclude']) ? $attributes['exclude'] : '';
             $excludedTypes = \array_values(\array_filter(
                 \array_map('trim', \explode(',', $excludeAttr)),
@@ -1259,17 +1451,13 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 $locale,
                 \array_values(\array_unique([...$excludedTypes, ...$ancestorKeys])),
                 $preferredDefault,
+                $includedTypes,
             );
         }
     }
 
     private function shouldEnhanceInlineTypeWithTabs(FormMetadata $typeForm): bool
     {
-        $typeKey = $typeForm->getKey();
-        if (\in_array($typeKey, ['row_item', 'column_item'], true)) {
-            return true;
-        }
-
         if ($typeForm->hasTag(self::TABS_TAG)) {
             $enabledAttr = $typeForm->findTag(self::TABS_TAG)?->getAttribute('enabled');
 
@@ -1463,6 +1651,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
     /**
      * @param list<string> $excludedTypes
+     * @param list<string> $includedTypes
      */
     private function enhanceBlockField(
         FieldMetadata $blocksProperty,
@@ -1470,6 +1659,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         string $locale,
         array $excludedTypes = [],
         ?string $preferredDefault = null,
+        array $includedTypes = [],
     ): void {
         $blockForms = $this->getRegisteredBlockForms($locale);
         if ([] === $blockForms) {
@@ -1479,11 +1669,15 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $rootKey = $rootForm->getKey();
         $isGlobalBlockRoot = isset($blockForms[$rootKey]);
         $excludedMap = \array_fill_keys(['default', '', $rootKey, ...$excludedTypes], true);
+        $includedMap = [] !== $includedTypes ? \array_fill_keys($includedTypes, true) : null;
         $existingTypes = $blocksProperty->getTypes();
 
         $addedCount = 0;
         foreach ($blockForms as $typeKey => $blockForm) {
             if (isset($excludedMap[$typeKey])) {
+                continue;
+            }
+            if (null !== $includedMap && !isset($includedMap[$typeKey])) {
                 continue;
             }
 
@@ -1509,6 +1703,21 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
         if ($addedCount > 0 && isset($existingTypes['default'])) {
             $blocksProperty->removeType('default');
+        }
+
+        /** @var array<string, FormMetadata> $currentTypes */
+        $currentTypes = [];
+        foreach ($blocksProperty->getTypes() as $tKey => $tForm) {
+            if (\is_string($tKey)) {
+                $currentTypes[$tKey] = $tForm;
+            }
+        }
+        $sortedTypes = $this->sortBlockFormsAlphabetically($currentTypes, $locale);
+        foreach (\array_keys($currentTypes) as $tKey) {
+            $blocksProperty->removeType($tKey);
+        }
+        foreach ($sortedTypes as $tForm) {
+            $blocksProperty->addType($tForm);
         }
 
         $updatedTypes = $blocksProperty->getTypes();
@@ -1677,7 +1886,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                     }
                 }
 
-                return $this->registeredBlocksCache[$locale] = $blockForms;
+                return $this->registeredBlocksCache[$locale] = $this->sortBlockFormsAlphabetically($blockForms, $locale);
             }
         } catch (\Throwable) {
             // Gracefully ignore early initialization or cache warmup
@@ -1686,5 +1895,30 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         }
 
         return $this->registeredBlocksCache[$locale] = [];
+    }
+
+    /**
+     * Sorts a map of block `FormMetadata` instances alphabetically by their localized title
+     * (falling back to English title and block key).
+     *
+     * @param array<string, FormMetadata> $forms
+     *
+     * @return array<string, FormMetadata>
+     */
+    private function sortBlockFormsAlphabetically(array $forms, string $locale): array
+    {
+        \uasort($forms, static function (FormMetadata $a, FormMetadata $b) use ($locale): int {
+            $titlesA = $a->getTitles();
+            $titlesB = $b->getTitles();
+
+            $labelA = $titlesA[$locale] ?? $titlesA['en'] ?? $a->getKey();
+            $labelB = $titlesB[$locale] ?? $titlesB['en'] ?? $b->getKey();
+
+            $cmp = \strnatcasecmp((string) $labelA, (string) $labelB);
+
+            return 0 !== $cmp ? $cmp : \strnatcasecmp($a->getKey(), $b->getKey());
+        });
+
+        return $forms;
     }
 }

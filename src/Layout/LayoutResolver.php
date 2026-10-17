@@ -24,7 +24,9 @@ final class LayoutResolver implements LayoutResolverInterface
     ) {
         $merged = self::DEFAULT_MAPPINGS;
         foreach ($mappings as $group => $groupMappings) {
-            $merged[$group] = \array_merge($merged[$group] ?? [], $groupMappings);
+            foreach ($groupMappings as $optionKey => $optionValue) {
+                $merged[$group][(string) $optionKey] = $optionValue;
+            }
         }
         $this->mappings = $merged;
     }
@@ -145,8 +147,12 @@ final class LayoutResolver implements LayoutResolverInterface
 
         $attributes = [];
         foreach ($layoutData as $key => $value) {
-            if (\is_scalar($value) && '' !== (string) $value && !\in_array($key, ['blocks', 'title', 'id', 'uuid', 'description'], true)) {
-                $attrName = 'data-layout-' . \str_replace('_', '-', (string) $key);
+            $keyStr = (string) $key;
+            if (1 !== \preg_match('/^[a-zA-Z0-9_-]+$/', $keyStr)) {
+                continue;
+            }
+            if (\is_scalar($value) && '' !== (string) $value && !\in_array($keyStr, ['blocks', 'title', 'id', 'uuid', 'description'], true)) {
+                $attrName = 'data-layout-' . \str_replace('_', '-', $keyStr);
                 $attributes[$attrName] = (string) $value;
             }
         }

@@ -111,7 +111,10 @@ class SuluPageSourceResolverTest extends TestCase
             ])
             ->willReturn($pageStub);
 
-        $request = new Request(query: ['provider' => 'pages', 'id' => 'preview-uuid-789', 'locale' => 'en']);
+        $request = new Request(
+            query: ['provider' => 'pages', 'id' => 'preview-uuid-789', 'locale' => 'en'],
+            attributes: ['preview' => true],
+        );
         $requestStack = new RequestStack();
         $requestStack->push($request);
 
@@ -122,6 +125,20 @@ class SuluPageSourceResolverTest extends TestCase
         $this->assertNotNull($result);
         $this->assertSame('preview-uuid-789', $result['id']);
         $this->assertSame('Preview Page Title', $result['title']);
+    }
+
+    public function testResolveFromRequestIgnoresSpoofedQueryProviderWhenPreviewAttributeMissing(): void
+    {
+        $pageRepositoryMock = $this->createMock(PageRepositoryInterface::class);
+        $pageRepositoryMock->expects($this->never())->method('findOneBy');
+
+        $request = new Request(query: ['provider' => 'pages', 'id' => 'spoofed-uuid-789', 'locale' => 'en']);
+        $requestStack = new RequestStack();
+        $requestStack->push($request);
+
+        $resolver = new SuluPageSourceResolver($pageRepositoryMock, null, $requestStack);
+
+        $this->assertNull($resolver->resolvePage(null, 'en'));
     }
 
     public function testResolveCurrentPageFromContextWithContent(): void

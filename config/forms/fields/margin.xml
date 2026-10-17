@@ -1,0 +1,231 @@
+<?xml version="1.0" ?>
+<form xmlns="http://schemas.sulu.io/template/template"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/form-1.0.xsd">
+    <key>block_suite_field_margin</key>
+    <properties>
+    <property name="margin_top" type="single_select" colspan="6" mandatory="false" visibleCondition="position != 'absolute'">
+        <meta>
+            <title lang="en">Margin Top</title>
+            <title lang="tr">Üst Dış Boşluk (Margin Top)</title>
+            <title lang="de">Abstand Oben (Margin Top)</title>
+            <title lang="ru">Отступ сверху (Margin Top)</title>
+            <title lang="es">Margen Superior</title>
+            <title lang="fr">Marge Supérieure</title>
+            <info_text lang="en">Set the top margin.</info_text>
+            <info_text lang="tr">Üst dış boşluğu ayarlayın.</info_text>
+            <info_text lang="de">Legen Sie den oberen Außenabstand fest.</info_text>
+            <info_text lang="ru">Установите верхний внешний отступ.</info_text>
+            <info_text lang="es">Establezca el margen superior.</info_text>
+            <info_text lang="fr">Définissez la marge supérieure.</info_text>
+        </meta>
+        <params>
+            <param name="default_value" value=""/>
+            <param name="values" type="collection">
+                <param name="">
+                    <meta>
+                        <title lang="en">Keep existing</title>
+                        <title lang="tr">Mevcut olanı koru</title>
+                        <title lang="de">Bestehenden beibehalten</title>
+                        <title lang="ru">Оставить текущий</title>
+                        <title lang="es">Mantener existente</title>
+                        <title lang="fr">Conserver l'existant</title>
+                    </meta>
+                </param>
+                <param name="xs">
+                    <meta>
+                        <title lang="en">X-Small</title>
+                        <title lang="tr">Çok Küçük (XS)</title>
+                        <title lang="de">Extra Klein (XS)</title>
+                        <title lang="ru">Очень малый (XS)</title>
+                        <title lang="es">Extra Pequeño (XS)</title>
+                        <title lang="fr">Très Petit (XS)</title>
+                    </meta>
+                </param>
+                <param name="sm">
+                    <meta>
+                        <title lang="en">Small</title>
+                        <title lang="tr">Küçük (SM)</title>
+                        <title lang="de">Klein (SM)</title>
+                        <title lang="ru">Малый (SM)</title>
+                        <title lang="es">Pequeño (SM)</title>
+                        <title lang="fr">Petit (SM)</title>
+                    </meta>
+                </param>
+                <param name="default">
+                    <meta>
+                        <title lang="en">Default</title>
+                        <title lang="tr">Varsayılan</title>
+                        <title lang="de">Standard</title>
+                        <title lang="ru">По умолчанию</title>
+                        <title lang="es">Predeterminado</title>
+                        <title lang="fr">Par Défaut</title>
+                    </meta>
+                </param>
+                <param name="md">
+                    <meta>
+                        <title lang="en">Medium</title>
+                        <title lang="tr">Orta (MD)</title>
+                        <title lang="de">Mittel (MD)</title>
+                        <title lang="ru">Средний (MD)</title>
+                        <title lang="es">Mediano (MD)</title>
+                        <title lang="fr">Moyen (MD)</title>
+                    </meta>
+                </param>
+                <param name="lg">
+                    <meta>
+                        <title lang="en">Large</title>
+                        <title lang="tr">Büyük (LG)</title>
+                        <title lang="de">Groß (LG)</title>
+                        <title lang="ru">Большой (LG)</title>
+                        <title lang="es">Grande (LG)</title>
+                        <title lang="fr">Grand (LG)</title>
+                    </meta>
+                </param>
+                <param name="xl">
+                    <meta>
+                        <title lang="en">X-Large</title>
+                        <title lang="tr">Çok Büyük (XL)</title>
+                        <title lang="de">Extra Groß (XL)</title>
+                        <title lang="ru">Очень большой (XL)</title>
+                        <title lang="es">Extra Grande (XL)</title>
+                        <title lang="fr">Très Grand (XL)</title>
+                    </meta>
+                </param>
+                <param name="remove">
+                    <meta>
+                        <title lang="en">Remove</title>
+                        <title lang="tr">Kaldır</title>
+                        <title lang="de">Entfernen</title>
+                        <title lang="ru">Убрать</title>
+                        <title lang="es">Eliminar</title>
+                        <title lang="fr">Supprimer</title>
+                    </meta>
+                </param>
+                <param name="auto">
+                    <meta>
+                        <title lang="en">Auto</title>
+                        <title lang="tr">Otomatik</title>
+                        <title lang="de">Auto</title>
+                        <title lang="ru">Авто</title>
+                        <title lang="es">Auto</title>
+                        <title lang="fr">Auto</title>
+                    </meta>
+                </param>
+            </param>
+        </params>
+    </property>
+
+    <property name="margin_bottom" type="single_select" colspan="6" mandatory="false" visibleCondition="position != 'absolute'">
+        <meta>
+            <title lang="en">Margin Bottom</title>
+            <title lang="tr">Alt Dış Boşluk (Margin Bottom)</title>
+            <title lang="de">Abstand Unten (Margin Bottom)</title>
+            <title lang="ru">Отступ снизу (Margin Bottom)</title>
+            <title lang="es">Margen Inferior</title>
+            <title lang="fr">Marge Inférieure</title>
+            <info_text lang="en">Set the bottom margin.</info_text>
+            <info_text lang="tr">Alt dış boşluğu ayarlayın.</info_text>
+            <info_text lang="de">Legen Sie den unteren Außenabstand fest.</info_text>
+            <info_text lang="ru">Установите нижний внешний отступ.</info_text>
+            <info_text lang="es">Establezca el margen inferior.</info_text>
+            <info_text lang="fr">Définissez la marge inférieure.</info_text>
+        </meta>
+        <params>
+            <param name="default_value" value=""/>
+            <param name="values" type="collection">
+                <param name="">
+                    <meta>
+                        <title lang="en">Keep existing</title>
+                        <title lang="tr">Mevcut olanı koru</title>
+                        <title lang="de">Bestehenden beibehalten</title>
+                        <title lang="ru">Оставить текущий</title>
+                        <title lang="es">Mantener existente</title>
+                        <title lang="fr">Conserver l'existant</title>
+                    </meta>
+                </param>
+                <param name="xs">
+                    <meta>
+                        <title lang="en">X-Small</title>
+                        <title lang="tr">Çok Küçük (XS)</title>
+                        <title lang="de">Extra Klein (XS)</title>
+                        <title lang="ru">Очень малый (XS)</title>
+                        <title lang="es">Extra Pequeño (XS)</title>
+                        <title lang="fr">Très Petit (XS)</title>
+                    </meta>
+                </param>
+                <param name="sm">
+                    <meta>
+                        <title lang="en">Small</title>
+                        <title lang="tr">Küçük (SM)</title>
+                        <title lang="de">Klein (SM)</title>
+                        <title lang="ru">Малый (SM)</title>
+                        <title lang="es">Pequeño (SM)</title>
+                        <title lang="fr">Petit (SM)</title>
+                    </meta>
+                </param>
+                <param name="default">
+                    <meta>
+                        <title lang="en">Default</title>
+                        <title lang="tr">Varsayılan</title>
+                        <title lang="de">Standard</title>
+                        <title lang="ru">По умолчанию</title>
+                        <title lang="es">Predeterminado</title>
+                        <title lang="fr">Par Défaut</title>
+                    </meta>
+                </param>
+                <param name="md">
+                    <meta>
+                        <title lang="en">Medium</title>
+                        <title lang="tr">Orta (MD)</title>
+                        <title lang="de">Mittel (MD)</title>
+                        <title lang="ru">Средний (MD)</title>
+                        <title lang="es">Mediano (MD)</title>
+                        <title lang="fr">Moyen (MD)</title>
+                    </meta>
+                </param>
+                <param name="lg">
+                    <meta>
+                        <title lang="en">Large</title>
+                        <title lang="tr">Büyük (LG)</title>
+                        <title lang="de">Groß (LG)</title>
+                        <title lang="ru">Большой (LG)</title>
+                        <title lang="es">Grande (LG)</title>
+                        <title lang="fr">Grand (LG)</title>
+                    </meta>
+                </param>
+                <param name="xl">
+                    <meta>
+                        <title lang="en">X-Large</title>
+                        <title lang="tr">Çok Büyük (XL)</title>
+                        <title lang="de">Extra Groß (XL)</title>
+                        <title lang="ru">Очень большой (XL)</title>
+                        <title lang="es">Extra Grande (XL)</title>
+                        <title lang="fr">Très Grand (XL)</title>
+                    </meta>
+                </param>
+                <param name="remove">
+                    <meta>
+                        <title lang="en">Remove</title>
+                        <title lang="tr">Kaldır</title>
+                        <title lang="de">Entfernen</title>
+                        <title lang="ru">Убрать</title>
+                        <title lang="es">Eliminar</title>
+                        <title lang="fr">Supprimer</title>
+                    </meta>
+                </param>
+                <param name="auto">
+                    <meta>
+                        <title lang="en">Auto</title>
+                        <title lang="tr">Otomatik</title>
+                        <title lang="de">Auto</title>
+                        <title lang="ru">Авто</title>
+                        <title lang="es">Auto</title>
+                        <title lang="fr">Auto</title>
+                    </meta>
+                </param>
+            </param>
+        </params>
+    </property>
+    </properties>
+</form>

@@ -12,21 +12,32 @@ use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
 use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Contracts\Service\ResetInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator;
 
 /**
  * Built-in Dynamic Content source provider for Sulu 3 Articles (Single & Collection).
  */
-final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvider
+final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvider implements ResetInterface
 {
+    /** @var array<string, array<string, mixed>|null> */
+    private array $resolvedEntityCache = [];
+
     public function __construct(
         private readonly ?ArticleRepositoryInterface $articleRepository = null,
         private readonly ?ContentResolverInterface $contentResolver = null,
         private readonly ?RequestStack $requestStack = null,
         private readonly ?ReferenceStoreInterface $referenceStore = null,
         private readonly ?ContentAggregatorInterface $contentAggregator = null,
+        private readonly ?SuluSmartContentQueryBridge $smartContentBridge = null,
     ) {
+    }
+
+    public function reset(): void
+    {
+        $this->resolvedEntityCache = [];
     }
 
     public function getKey(): string
@@ -159,22 +170,35 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             return $collection[0] ?? null;
         }
 
+        $trimUuid = \trim($uuid);
         $resolvedLocale = $this->resolveLocale($locale, $this->requestStack);
+        $isPreview = $this->isPreviewContext();
+        $stageKey = $isPreview ? DimensionContentInterface::STAGE_DRAFT : DimensionContentInterface::STAGE_LIVE;
+        $cacheKey = "{$stageKey}:{$resolvedLocale}:{$trimUuid}";
+
+        if (\array_key_exists($cacheKey, $this->resolvedEntityCache)) {
+            $cached = $this->resolvedEntityCache[$cacheKey];
+            if (null !== $cached) {
+                $this->referenceStore?->add($trimUuid, ArticleInterface::RESOURCE_KEY);
+            }
+
+            return $cached;
+        }
 
         try {
             $article = $this->articleRepository->findOneBy(
                 [
-                    'uuid' => \trim($uuid),
+                    'uuid' => $trimUuid,
                     'locale' => $resolvedLocale,
                     'stage' => DimensionContentInterface::STAGE_LIVE,
                 ],
                 [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_WEBSITE => true],
             );
 
-            if (null === $article && $this->isPreviewContext()) {
+            if (null === $article && $isPreview) {
                 $article = $this->articleRepository->findOneBy(
                     [
-                        'uuid' => \trim($uuid),
+                        'uuid' => $trimUuid,
                         'locale' => $resolvedLocale,
                         'stage' => DimensionContentInterface::STAGE_DRAFT,
                     ],
@@ -182,7 +206,13 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
                 );
             }
 
-            return null !== $article ? $this->normalizeArticleEntity($article, $resolvedLocale) : null;
+            if (null === $article) {
+                $this->resolvedEntityCache[$cacheKey] = null;
+
+                return null;
+            }
+
+            return $this->normalizeArticleEntity($article, $resolvedLocale);
         } catch (\Throwable) {
             return null;
         }
@@ -190,14 +220,61 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
 
     public function resolveCollection(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
     {
-        if (null === $this->articleRepository) {
-            return [];
-        }
-
         $resolvedLocale = $this->resolveLocale($locale, $this->requestStack);
         $query = isset($config['query']) && \is_array($config['query'])
             ? \array_merge($config, $config['query'])
             : $config;
+
+        $uuids = $this->normalizeStringList($query['article_ids'] ?? ($query['uuids'] ?? ($query['ids'] ?? null)));
+        $rawCategories = $query['category_keys'] ?? ($query['categories'] ?? null);
+        $hasStringCategoryKeys = [] === $this->normalizeIntList($query['category_ids'] ?? $rawCategories)
+            && [] !== $this->normalizeStringList($rawCategories);
+
+        if (
+            [] === $uuids
+            && !$hasStringCategoryKeys
+            && null !== $this->smartContentBridge
+            && $this->smartContentBridge->hasProvider('articles')
+        ) {
+            $excludedIds = $this->normalizeStringList($query['exclude_ids'] ?? ($query['exclude_id'] ?? null));
+            $rawLimit = isset($query['limit']) && \is_numeric($query['limit']) ? (int) $query['limit'] : 10;
+            $limit = \max(1, \min(100, $rawLimit));
+
+            $bridgeQuery = $query;
+            if ([] !== $excludedIds) {
+                $bridgeQuery['limit'] = \min(100, $limit + \count($excludedIds));
+            }
+
+            $flatIds = $this->smartContentBridge->queryFlatIds('articles', $bridgeQuery, $resolvedLocale);
+            $filteredIds = [] !== $excludedIds
+                ? \array_slice(\array_values(\array_diff($flatIds, $excludedIds)), 0, $limit)
+                : \array_slice($flatIds, 0, $limit);
+
+            if ([] === $filteredIds) {
+                return [];
+            }
+
+            $loaded = $this->smartContentBridge->loadOrderedResources('articles', $filteredIds, $resolvedLocale);
+            if ([] === $loaded && null !== $this->articleRepository) {
+                $loaded = $this->loadArticlesByOrderedUuids($filteredIds, $resolvedLocale);
+            }
+
+            $result = [];
+            foreach ($loaded as $resource) {
+                if ($resource instanceof ArticleInterface) {
+                    $normalized = $this->normalizeArticleEntity($resource, $resolvedLocale);
+                    if (null !== $normalized) {
+                        $result[] = $normalized;
+                    }
+                }
+            }
+
+            return $result;
+        }
+
+        if (null === $this->articleRepository) {
+            return [];
+        }
 
         /** @var array<string, mixed> $filters */
         $filters = [
@@ -205,7 +282,6 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             'stage' => DimensionContentInterface::STAGE_LIVE,
         ];
 
-        $uuids = $this->normalizeStringList($query['article_ids'] ?? ($query['uuids'] ?? ($query['ids'] ?? null)));
         if ([] !== $uuids) {
             $filters['uuids'] = $uuids;
         }
@@ -243,15 +319,14 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             }
         }
 
-        $offset = isset($query['offset']) && \is_numeric($query['offset']) && (int) $query['offset'] > 0
-            ? (int) $query['offset']
+        $offset = isset($query['offset']) && \is_numeric($query['offset'])
+            ? \max(0, \min(500, (int) $query['offset']))
             : 0;
         $excludedIds = $this->normalizeStringList($query['exclude_ids'] ?? ($query['exclude_id'] ?? null));
 
-        $limit = isset($query['limit']) && \is_numeric($query['limit']) ? (int) $query['limit'] : 10;
-        if ($limit > 0) {
-            $filters['limit'] = $limit + $offset + \count($excludedIds);
-        }
+        $rawLimit = isset($query['limit']) && \is_numeric($query['limit']) ? (int) $query['limit'] : 10;
+        $limit = \max(1, \min(100, $rawLimit));
+        $filters['limit'] = $limit + $offset + \count($excludedIds);
 
         /** @var array<string, 'asc'|'desc'> $sortBy */
         $sortBy = ['created' => 'desc'];
@@ -294,18 +369,22 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
 
             $excludedMap = \array_fill_keys($excludedIds, true);
             $result = [];
+            $skipped = 0;
             foreach ($articles as $article) {
                 if (isset($excludedMap[$article->getUuid()])) {
+                    continue;
+                }
+                if ($skipped < $offset) {
+                    ++$skipped;
                     continue;
                 }
                 $normalized = $this->normalizeArticleEntity($article, $resolvedLocale);
                 if (null !== $normalized) {
                     $result[] = $normalized;
+                    if (\count($result) >= $limit) {
+                        break;
+                    }
                 }
-            }
-
-            if ($offset > 0 || ($limit > 0 && \count($result) > $limit)) {
-                $result = \array_slice($result, $offset, $limit > 0 ? $limit : null);
             }
 
             return $result;
@@ -319,13 +398,30 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
      */
     private function normalizeArticleEntity(ArticleInterface $article, string $locale): ?array
     {
+        $uuid = $article->getUuid();
+        $stageKey = $this->isPreviewContext() ? DimensionContentInterface::STAGE_DRAFT : DimensionContentInterface::STAGE_LIVE;
+        $cacheKey = '' !== $uuid ? "{$stageKey}:{$locale}:{$uuid}" : null;
+
+        if (null !== $cacheKey && \array_key_exists($cacheKey, $this->resolvedEntityCache)) {
+            $cached = $this->resolvedEntityCache[$cacheKey];
+            if (null !== $cached) {
+                $this->referenceStore?->add($uuid, ArticleInterface::RESOURCE_KEY);
+            }
+
+            return $cached;
+        }
+
         $dimensionContent = $this->extractDimensionContent($article, $locale);
         if (null === $dimensionContent) {
+            if (null !== $cacheKey) {
+                $this->resolvedEntityCache[$cacheKey] = null;
+            }
+
             return null;
         }
 
-        if ('' !== $article->getUuid()) {
-            $this->referenceStore?->add($article->getUuid(), ArticleInterface::RESOURCE_KEY);
+        if ('' !== $uuid) {
+            $this->referenceStore?->add($uuid, ArticleInterface::RESOURCE_KEY);
         }
 
         if (null !== $this->contentResolver) {
@@ -333,8 +429,8 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
                 $resolved = $this->contentResolver->resolve($dimensionContent);
                 /** @var array<string, mixed> $articleData */
                 $articleData = $resolved['content'];
-                $articleData['id'] = $article->getUuid();
-                $articleData['uuid'] = $article->getUuid();
+                $articleData['id'] = $uuid;
+                $articleData['uuid'] = $uuid;
 
                 $title = $dimensionContent->getTitle();
                 if (null !== $title) {
@@ -373,7 +469,12 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
                     $articleData['date'] = $articleData['authored'];
                 }
 
-                return $this->enrichArticleMetadata($articleData, $dimensionContent);
+                $enriched = $this->enrichArticleMetadata($articleData, $dimensionContent);
+                if (null !== $cacheKey) {
+                    $this->resolvedEntityCache[$cacheKey] = $enriched;
+                }
+
+                return $enriched;
             } catch (\Throwable) {
                 // Fallback to direct entity getters
             }
@@ -381,8 +482,8 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
 
         /** @var array<string, mixed> $articleData */
         $articleData = $dimensionContent->getTemplateData();
-        $articleData['id'] = $article->getUuid();
-        $articleData['uuid'] = $article->getUuid();
+        $articleData['id'] = $uuid;
+        $articleData['uuid'] = $uuid;
         $entityTitle = $dimensionContent->getTitle();
         $articleData['title'] = $entityTitle;
         $articleData['headline'] = $this->firstNonEmptyString($articleData['headline'] ?? null, $entityTitle);
@@ -410,7 +511,12 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             $articleData['date'] = $articleData['authored'];
         }
 
-        return $this->enrichArticleMetadata($articleData, $dimensionContent);
+        $enriched = $this->enrichArticleMetadata($articleData, $dimensionContent);
+        if (null !== $cacheKey) {
+            $this->resolvedEntityCache[$cacheKey] = $enriched;
+        }
+
+        return $enriched;
     }
 
     /**
@@ -474,6 +580,9 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
 
         $draftFallback = null;
         foreach ($dimensionContents as $content) {
+            if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()) {
+                continue;
+            }
             if ($content->getLocale() === $locale) {
                 $stage = $content->getStage();
                 if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
@@ -482,6 +591,26 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
                 if ($isPreview && DimensionContentInterface::STAGE_DRAFT === $stage) {
                     $draftFallback ??= $content;
                 }
+            }
+        }
+
+        if (null !== $draftFallback) {
+            return $draftFallback;
+        }
+
+        foreach ($dimensionContents as $content) {
+            if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion() || null !== $content->getLocale()) {
+                continue;
+            }
+            if (null === $content->getTitle() && [] === $content->getTemplateData()) {
+                continue;
+            }
+            $stage = $content->getStage();
+            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
+                return $content;
+            }
+            if ($isPreview && DimensionContentInterface::STAGE_DRAFT === $stage) {
+                $draftFallback ??= $content;
             }
         }
 
@@ -495,14 +624,8 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             return false;
         }
 
-        $provider = $request->query->get('provider');
-        $route = $request->attributes->get('_route');
-
-        return ('articles' === $provider || 'pages' === $provider || 'snippets' === $provider)
-            || $request->query->getBoolean('preview')
-            || $request->attributes->getBoolean('preview')
-            || $request->attributes->getBoolean('_sulu_preview')
-            || (\is_string($route) && \str_starts_with($route, 'sulu_preview'));
+        return $request->attributes->getBoolean('preview')
+            || $request->attributes->getBoolean('_sulu_preview');
     }
 
     private function firstNonEmptyString(mixed ...$candidates): ?string
@@ -554,5 +677,45 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
         }
 
         return null;
+    }
+
+    /**
+     * @param list<string> $uuids
+     *
+     * @return list<ArticleInterface>
+     */
+    private function loadArticlesByOrderedUuids(array $uuids, string $locale): array
+    {
+        if (null === $this->articleRepository || [] === $uuids) {
+            return [];
+        }
+
+        try {
+            $articles = $this->articleRepository->findBy(
+                [
+                    'uuids' => $uuids,
+                    'locale' => $locale,
+                    'stage' => DimensionContentInterface::STAGE_LIVE,
+                ],
+                [],
+                [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_WEBSITE => true],
+            );
+
+            $byUuid = [];
+            foreach ($articles as $article) {
+                $byUuid[$article->getUuid()] = $article;
+            }
+
+            $ordered = [];
+            foreach ($uuids as $uuid) {
+                if (isset($byUuid[$uuid])) {
+                    $ordered[] = $byUuid[$uuid];
+                }
+            }
+
+            return $ordered;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 }

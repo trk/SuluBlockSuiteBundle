@@ -7,6 +7,7 @@ import {translate} from 'sulu-admin-bundle/utils';
 import {Requester} from 'sulu-admin-bundle/services';
 import {userStore} from 'sulu-admin-bundle/stores';
 import type {FieldTypeProps} from 'sulu-admin-bundle/types';
+import reusableBlockStore from '../../stores/reusableBlockStore';
 import Preset from './Preset';
 import Reusable from './Reusable';
 import styles from './presetSelection.scss';
@@ -351,6 +352,10 @@ export default class PresetSelection extends React.Component<Props> {
     @action handleSaveReusableSuccess = (createdSnippet: ?Object, convertBlock: boolean = true) => {
         this.saveReusableOpen = false;
 
+        if (createdSnippet && createdSnippet.id) {
+            reusableBlockStore.set(createdSnippet.id, createdSnippet, this.currentLocale);
+        }
+
         if (!convertBlock || !createdSnippet || !createdSnippet.id) {
             return;
         }
@@ -360,10 +365,7 @@ export default class PresetSelection extends React.Component<Props> {
         const formStore = formInspector ? formInspector.formStore : null;
 
         if (formStore && typeof formStore.change === 'function' && blockPath) {
-            const currentBlock = this.blockData || {};
-            const preservedSettings = currentBlock.settings ? {settings: currentBlock.settings} : {};
             formStore.change(blockPath, {
-                ...preservedSettings,
                 type: 'reusable',
                 snippet: createdSnippet.id,
                 props: {},

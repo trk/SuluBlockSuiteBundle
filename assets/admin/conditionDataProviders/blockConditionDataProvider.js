@@ -26,6 +26,20 @@ export default function blockConditionDataProvider(
     const parentChain = [];
     const blockChain = [];
 
+    if (!cursorPath.endsWith('/props') && jsonpointer.has(data, cursorPath)) {
+        const initialEvaluated = jsonpointer.get(data, cursorPath);
+        if (
+            initialEvaluated
+            && typeof initialEvaluated === 'object'
+            && !isArrayLike(initialEvaluated)
+            && typeof initialEvaluated.type === 'string'
+        ) {
+            const enrichedInitial = enrichBlockObject(initialEvaluated);
+            parentChain.push(enrichedInitial);
+            blockChain.push({...enrichedInitial});
+        }
+    }
+
     while (cursorPath.includes('/')) {
         cursorPath = cursorPath.substring(0, cursorPath.lastIndexOf('/'));
         if (cursorPath === '') {
@@ -61,7 +75,7 @@ export default function blockConditionDataProvider(
     if (blockChain.length > 0) {
         const nearestBlock = blockChain[0];
         Object.keys(nearestBlock).forEach((key) => {
-            if (!(key in data)) {
+            if (!key.startsWith('__')) {
                 result[key] = nearestBlock[key];
             }
         });

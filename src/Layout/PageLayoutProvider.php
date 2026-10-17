@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Totoglu\SuluBlockSuiteBundle\Layout;
 
 use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface;
 use Sulu\Snippet\Domain\Model\SnippetInterface;
@@ -12,9 +13,10 @@ use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+use Symfony\Contracts\Service\ResetInterface;
 use Twig\Environment;
 
-final class PageLayoutProvider implements PageLayoutProviderInterface
+final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInterface
 {
     private const MAX_RENDER_DEPTH = 10;
 
@@ -41,6 +43,11 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
     private array $activeLayouts = [];
 
     /**
+     * @var array<string, bool>
+     */
+    private array $resolvingIds = [];
+
+    /**
      * @param string|array<array-key, string> $layoutsDirectory
      */
     public function __construct(
@@ -49,9 +56,19 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
         private readonly ?RequestStack $requestStack = null,
         string|array $layoutsDirectory = '',
         private readonly ?ReferenceStoreInterface $referenceStore = null,
+        private readonly ?ContentResolverInterface $contentResolver = null,
     ) {
         $dirs = \is_array($layoutsDirectory) ? \array_values($layoutsDirectory) : [$layoutsDirectory];
         $this->layoutsDirectories = \array_values(\array_filter($dirs, static fn (string $dir): bool => '' !== \trim($dir)));
+    }
+
+    public function reset(): void
+    {
+        $this->cache = [];
+        $this->liveSnippetsByLocale = [];
+        $this->renderDepth = 0;
+        $this->activeLayouts = [];
+        $this->resolvingIds = [];
     }
 
     public function getLayout(string $identifier, ?string $locale = null): ?array
@@ -83,7 +100,15 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
         $cacheKey = $resolvedLocale . ':' . $normalizedId;
 
         if (\array_key_exists($cacheKey, $this->cache)) {
-            return $this->cache[$cacheKey];
+            $cached = $this->cache[$cacheKey];
+            if (null !== $cached) {
+                $cachedUuid = $cached['uuid'] ?? ($cached['id'] ?? null);
+                if (\is_string($cachedUuid) && '' !== $cachedUuid) {
+                    $this->referenceStore?->add($cachedUuid, SnippetInterface::RESOURCE_KEY);
+                }
+            }
+
+            return $cached;
         }
 
         // 1. Try finding in Sulu snippet repository
@@ -281,7 +306,15 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
         $cacheKey = 'reusable:' . $resolvedLocale . ':' . $trimId;
 
         if (\array_key_exists($cacheKey, $this->cache)) {
-            return $this->cache[$cacheKey];
+            $cached = $this->cache[$cacheKey];
+            if (null !== $cached) {
+                $cachedUuid = $cached['uuid'] ?? ($cached['id'] ?? $trimId);
+                if (\is_string($cachedUuid) && '' !== $cachedUuid) {
+                    $this->referenceStore?->add($cachedUuid, SnippetInterface::RESOURCE_KEY);
+                }
+            }
+
+            return $cached;
         }
 
         try {
@@ -296,8 +329,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
 
             $content = $this->findLiveDimensionContent($snippet, 'reusable_block', $resolvedLocale);
             if (null !== $content) {
-                /** @var array<string, mixed> $templateData */
-                $templateData = $content->getTemplateData();
+                $templateData = $this->resolveSnippetContentData($content, $cacheKey);
                 $title = $content->getTitle();
 
                 $this->referenceStore?->add($snippet->getUuid(), SnippetInterface::RESOURCE_KEY);
@@ -326,10 +358,11 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
         ?SnippetDimensionContentInterface $dimensionContent = null,
         ?string $locale = null,
     ): ?array {
+        $resolvedLocale = $this->resolveLocale($locale);
         $targetContent = $dimensionContent ?? $this->findLiveDimensionContent(
             $snippet,
             'page_layout',
-            $this->resolveLocale($locale),
+            $resolvedLocale,
         );
 
         if (null === $targetContent) {
@@ -338,8 +371,10 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
 
         $this->referenceStore?->add($snippet->getUuid(), SnippetInterface::RESOURCE_KEY);
 
-        /** @var array<string, mixed> $templateData */
-        $templateData = $targetContent->getTemplateData();
+        $templateData = $this->resolveSnippetContentData(
+            $targetContent,
+            'layout:' . $resolvedLocale . ':' . $snippet->getUuid(),
+        );
         $title = $targetContent->getTitle();
 
         $templateData['id'] = $snippet->getUuid();
@@ -352,6 +387,34 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
         return $templateData;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveSnippetContentData(
+        SnippetDimensionContentInterface $dimensionContent,
+        string $guardKey,
+    ): array {
+        /** @var array<string, mixed> $templateData */
+        $templateData = $dimensionContent->getTemplateData();
+
+        if (null === $this->contentResolver || isset($this->resolvingIds[$guardKey])) {
+            return $templateData;
+        }
+
+        $this->resolvingIds[$guardKey] = true;
+        try {
+            $resolved = $this->contentResolver->resolve($dimensionContent);
+
+            return \array_replace($templateData, $resolved['content']);
+        } catch (\Throwable) {
+            // Fallback to raw templateData
+        } finally {
+            unset($this->resolvingIds[$guardKey]);
+        }
+
+        return $templateData;
+    }
+
     private function findLiveDimensionContent(
         SnippetInterface $snippet,
         string $templateKey,
@@ -359,12 +422,30 @@ final class PageLayoutProvider implements PageLayoutProviderInterface
     ): ?SnippetDimensionContentInterface {
         /** @var iterable<SnippetDimensionContentInterface> $dimensionContents */
         $dimensionContents = $snippet->getDimensionContents();
+
         foreach ($dimensionContents as $content) {
-            if ($templateKey !== $content->getTemplateKey()) {
+            if (
+                $templateKey !== $content->getTemplateKey()
+                || DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()
+                || $content->getLocale() !== $locale
+            ) {
+                continue;
+            }
+            $stage = $content->getStage();
+            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
+                return $content;
+            }
+        }
+
+        foreach ($dimensionContents as $content) {
+            if (
+                $templateKey !== $content->getTemplateKey()
+                || DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()
+            ) {
                 continue;
             }
             $contentLocale = $content->getLocale();
-            if (null !== $contentLocale && '' !== $contentLocale && $contentLocale !== $locale) {
+            if (null !== $contentLocale && '' !== $contentLocale) {
                 continue;
             }
             $stage = $content->getStage();

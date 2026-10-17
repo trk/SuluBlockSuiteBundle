@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Renderer;
 
+use Symfony\Contracts\Service\ResetInterface;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface;
 use Twig\Environment;
 
@@ -11,7 +12,7 @@ use Twig\Environment;
  * Core block rendering engine that resolves block templates across registered
  * namespaces and delegates block collection rendering to the active UI framework strategy.
  */
-final class BlockRenderer
+final class BlockRenderer implements ResetInterface
 {
     private const MAX_RENDER_DEPTH = 16;
 
@@ -59,6 +60,13 @@ final class BlockRenderer
 
         $this->templateNamespaces = $normalized;
         $this->collectionRenderer = $collectionRenderer;
+    }
+
+    public function reset(): void
+    {
+        $this->templateCache = [];
+        $this->renderDepth = 0;
+        $this->activeReusableSnippets = [];
     }
 
     public function setCollectionRenderer(?BlockCollectionRendererInterface $collectionRenderer): void
@@ -119,15 +127,23 @@ final class BlockRenderer
         }
 
         $reusableSnippetId = null;
-        if ('reusable' === $type && isset($block['snippet'])) {
-            $snippet = $block['snippet'];
-            if (\is_string($snippet) && '' !== \trim($snippet)) {
-                $reusableSnippetId = \trim($snippet);
-            } elseif (\is_array($snippet)) {
-                $innerSnippet = isset($snippet['content']) && \is_array($snippet['content']) ? $snippet['content'] : [];
-                $candidateId = $snippet['uuid'] ?? ($snippet['id'] ?? ($innerSnippet['uuid'] ?? ($innerSnippet['id'] ?? null)));
-                if (\is_string($candidateId) && '' !== \trim($candidateId)) {
-                    $reusableSnippetId = \trim($candidateId);
+        if ('reusable' === $type) {
+            if (isset($block['snippet'])) {
+                $snippet = $block['snippet'];
+                if (\is_string($snippet) && '' !== \trim($snippet)) {
+                    $reusableSnippetId = \trim($snippet);
+                } elseif (\is_array($snippet)) {
+                    $innerSnippet = isset($snippet['content']) && \is_array($snippet['content']) ? $snippet['content'] : [];
+                    $candidateId = $snippet['uuid'] ?? ($snippet['id'] ?? ($innerSnippet['uuid'] ?? ($innerSnippet['id'] ?? null)));
+                    if (\is_string($candidateId) && '' !== \trim($candidateId)) {
+                        $reusableSnippetId = \trim($candidateId);
+                    }
+                }
+            }
+            if (null === $reusableSnippetId && isset($block['view']) && \is_array($block['view']) && isset($block['view']['snippet']) && \is_array($block['view']['snippet'])) {
+                $viewSnippetId = $block['view']['snippet']['id'] ?? ($block['view']['snippet']['uuid'] ?? null);
+                if (\is_string($viewSnippetId) && '' !== \trim($viewSnippetId)) {
+                    $reusableSnippetId = \trim($viewSnippetId);
                 }
             }
 

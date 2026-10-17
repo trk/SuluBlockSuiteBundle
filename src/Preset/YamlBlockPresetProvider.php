@@ -4,18 +4,33 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Preset;
 
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Bundle\MediaBundle\Media\Manager\MediaManagerInterface;
+use Sulu\Content\Domain\Model\DimensionContentInterface;
+use Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface;
+use Sulu\Snippet\Domain\Model\SnippetInterface;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+use Symfony\Contracts\Service\ResetInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-final class YamlBlockPresetProvider implements BlockPresetProviderInterface
+final class YamlBlockPresetProvider implements BlockPresetProviderInterface, ResetInterface
 {
     /**
      * @var array<string, list<array{id: string, title: string, description: ?string, preview_image: ?string, props: array<string, mixed>, values?: array<string, mixed>}>>
      */
     private array $cache = [];
+
+    /**
+     * @var array<string, list<SnippetInterface>>
+     */
+    private array $liveSnippetsByLocale = [];
+
+    /**
+     * @var array<string, list<string>>
+     */
+    private array $snippetUuidsByCacheKey = [];
 
     private ?MediaPreviewUrlResolver $mediaPreviewUrlResolverInstance = null;
 
@@ -34,9 +49,17 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
         private readonly bool $enableSnippetPresets = true,
         private readonly ?MediaManagerInterface $mediaManager = null,
         ?MediaPreviewUrlResolver $mediaPreviewUrlResolver = null,
+        private readonly ?ReferenceStoreInterface $referenceStore = null,
     ) {
         $this->yamlDirectories = \is_array($yamlDirectory) ? \array_values($yamlDirectory) : [$yamlDirectory];
         $this->mediaPreviewUrlResolverInstance = $mediaPreviewUrlResolver;
+    }
+
+    public function reset(): void
+    {
+        $this->cache = [];
+        $this->liveSnippetsByLocale = [];
+        $this->snippetUuidsByCacheKey = [];
     }
 
     private function getMediaPreviewUrlResolver(): MediaPreviewUrlResolver
@@ -51,6 +74,10 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
     {
         $cacheKey = $blockType . '_' . $locale;
         if (isset($this->cache[$cacheKey])) {
+            foreach ($this->snippetUuidsByCacheKey[$cacheKey] ?? [] as $uuid) {
+                $this->referenceStore?->add($uuid, SnippetInterface::RESOURCE_KEY);
+            }
+
             return $this->cache[$cacheKey];
         }
 
@@ -142,77 +169,95 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
 
         /** @var list<array{id: string, title: string, description: ?string, preview_image: ?string, props: array<string, mixed>, values?: array<string, mixed>}> $presets */
         $presets = \array_values($presetsMap);
+        $matchedUuids = [];
 
         if ($this->enableSnippetPresets && null !== $this->snippetRepository) {
             try {
-                $snippets = $this->snippetRepository->findBy(
-                    [
-                        'templateKeys' => ['block_preset'],
-                        'locale' => $locale,
-                    ],
-                    ['title' => 'asc'],
-                    [SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => []],
-                );
+                if (!isset($this->liveSnippetsByLocale[$locale])) {
+                    /** @var iterable<SnippetInterface> $fetched */
+                    $fetched = $this->snippetRepository->findBy(
+                        [
+                            'templateKeys' => ['block_preset'],
+                            'locale' => $locale,
+                            'stage' => DimensionContentInterface::STAGE_LIVE,
+                        ],
+                        ['title' => 'asc'],
+                        [SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => []],
+                    );
 
-                foreach ($snippets as $snippet) {
-                    foreach ($snippet->getDimensionContents() as $content) {
-                        if ('block_preset' === $content->getTemplateKey()) {
-                            $templateData = $content->getTemplateData();
+                    $list = [];
+                    foreach ($fetched as $item) {
+                        $list[] = $item;
+                    }
+                    $this->liveSnippetsByLocale[$locale] = $list;
+                }
 
-                            $blockEntry = null;
-                            if (isset($templateData['block']) && \is_array($templateData['block']) && isset($templateData['block'][0]) && \is_array($templateData['block'][0])) {
-                                $blockEntry = $templateData['block'][0];
-                            }
+                foreach ($this->liveSnippetsByLocale[$locale] as $snippet) {
+                    $content = $this->findLivePresetDimensionContent($snippet, $locale);
+                    if (null === $content) {
+                        continue;
+                    }
 
-                            $configuredType = null;
-                            if (null !== $blockEntry && isset($blockEntry['type']) && \is_string($blockEntry['type'])) {
-                                $configuredType = $blockEntry['type'];
-                            } elseif (isset($templateData['target_block']) && \is_string($templateData['target_block'])) {
-                                $configuredType = $templateData['target_block'];
-                            }
+                    $templateData = $content->getTemplateData();
 
-                            if ($configuredType === $blockType) {
-                                $title = $content->getTitle() ?? $snippet->getUuid();
-                                if ($this->isTestPreset($snippet->getUuid(), $title)) {
-                                    continue;
-                                }
+                    $blockEntry = null;
+                    if (isset($templateData['block']) && \is_array($templateData['block']) && isset($templateData['block'][0]) && \is_array($templateData['block'][0])) {
+                        $blockEntry = $templateData['block'][0];
+                    }
 
-                                /** @var array<string, mixed> $props */
-                                $props = [];
-                                $rawProps = null;
-                                if (null !== $blockEntry && isset($blockEntry['props']) && \is_array($blockEntry['props'])) {
-                                    $rawProps = $blockEntry['props'];
-                                } elseif (isset($templateData['props']) && \is_array($templateData['props'])) {
-                                    $rawProps = $templateData['props'];
-                                }
-                                if (\is_array($rawProps)) {
-                                    foreach ($rawProps as $k => $v) {
-                                        $props[(string) $k] = $v;
-                                    }
-                                }
+                    $configuredType = null;
+                    if (null !== $blockEntry && isset($blockEntry['type']) && \is_string($blockEntry['type'])) {
+                        $configuredType = $blockEntry['type'];
+                    } elseif (isset($templateData['target_block']) && \is_string($templateData['target_block'])) {
+                        $configuredType = $templateData['target_block'];
+                    }
 
-                                /** @var array<string, mixed> $values */
-                                $values = [];
-                                if (null !== $blockEntry) {
-                                    foreach ($blockEntry as $k => $v) {
-                                        $values[(string) $k] = $v;
-                                    }
-                                }
+                    if ($configuredType === $blockType) {
+                        $uuid = $snippet->getUuid();
+                        $title = $content->getTitle() ?? $uuid;
+                        if ($this->isTestPreset($uuid, $title)) {
+                            continue;
+                        }
 
-                                $description = isset($templateData['description']) && \is_string($templateData['description']) ? $templateData['description'] : null;
+                        if ('' !== $uuid) {
+                            $matchedUuids[] = $uuid;
+                            $this->referenceStore?->add($uuid, SnippetInterface::RESOURCE_KEY);
+                        }
 
-                                $previewImage = $this->getMediaPreviewUrlResolver()->resolve($templateData['preview_image'] ?? null, $locale);
-
-                                $presets[] = [
-                                    'id' => 'snippet_' . $snippet->getUuid(),
-                                    'title' => $title,
-                                    'description' => $description,
-                                    'preview_image' => $previewImage,
-                                    'props' => $props,
-                                    'values' => $values,
-                                ];
+                        /** @var array<string, mixed> $props */
+                        $props = [];
+                        $rawProps = null;
+                        if (null !== $blockEntry && isset($blockEntry['props']) && \is_array($blockEntry['props'])) {
+                            $rawProps = $blockEntry['props'];
+                        } elseif (isset($templateData['props']) && \is_array($templateData['props'])) {
+                            $rawProps = $templateData['props'];
+                        }
+                        if (\is_array($rawProps)) {
+                            foreach ($rawProps as $k => $v) {
+                                $props[(string) $k] = $v;
                             }
                         }
+
+                        /** @var array<string, mixed> $values */
+                        $values = [];
+                        if (null !== $blockEntry) {
+                            foreach ($blockEntry as $k => $v) {
+                                $values[(string) $k] = $v;
+                            }
+                        }
+
+                        $description = isset($templateData['description']) && \is_string($templateData['description']) ? $templateData['description'] : null;
+
+                        $previewImage = $this->getMediaPreviewUrlResolver()->resolve($templateData['preview_image'] ?? null, $locale);
+
+                        $presets[] = [
+                            'id' => 'snippet_' . $uuid,
+                            'title' => $title,
+                            'description' => $description,
+                            'preview_image' => $previewImage,
+                            'props' => $props,
+                            'values' => $values,
+                        ];
                     }
                 }
             } catch (\Throwable) {
@@ -220,9 +265,51 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
             }
         }
 
+        $this->snippetUuidsByCacheKey[$cacheKey] = $matchedUuids;
         $this->cache[$cacheKey] = $presets;
 
         return $presets;
+    }
+
+    private function findLivePresetDimensionContent(
+        SnippetInterface $snippet,
+        string $locale,
+    ): ?SnippetDimensionContentInterface {
+        /** @var iterable<SnippetDimensionContentInterface> $dimensionContents */
+        $dimensionContents = $snippet->getDimensionContents();
+
+        foreach ($dimensionContents as $content) {
+            if (
+                'block_preset' !== $content->getTemplateKey()
+                || DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()
+                || $content->getLocale() !== $locale
+            ) {
+                continue;
+            }
+            $stage = $content->getStage();
+            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
+                return $content;
+            }
+        }
+
+        foreach ($dimensionContents as $content) {
+            if (
+                'block_preset' !== $content->getTemplateKey()
+                || DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()
+            ) {
+                continue;
+            }
+            $contentLocale = $content->getLocale();
+            if (null !== $contentLocale && '' !== $contentLocale) {
+                continue;
+            }
+            $stage = $content->getStage();
+            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
+                return $content;
+            }
+        }
+
+        return null;
     }
 
     private function resolveLocalizedText(mixed $data, string $locale, ?string $fallback): ?string
@@ -279,9 +366,10 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface
     public function clearCache(?string $blockType = null, ?string $locale = null): void
     {
         if (null !== $blockType && null !== $locale) {
-            unset($this->cache[$blockType . '_' . $locale]);
+            $cacheKey = $blockType . '_' . $locale;
+            unset($this->cache[$cacheKey], $this->snippetUuidsByCacheKey[$cacheKey], $this->liveSnippetsByLocale[$locale]);
         } else {
-            $this->cache = [];
+            $this->reset();
         }
     }
 }

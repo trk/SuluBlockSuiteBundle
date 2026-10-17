@@ -7,17 +7,16 @@
         {% set snippet = reusable_block_load(snippet_id) %}
     {% endif %}
 {% endif %}
-{% set inner_blocks = snippet.blocks|default(snippet.content.blocks|default([])) %}
-{% set props = block._props|default(block.props is iterable ? block.props : {}) %}
-{% set wrapper_classes = sulu_block_suite_wrapper_classes(props, 'reusable-block-wrapper') %}
-{% set block_id = block._id|default(props.id|default(block.id|default(null))) %}
+{% set inner_blocks = block.blocks|default(snippet.blocks|default(snippet.content.blocks|default([]))) %}
 
 {% if inner_blocks is not empty %}
-    <div {% if block_id %}id="{{ block_id }}"{% endif %} class="{{ wrapper_classes }}">
+    {% if _slot is defined or _in_column|default(false) %}
         {% for inner_block in inner_blocks|hydrate_blocks(_context) %}
             {% if inner_block.type is defined and inner_block.type != 'reusable' %}
                 {{ sulu_block_render(inner_block, _context) }}
             {% endif %}
         {% endfor %}
-    </div>
+    {% else %}
+        {{ sulu_blocks_render(inner_blocks, _context) }}
+    {% endif %}
 {% endif %}

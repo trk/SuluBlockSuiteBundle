@@ -137,7 +137,7 @@ final class DynamicContentTwigExtension extends AbstractExtension
                 }
             }
 
-            $hydratedBlocks = $this->hydrateBlocks($leafBlocks, $context);
+            $hydratedBlocks = $this->hydrateBlocks($leafBlocks, \array_merge($context, ['_in_column' => true]));
             $sourceCount += \count($leafBlocks);
             $visibleCount += \count($hydratedBlocks);
             $node[$key] = $hydratedBlocks;

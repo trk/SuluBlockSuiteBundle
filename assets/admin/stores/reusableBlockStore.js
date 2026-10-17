@@ -1,5 +1,5 @@
 // @flow
-import {action, observable} from 'mobx';
+import {action, observable, runInAction} from 'mobx';
 import {Requester} from 'sulu-admin-bundle/services';
 import userStore from 'sulu-admin-bundle/stores/userStore';
 
@@ -18,14 +18,13 @@ class ReusableBlockStore {
     }
 
     get(id: string, locale?: string): ?Object {
-        return this.cache.get(this.getCacheKey(id, locale)) || this.cache.get(id);
+        return this.cache.get(this.getCacheKey(id, locale));
     }
 
     set(id: string, data: Object, locale?: string) {
         const key = this.getCacheKey(id, locale);
         action(() => {
             this.cache.set(key, data);
-            this.cache.set(id, data);
         })();
     }
 
@@ -46,18 +45,21 @@ class ReusableBlockStore {
         }
 
         const promise = Requester.get(`/admin/api/reusable-blocks/${id}?locale=${loc}`)
-            .then(action((data) => {
+            .then((data) => runInAction(() => {
                 this.loadingPromises.delete(key);
                 if (data && !data.error) {
                     this.cache.set(key, data);
-                    this.cache.set(id, data);
                     return data;
                 }
-                return null;
+                const notFound = {id, notFound: true};
+                this.cache.set(key, notFound);
+                return notFound;
             }))
-            .catch(action(() => {
+            .catch(() => runInAction(() => {
                 this.loadingPromises.delete(key);
-                return null;
+                const notFound = {id, notFound: true};
+                this.cache.set(key, notFound);
+                return notFound;
             }));
 
         this.loadingPromises.set(key, promise);

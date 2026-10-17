@@ -40,6 +40,35 @@ function countElementErrors(nodes: any): number {
     return count;
 }
 
+function resolveChildDataPath(node: any): ?string {
+    if (!node || typeof node !== 'object' || !node.props) {
+        return undefined;
+    }
+
+    if (typeof node.props.dataPath === 'string' && node.props.dataPath !== '') {
+        return node.props.dataPath;
+    }
+
+    const children = React.Children.toArray(node.props.children);
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (!child || typeof child !== 'object' || !child.props) {
+            continue;
+        }
+        if (typeof child.props.dataPath === 'string' && child.props.dataPath !== '') {
+            const rawPath = child.props.dataPath;
+            const lastSlash = rawPath.lastIndexOf('/');
+            return lastSlash > 0 ? rawPath.substring(0, lastSlash) : rawPath;
+        }
+        const nestedPath = resolveChildDataPath(child);
+        if (nestedPath) {
+            return nestedPath;
+        }
+    }
+
+    return undefined;
+}
+
 function evalTabVisibleCondition(child: any): boolean {
     if (!child || !child.props || !child.props.schema) {
         return true;
@@ -49,8 +78,9 @@ function evalTabVisibleCondition(child: any): boolean {
         return true;
     }
     try {
+        const derivedDataPath = resolveChildDataPath(child);
         const conditionData = conditionDataProviderRegistry.getAll().reduce(
-            (acc, provider) => ({...acc, ...provider(acc, undefined, formInspector)}),
+            (acc, provider) => ({...acc, ...provider(acc, derivedDataPath, formInspector)}),
             {...(data || {})}
         );
         return Boolean(jexl.evalSync(schema.visibleCondition, conditionData));

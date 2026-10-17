@@ -84,7 +84,7 @@
                 <info_text lang="es">Elija el tipo de bloque de destino y configure su contenido listo para usar y valores de estilo.</info_text>
                 <info_text lang="fr">Choisissez le type de bloc cible et configurez ses valeurs de contenu et de style prêtes à l'emploi.</info_text>
             </meta>
-            <tag name="sulu_block_suite.auto_blocks" default="headline" exclude="reusable"/>
+            <tag name="sulu_block_suite.auto_blocks" exclude="reusable"/>
             <types>
                 <type name="default">
                     <meta>

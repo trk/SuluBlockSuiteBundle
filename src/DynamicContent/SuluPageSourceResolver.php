@@ -13,9 +13,16 @@ use Sulu\Page\Domain\Model\PageDimensionContentInterface;
 use Sulu\Page\Domain\Model\PageInterface;
 use Sulu\Page\Domain\Repository\PageRepositoryInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Contracts\Service\ResetInterface;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 
-class SuluPageSourceResolver implements PageSourceResolverInterface
+class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterface
 {
+    /**
+     * @var array<string, array<string, mixed>|null>
+     */
+    private array $resolvedEntityCache = [];
+
     public function __construct(
         private readonly ?PageRepositoryInterface $pageRepository = null,
         private readonly ?ContentResolverInterface $contentResolver = null,
@@ -23,7 +30,13 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         private readonly ?ReferenceStoreInterface $referenceStore = null,
         private readonly ?ContentAggregatorInterface $contentAggregator = null,
         private readonly ?RequestAnalyzerInterface $requestAnalyzer = null,
+        private readonly ?SuluSmartContentQueryBridge $smartContentBridge = null,
     ) {
+    }
+
+    public function reset(): void
+    {
+        $this->resolvedEntityCache = [];
     }
 
     /**
@@ -226,16 +239,47 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             return null;
         }
 
+        $isPreview = $this->isPreviewContext();
+
         // 1. Preview request query parameter (?provider=pages&id=UUID)
         $previewId = $request->query->get('id');
-        if ($this->isPreviewContext() && \is_string($previewId) && '' !== \trim($previewId)) {
+        if ($isPreview && \is_string($previewId) && '' !== \trim($previewId)) {
             $resolved = $this->resolvePage(\trim($previewId), $locale);
             if (null !== $resolved) {
                 return $resolved;
             }
         }
 
-        // 2. Request attributes from Sulu 3 / Sulu 2 Website routing
+        // 2. Reuse already-resolved Sulu Website content attribute before re-resolving entities
+        $reqContent = $request->attributes->get('content');
+        if (\is_array($reqContent) && (isset($reqContent['title']) || isset($reqContent['headline']))) {
+            /** @var array<string, mixed> $context */
+            $context = ['content' => $reqContent];
+            $extension = $request->attributes->get('extension');
+            if (\is_array($extension)) {
+                $context['extension'] = $extension;
+            }
+            $view = $request->attributes->get('view');
+            if (\is_array($view)) {
+                $context['view'] = $view;
+            }
+            $object = $request->attributes->get('object');
+            if (\is_object($object)) {
+                $context['object'] = $object;
+            }
+            $resource = $request->attributes->get('resource');
+            if (\is_object($resource)) {
+                $context['resource'] = $resource;
+            }
+            $uuidAttr = $request->attributes->get('uuid') ?? $request->attributes->get('id');
+            if (\is_string($uuidAttr) && '' !== \trim($uuidAttr)) {
+                $context['resource_id'] = \trim($uuidAttr);
+            }
+
+            return $this->resolveCurrentPage($context, $locale);
+        }
+
+        // 3. Request attributes from Sulu 3 / Sulu 2 Website routing
         $object = $request->attributes->get('object');
         if ($object instanceof PageInterface || $object instanceof PageDimensionContentInterface) {
             return $this->resolvePage($object, $locale);
@@ -249,11 +293,6 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         $structure = $request->attributes->get('structure');
         if ($structure instanceof PageInterface || $structure instanceof PageDimensionContentInterface) {
             return $this->resolvePage($structure, $locale);
-        }
-
-        $reqContent = $request->attributes->get('content');
-        if (\is_array($reqContent) && (isset($reqContent['title']) || isset($reqContent['headline']))) {
-            return $this->resolveCurrentPage(['content' => $reqContent], $locale);
         }
 
         $uuid = $request->attributes->get('uuid') ?? $request->attributes->get('id');
@@ -385,9 +424,11 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             return [];
         }
 
+        $clampedLimit = \max(1, \min(100, $limit));
+
         $criteria = \array_merge($options, [
             'parent_id' => $parentUuid,
-            'limit' => $limit,
+            'limit' => $clampedLimit,
         ]);
 
         if ($excludeCurrent && null !== $currentUuid && '' !== $currentUuid) {
@@ -406,7 +447,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
      */
     public function resolveChildren(string|object|array $parent, ?string $locale = null, int $limit = 50): array
     {
-        if (null === $this->pageRepository) {
+        if (null === $this->pageRepository && null === $this->smartContentBridge) {
             return [];
         }
 
@@ -423,6 +464,24 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             return [];
         }
 
+        $limit = \max(1, \min(100, $limit > 0 ? $limit : 50));
+
+        if (null !== $this->smartContentBridge && $this->smartContentBridge->hasProvider('pages')) {
+            $flatIds = $this->smartContentBridge->queryFlatIds(
+                providerType: 'pages',
+                config: ['limit' => $limit, 'sort_by' => 'created', 'sort_order' => 'desc'],
+                locale: $resolvedLocale,
+                dataSource: $parentId,
+                includeSubFolders: false,
+            );
+
+            return $this->loadAndNormalizePagesByOrderedUuids($flatIds, $resolvedLocale);
+        }
+
+        if (null === $this->pageRepository) {
+            return [];
+        }
+
         /** @var array{uuid?: string, uuids?: list<string>, locale?: string, stage?: string, parentId?: string, descendantOfId?: string, webspaceKey?: string, limit?: int} $filters */
         $filters = [
             'parentId' => $parentId,
@@ -430,7 +489,11 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             'stage' => DimensionContentInterface::STAGE_LIVE,
         ];
 
-        $limit = $limit > 0 ? $limit : 50;
+        $webspaceKey = $this->resolveCurrentWebspaceKey();
+        if (null !== $webspaceKey) {
+            $filters['webspaceKey'] = $webspaceKey;
+        }
+
         $filters['limit'] = $limit;
 
         try {
@@ -464,7 +527,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
      */
     public function resolveQuery(array $criteria, ?string $locale = null): array
     {
-        if (null === $this->pageRepository) {
+        if (null === $this->pageRepository && null === $this->smartContentBridge) {
             return [];
         }
 
@@ -481,6 +544,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             $filters['uuids'] = $uuids;
         }
 
+        $resolvedParentUuid = null;
         if (\array_key_exists('parent_id', $criteria)) {
             $rawParentCriteria = $criteria['parent_id'];
             $resolvedParentUuid = (\is_string($rawParentCriteria) || \is_object($rawParentCriteria) || \is_array($rawParentCriteria))
@@ -498,16 +562,62 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             $filters['parentId'] = $resolvedParentUuid;
         }
 
+        $descendantOfId = null;
         if (isset($criteria['descendant_of_id']) && \is_string($criteria['descendant_of_id']) && '' !== \trim($criteria['descendant_of_id'])) {
-            $filters['descendantOfId'] = \trim($criteria['descendant_of_id']);
+            $descendantOfId = \trim($criteria['descendant_of_id']);
+            $filters['descendantOfId'] = $descendantOfId;
+        }
+
+        $rawCategories = $criteria['category_keys'] ?? ($criteria['categories'] ?? null);
+        $hasStringCategoryKeys = [] === $this->normalizeIntList($criteria['category_ids'] ?? $rawCategories)
+            && [] !== $this->normalizeStringList($rawCategories);
+        $navigationContexts = $this->normalizeStringList($criteria['navigation_contexts'] ?? ($criteria['navigation_context'] ?? null));
+        $hasCustomDepth = isset($criteria['depth']) && \is_numeric($criteria['depth']) && (int) $criteria['depth'] > 0;
+        $bridgeDataSource = $resolvedParentUuid ?? $descendantOfId;
+
+        if (
+            [] === $uuids
+            && null !== $bridgeDataSource
+            && !$hasStringCategoryKeys
+            && [] === $navigationContexts
+            && !$hasCustomDepth
+            && null !== $this->smartContentBridge
+            && $this->smartContentBridge->hasProvider('pages')
+        ) {
+            $excludedIds = $this->normalizeStringList($criteria['exclude_ids'] ?? ($criteria['exclude_id'] ?? null));
+            $rawLimit = isset($criteria['limit']) && \is_numeric($criteria['limit']) ? (int) $criteria['limit'] : 10;
+            $limit = \max(1, \min(100, $rawLimit));
+
+            $bridgeQuery = $criteria;
+            if ([] !== $excludedIds) {
+                $bridgeQuery['limit'] = \min(100, $limit + \count($excludedIds));
+            }
+
+            $flatIds = $this->smartContentBridge->queryFlatIds(
+                providerType: 'pages',
+                config: $bridgeQuery,
+                locale: $resolvedLocale,
+                dataSource: $bridgeDataSource,
+                includeSubFolders: null === $resolvedParentUuid && null !== $descendantOfId,
+            );
+
+            $filteredIds = [] !== $excludedIds
+                ? \array_slice(\array_values(\array_diff($flatIds, $excludedIds)), 0, $limit)
+                : \array_slice($flatIds, 0, $limit);
+
+            return $this->loadAndNormalizePagesByOrderedUuids($filteredIds, $resolvedLocale);
+        }
+
+        if (null === $this->pageRepository) {
+            return [];
         }
 
         if (isset($criteria['webspace_key']) && \is_string($criteria['webspace_key']) && '' !== \trim($criteria['webspace_key'])) {
             $filters['webspaceKey'] = \trim($criteria['webspace_key']);
-        } elseif (null !== $this->requestAnalyzer) {
-            $webspaceKey = $this->requestAnalyzer->getWebspace()?->getKey();
-            if (\is_string($webspaceKey) && '' !== \trim($webspaceKey)) {
-                $filters['webspaceKey'] = \trim($webspaceKey);
+        } else {
+            $webspaceKey = $this->resolveCurrentWebspaceKey();
+            if (null !== $webspaceKey) {
+                $filters['webspaceKey'] = $webspaceKey;
             }
         }
 
@@ -553,16 +663,15 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             $filters['depth'] = (int) $criteria['depth'];
         }
 
-        $offset = isset($criteria['offset']) && \is_numeric($criteria['offset']) && (int) $criteria['offset'] > 0
-            ? (int) $criteria['offset']
+        $offset = isset($criteria['offset']) && \is_numeric($criteria['offset'])
+            ? \max(0, \min(500, (int) $criteria['offset']))
             : 0;
         $excludedIds = $this->normalizeStringList($criteria['exclude_ids'] ?? ($criteria['exclude_id'] ?? null));
 
-        $limit = isset($criteria['limit']) && \is_numeric($criteria['limit']) ? (int) $criteria['limit'] : 10;
-        if ($limit > 0) {
-            // Fetch extra rows when offset or excluded IDs are applied in memory
-            $filters['limit'] = $limit + $offset + \count($excludedIds);
-        }
+        $rawLimit = isset($criteria['limit']) && \is_numeric($criteria['limit']) ? (int) $criteria['limit'] : 10;
+        $limit = \max(1, \min(100, $rawLimit));
+        // Fetch extra rows when offset or excluded IDs are applied in memory
+        $filters['limit'] = $limit + $offset + \count($excludedIds);
 
         /** @var array<string, 'asc'|'desc'> $sortBy */
         $sortBy = ['created' => 'desc'];
@@ -610,18 +719,22 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
 
             $excludedMap = \array_fill_keys($excludedIds, true);
             $result = [];
+            $skipped = 0;
             foreach ($pages as $page) {
                 if (isset($excludedMap[$page->getUuid()])) {
+                    continue;
+                }
+                if ($skipped < $offset) {
+                    ++$skipped;
                     continue;
                 }
                 $data = $this->normalizePageEntity($page, $resolvedLocale);
                 if (null !== $data) {
                     $result[] = $data;
+                    if (\count($result) >= $limit) {
+                        break;
+                    }
                 }
-            }
-
-            if ($offset > 0 || ($limit > 0 && \count($result) > $limit)) {
-                $result = \array_slice($result, $offset, $limit > 0 ? $limit : null);
             }
 
             return $result;
@@ -688,13 +801,30 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
      */
     private function normalizePageEntity(PageInterface $page, string $locale): ?array
     {
+        $uuid = $page->getUuid();
+        $stageKey = $this->isPreviewContext() ? DimensionContentInterface::STAGE_DRAFT : DimensionContentInterface::STAGE_LIVE;
+        $cacheKey = '' !== $uuid ? "{$stageKey}:{$locale}:{$uuid}" : null;
+
+        if (null !== $cacheKey && \array_key_exists($cacheKey, $this->resolvedEntityCache)) {
+            $cached = $this->resolvedEntityCache[$cacheKey];
+            if (null !== $cached) {
+                $this->referenceStore?->add($uuid, PageInterface::RESOURCE_KEY);
+            }
+
+            return $cached;
+        }
+
         $dimensionContent = $this->extractDimensionContent($page, $locale);
         if (null === $dimensionContent) {
+            if (null !== $cacheKey) {
+                $this->resolvedEntityCache[$cacheKey] = null;
+            }
+
             return null;
         }
 
-        if ('' !== $page->getUuid()) {
-            $this->referenceStore?->add($page->getUuid(), PageInterface::RESOURCE_KEY);
+        if ('' !== $uuid) {
+            $this->referenceStore?->add($uuid, PageInterface::RESOURCE_KEY);
         }
 
         if (null !== $this->contentResolver) {
@@ -702,8 +832,8 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
                 $resolved = $this->contentResolver->resolve($dimensionContent);
                 /** @var array<string, mixed> $pageData */
                 $pageData = $resolved['content'];
-                $pageData['id'] = $page->getUuid();
-                $pageData['uuid'] = $page->getUuid();
+                $pageData['id'] = $uuid;
+                $pageData['uuid'] = $uuid;
 
                 $title = $dimensionContent->getTitle();
                 if (null !== $title) {
@@ -743,7 +873,12 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
                     $pageData['author'] = $dimensionContent->getAuthor();
                 }
 
-                return $this->enrichPageMetadata($pageData, $page, $dimensionContent);
+                $enriched = $this->enrichPageMetadata($pageData, $page, $dimensionContent);
+                if (null !== $cacheKey) {
+                    $this->resolvedEntityCache[$cacheKey] = $enriched;
+                }
+
+                return $enriched;
             } catch (\Throwable) {
                 // Fallback to direct entity getters
             }
@@ -751,8 +886,8 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
 
         /** @var array<string, mixed> $pageData */
         $pageData = $dimensionContent->getTemplateData();
-        $pageData['id'] = $page->getUuid();
-        $pageData['uuid'] = $page->getUuid();
+        $pageData['id'] = $uuid;
+        $pageData['uuid'] = $uuid;
         $entityTitle = $dimensionContent->getTitle();
         $pageData['title'] = $entityTitle;
         $pageData['headline'] = $this->firstNonEmptyString($pageData['headline'] ?? null, $entityTitle);
@@ -781,7 +916,12 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             $pageData['author'] = $dimensionContent->getAuthor();
         }
 
-        return $this->enrichPageMetadata($pageData, $page, $dimensionContent);
+        $enriched = $this->enrichPageMetadata($pageData, $page, $dimensionContent);
+        if (null !== $cacheKey) {
+            $this->resolvedEntityCache[$cacheKey] = $enriched;
+        }
+
+        return $enriched;
     }
 
     /**
@@ -856,6 +996,9 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
 
         $draftFallback = null;
         foreach ($dimensionContents as $content) {
+            if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()) {
+                continue;
+            }
             if ($content->getLocale() === $locale) {
                 $stage = $content->getStage();
                 if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
@@ -879,7 +1022,23 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             }
         }
 
-        return null;
+        foreach ($dimensionContents as $content) {
+            if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion() || null !== $content->getLocale()) {
+                continue;
+            }
+            if (null === $content->getTitle() && [] === $content->getTemplateData()) {
+                continue;
+            }
+            $stage = $content->getStage();
+            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
+                return $content;
+            }
+            if ($isPreview && DimensionContentInterface::STAGE_DRAFT === $stage) {
+                $draftFallback ??= $content;
+            }
+        }
+
+        return $draftFallback;
     }
 
     private function findPageEntityByUuid(string $uuid, string $locale): ?PageInterface
@@ -889,13 +1048,20 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             return null;
         }
 
+        $webspaceKey = $this->resolveCurrentWebspaceKey();
+
         try {
+            $liveFilters = [
+                'uuid' => $trimId,
+                'locale' => $locale,
+                'stage' => DimensionContentInterface::STAGE_LIVE,
+            ];
+            if (null !== $webspaceKey) {
+                $liveFilters['webspaceKey'] = $webspaceKey;
+            }
+
             $pageEntity = $this->pageRepository->findOneBy(
-                [
-                    'uuid' => $trimId,
-                    'locale' => $locale,
-                    'stage' => DimensionContentInterface::STAGE_LIVE,
-                ],
+                $liveFilters,
                 [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
             );
 
@@ -907,17 +1073,36 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
                 return null;
             }
 
+            $draftFilters = [
+                'uuid' => $trimId,
+                'locale' => $locale,
+                'stage' => DimensionContentInterface::STAGE_DRAFT,
+            ];
+            if (null !== $webspaceKey) {
+                $draftFilters['webspaceKey'] = $webspaceKey;
+            }
+
             return $this->pageRepository->findOneBy(
-                [
-                    'uuid' => $trimId,
-                    'locale' => $locale,
-                    'stage' => DimensionContentInterface::STAGE_DRAFT,
-                ],
+                $draftFilters,
                 [PageRepositoryInterface::GROUP_SELECT_PAGE_ADMIN => true],
             );
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function resolveCurrentWebspaceKey(): ?string
+    {
+        if (null === $this->requestAnalyzer) {
+            return null;
+        }
+
+        $webspaceKey = $this->requestAnalyzer->getWebspace()?->getKey();
+        if (\is_string($webspaceKey) && '' !== \trim($webspaceKey)) {
+            return \trim($webspaceKey);
+        }
+
+        return null;
     }
 
     private function isPreviewContext(): bool
@@ -927,14 +1112,8 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
             return false;
         }
 
-        $provider = $request->query->get('provider');
-        $route = $request->attributes->get('_route');
-
-        return ('pages' === $provider || 'articles' === $provider || 'snippets' === $provider)
-            || $request->query->getBoolean('preview')
-            || $request->attributes->getBoolean('preview')
-            || $request->attributes->getBoolean('_sulu_preview')
-            || (\is_string($route) && \str_starts_with($route, 'sulu_preview'));
+        return $request->attributes->getBoolean('preview')
+            || $request->attributes->getBoolean('_sulu_preview');
     }
 
     /**
@@ -1064,5 +1243,61 @@ class SuluPageSourceResolver implements PageSourceResolverInterface
         }
 
         return null;
+    }
+
+    /**
+     * @param list<string> $uuids
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function loadAndNormalizePagesByOrderedUuids(array $uuids, string $locale): array
+    {
+        if ([] === $uuids) {
+            return [];
+        }
+
+        $loaded = null !== $this->smartContentBridge
+            ? $this->smartContentBridge->loadOrderedResources('pages', $uuids, $locale)
+            : [];
+
+        if ([] === $loaded && null !== $this->pageRepository) {
+            try {
+                /** @var iterable<PageInterface> $pages */
+                $pages = $this->pageRepository->findBy(
+                    [
+                        'uuids' => $uuids,
+                        'locale' => $locale,
+                        'stage' => DimensionContentInterface::STAGE_LIVE,
+                    ],
+                    [],
+                    [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
+                );
+
+                $byUuid = [];
+                foreach ($pages as $page) {
+                    $byUuid[$page->getUuid()] = $page;
+                }
+
+                foreach ($uuids as $uuid) {
+                    if (isset($byUuid[$uuid])) {
+                        $loaded[] = $byUuid[$uuid];
+                    }
+                }
+            } catch (\Throwable) {
+                return [];
+            }
+        }
+
+        $result = [];
+        foreach ($loaded as $resource) {
+            if ($resource instanceof PageInterface) {
+                $normalized = $this->normalizePageEntity($resource, $locale);
+                if (null !== $normalized) {
+                    $result[] = $normalized;
+                }
+            }
+        }
+
+        return $result;
     }
 }

@@ -1,0 +1,38 @@
+<?xml version="1.0" ?>
+<form xmlns="http://schemas.sulu.io/template/template"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/form-1.0.xsd">
+    <key>block_suite_field_image_loading</key>
+    <properties>
+        <property name="image_loading" type="checkbox" colspan="6" mandatory="false">
+            <meta>
+                <title lang="en">Image Loading</title>
+                <title lang="tr">Görsel Yükleme</title>
+                <title lang="de">Bild-Ladeverhalten</title>
+                <title lang="ru">Загрузка изображения</title>
+                <title lang="es">Carga de imagen</title>
+                <title lang="fr">Chargement de l'image</title>
+                <info_text lang="en">By default, images are loaded lazy. Enable eager loading for images in the initial viewport.</info_text>
+                <info_text lang="tr">Varsayılan olarak görseller tembel (lazy) yüklenir. İlk görünüm alanındaki (viewport) görseller için hemen yüklemeyi (eager) etkinleştirin.</info_text>
+                <info_text lang="de">Standardmäßig werden Bilder verzögert (lazy) geladen. Aktivieren Sie das sofortige Laden (eager) für Bilder im ersten sichtbaren Bereich.</info_text>
+                <info_text lang="ru">По умолчанию изображения загружаются отложенно (lazy). Включите немедленную загрузку (eager) для изображений в первом экране.</info_text>
+                <info_text lang="es">Por defecto, las imágenes se cargan de forma diferida (lazy). Active la carga inmediata (eager) para las imágenes en la ventana gráfica inicial.</info_text>
+                <info_text lang="fr">Par défaut, les images sont chargées de manière différée (lazy). Activez le chargement immédiat (eager) pour les images dans la fenêtre d'affichage initiale.</info_text>
+            </meta>
+            <params>
+                <param name="type" value="toggler"/>
+                <param name="default_value" value="false"/>
+                <param name="label">
+                    <meta>
+                        <title lang="en">Load image eagerly</title>
+                        <title lang="tr">Görseli hemen yükle (Eager)</title>
+                        <title lang="de">Bild sofort laden (Eager)</title>
+                        <title lang="ru">Загружать сразу (Eager)</title>
+                        <title lang="es">Cargar imagen de inmediato (Eager)</title>
+                        <title lang="fr">Charger l'image immédiatement (Eager)</title>
+                    </meta>
+                </param>
+            </params>
+        </property>
+    </properties>
+</form>

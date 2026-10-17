@@ -16,6 +16,14 @@ use Totoglu\SuluBlockSuiteBundle\Controller\Admin\ReusableBlockUsageController;
 
 final class ReusableBlockUsageControllerTest extends TestCase
 {
+    private function createAllowingSecurityChecker(): SecurityCheckerInterface
+    {
+        $stub = $this->createStub(SecurityCheckerInterface::class);
+        $stub->method('hasPermission')->willReturn(true);
+
+        return $stub;
+    }
+
     public function testUsageReturnsSuccessfulData(): void
     {
         $mockRepo = $this->createMock(ReferenceRepositoryInterface::class);
@@ -39,7 +47,7 @@ final class ReusableBlockUsageControllerTest extends TestCase
                 ],
             ]);
 
-        $controller = new ReusableBlockUsageController($mockRepo);
+        $controller = new ReusableBlockUsageController($mockRepo, $this->createAllowingSecurityChecker());
         $request = new Request();
 
         $response = $controller->usage($request, 'snippet-123');
@@ -73,7 +81,7 @@ final class ReusableBlockUsageControllerTest extends TestCase
             ],
         ]);
 
-        $controller = new ReusableBlockUsageController($mockRepo);
+        $controller = new ReusableBlockUsageController($mockRepo, $this->createAllowingSecurityChecker());
         $request = Request::create(
             '/subsite/admin/api/reusable-blocks/s-1/usage',
             server: [
@@ -99,24 +107,38 @@ final class ReusableBlockUsageControllerTest extends TestCase
         $mockSecurity = $this->createMock(SecurityCheckerInterface::class);
         $mockSecurity->expects($this->once())
             ->method('hasPermission')
-            ->with(SnippetAdmin::SECURITY_CONTEXT, 'view')
+            ->with(
+                $this->callback(static function (\Sulu\Component\Security\Authorization\SecurityCondition $condition): bool {
+                    return SnippetAdmin::SECURITY_CONTEXT === $condition->getSecurityContext()
+                        && 'tr' === $condition->getLocale();
+                }),
+                'view',
+            )
             ->willReturn(false);
 
         $controller = new ReusableBlockUsageController(null, $mockSecurity);
-        $response = $controller->usage(new Request(), 'snippet-123');
+        $response = $controller->usage(new Request(['locale' => 'tr']), 'snippet-123');
 
         $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
     }
 
-    public function testUsageBadRequestOnInvalidId(): void
+    public function testUsageAndStatsForbiddenWhenSecurityCheckerIsNull(): void
     {
         $controller = new ReusableBlockUsageController();
+
+        $this->assertSame(Response::HTTP_FORBIDDEN, $controller->usage(new Request(), 'snippet-123')->getStatusCode());
+        $this->assertSame(Response::HTTP_FORBIDDEN, $controller->stats(new Request(['ids' => 'id-1']))->getStatusCode());
+    }
+
+    public function testUsageBadRequestOnInvalidId(): void
+    {
+        $controller = new ReusableBlockUsageController(null, $this->createAllowingSecurityChecker());
         $response = $controller->usage(new Request(), 'invalid/id#bad');
 
         $this->assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
     }
 
-    public function testStatsReturnsBatchCounts(): void
+    public function testStatsReturnsBatchCountsAndDeduplicatesIds(): void
     {
         $mockRepo = $this->createMock(ReferenceRepositoryInterface::class);
         $mockRepo->expects($this->exactly(2))
@@ -126,8 +148,8 @@ final class ReusableBlockUsageControllerTest extends TestCase
                 [['resourceKey' => SnippetInterface::RESOURCE_KEY, 'resourceId' => 'id-2'], ['referenceResourceId'], 0],
             ]);
 
-        $controller = new ReusableBlockUsageController($mockRepo);
-        $request = new Request(['ids' => 'id-1,id-2']);
+        $controller = new ReusableBlockUsageController($mockRepo, $this->createAllowingSecurityChecker());
+        $request = new Request(['ids' => 'id-1,id-2,id-1']);
 
         $response = $controller->stats($request);
         $this->assertSame(JsonResponse::HTTP_OK, $response->getStatusCode());
@@ -139,7 +161,7 @@ final class ReusableBlockUsageControllerTest extends TestCase
 
     public function testStatsReturnsEmptyWhenNoIds(): void
     {
-        $controller = new ReusableBlockUsageController();
+        $controller = new ReusableBlockUsageController(null, $this->createAllowingSecurityChecker());
         $response = $controller->stats(new Request());
 
         /** @var array{counts: array<string, int>} $data */

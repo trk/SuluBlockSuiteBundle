@@ -5,15 +5,25 @@ declare(strict_types=1);
 namespace Totoglu\SuluBlockSuiteBundle\Tests\Controller\Admin;
 
 use PHPUnit\Framework\TestCase;
+use Sulu\Component\Security\Authorization\SecurityCheckerInterface;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Totoglu\SuluBlockSuiteBundle\Controller\Admin\BlockPresetController;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor;
 use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
 
 final class BlockPresetControllerTest extends TestCase
 {
+    private function createAllowingSecurityChecker(): SecurityCheckerInterface
+    {
+        $stub = $this->createStub(SecurityCheckerInterface::class);
+        $stub->method('hasPermission')->willReturn(true);
+
+        return $stub;
+    }
+
     public function testInvokeReturnsSuccessfulJsonResponse(): void
     {
         $mockProvider = $this->createMock(BlockPresetProviderInterface::class);
@@ -29,7 +39,7 @@ final class BlockPresetControllerTest extends TestCase
                 ],
             ]);
 
-        $controller = new BlockPresetController($mockProvider);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
         $request = new Request(['locale' => 'tr']);
 
         $response = $controller($request, 'headline');
@@ -49,7 +59,7 @@ final class BlockPresetControllerTest extends TestCase
         $mockProvider = $this->createMock(BlockPresetProviderInterface::class);
         $mockProvider->expects($this->never())->method('getPresets');
 
-        $controller = new BlockPresetController($mockProvider);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
         $request = new Request();
 
         $response = $controller($request, 'invalid/path');
@@ -60,7 +70,7 @@ final class BlockPresetControllerTest extends TestCase
     public function testReusableBlockReturnsNotFoundWhenRepositoryIsNull(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $controller = new BlockPresetController($mockProvider);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
         $request = new Request();
 
         $response = $controller->reusableBlock($request, 'uuid-123');
@@ -71,7 +81,7 @@ final class BlockPresetControllerTest extends TestCase
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
         $mockRepo = $this->createStub(SnippetRepositoryInterface::class);
-        $controller = new BlockPresetController($mockProvider, $mockRepo);
+        $controller = new BlockPresetController($mockProvider, $mockRepo, null, null, null, $this->createAllowingSecurityChecker());
         $request = new Request();
 
         $response = $controller->reusableBlock($request, 'invalid/uuid/!');
@@ -90,7 +100,7 @@ final class BlockPresetControllerTest extends TestCase
 
         $visitor = new BlockSuiteFormMetadataVisitor($tempDir);
 
-        $controller = new BlockPresetController($mockProvider, null, null, $visitor);
+        $controller = new BlockPresetController($mockProvider, null, null, $visitor, null, $this->createAllowingSecurityChecker());
         $request = new Request(['locale' => 'en']);
 
         $response = $controller->blockTypes($request);
@@ -121,7 +131,7 @@ final class BlockPresetControllerTest extends TestCase
     public function testSavePresetReturnsBadRequestOnInvalidBlockType(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $controller = new BlockPresetController($mockProvider);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
 
         $request = new Request([], [], [], [], [], [], (string) \json_encode([
             'block_type' => 'invalid/type!',
@@ -135,7 +145,7 @@ final class BlockPresetControllerTest extends TestCase
     public function testSavePresetReturnsUnprocessableEntityOnEmptyTitle(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $controller = new BlockPresetController($mockProvider);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
 
         $request = new Request([], [], [], [], [], [], (string) \json_encode([
             'block_type' => 'card',
@@ -149,7 +159,7 @@ final class BlockPresetControllerTest extends TestCase
     public function testSavePresetReturnsServerErrorWhenMessageBusNotConfigured(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $controller = new BlockPresetController($mockProvider);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
 
         $request = new Request([], [], [], [], [], [], (string) \json_encode([
             'block_type' => 'card',
@@ -188,6 +198,7 @@ final class BlockPresetControllerTest extends TestCase
             null,
             null,
             $mockBus,
+            $this->createAllowingSecurityChecker(),
         );
 
         $request = new Request([], [], [], [], [], [], (string) \json_encode([
@@ -219,7 +230,7 @@ final class BlockPresetControllerTest extends TestCase
     public function testSavePresetChecksPermission(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $mockSecurityChecker = $this->createMock(\Sulu\Component\Security\Authorization\SecurityCheckerInterface::class);
+        $mockSecurityChecker = $this->createMock(SecurityCheckerInterface::class);
         $mockSecurityChecker->expects($this->once())
             ->method('checkPermission')
             ->with(
@@ -228,7 +239,7 @@ final class BlockPresetControllerTest extends TestCase
                 }),
                 \Sulu\Component\Security\Authorization\PermissionTypes::ADD,
             )
-            ->willThrowException(new \Symfony\Component\Security\Core\Exception\AccessDeniedException());
+            ->willThrowException(new AccessDeniedException());
 
         $controller = new BlockPresetController(
             $mockProvider,
@@ -245,14 +256,14 @@ final class BlockPresetControllerTest extends TestCase
             'locale' => 'tr',
         ]));
 
-        $this->expectException(\Symfony\Component\Security\Core\Exception\AccessDeniedException::class);
+        $this->expectException(AccessDeniedException::class);
         $controller->savePreset($request);
     }
 
     public function testSaveReusableBlockReturnsUnprocessableEntityOnEmptyTitle(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $controller = new BlockPresetController($mockProvider);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
         $request = new Request([], [], [], [], [], [], (string) \json_encode([
             'title' => '',
             'block' => ['type' => 'card'],
@@ -265,7 +276,7 @@ final class BlockPresetControllerTest extends TestCase
     public function testSaveReusableBlockReturnsBadRequestOnMissingBlock(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $controller = new BlockPresetController($mockProvider);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
         $request = new Request([], [], [], [], [], [], (string) \json_encode([
             'title' => 'Common Card',
             'block' => [],
@@ -278,7 +289,7 @@ final class BlockPresetControllerTest extends TestCase
     public function testSaveReusableBlockReturnsInternalServerErrorWhenMessageBusMissing(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $controller = new BlockPresetController($mockProvider);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
         $request = new Request([], [], [], [], [], [], (string) \json_encode([
             'title' => 'Common Card',
             'block' => ['type' => 'card', 'title' => 'Header'],
@@ -313,6 +324,7 @@ final class BlockPresetControllerTest extends TestCase
             null,
             null,
             $mockBus,
+            $this->createAllowingSecurityChecker(),
         );
 
         $request = new Request([], [], [], [], [], [], (string) \json_encode([
@@ -343,7 +355,7 @@ final class BlockPresetControllerTest extends TestCase
     public function testSaveReusableBlockChecksPermission(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $mockSecurityChecker = $this->createMock(\Sulu\Component\Security\Authorization\SecurityCheckerInterface::class);
+        $mockSecurityChecker = $this->createMock(SecurityCheckerInterface::class);
         $mockSecurityChecker->expects($this->once())
             ->method('checkPermission')
             ->with(
@@ -352,7 +364,7 @@ final class BlockPresetControllerTest extends TestCase
                 }),
                 \Sulu\Component\Security\Authorization\PermissionTypes::ADD,
             )
-            ->willThrowException(new \Symfony\Component\Security\Core\Exception\AccessDeniedException());
+            ->willThrowException(new AccessDeniedException());
 
         $controller = new BlockPresetController(
             $mockProvider,
@@ -369,14 +381,14 @@ final class BlockPresetControllerTest extends TestCase
             'block' => ['type' => 'card'],
         ]));
 
-        $this->expectException(\Symfony\Component\Security\Core\Exception\AccessDeniedException::class);
+        $this->expectException(AccessDeniedException::class);
         $controller->saveReusableBlock($request);
     }
 
     public function testGetEndpointsCheckViewPermissionAndStatsExcludedFromReusableBlockRoute(): void
     {
         $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
-        $mockSecurityChecker = $this->createMock(\Sulu\Component\Security\Authorization\SecurityCheckerInterface::class);
+        $mockSecurityChecker = $this->createMock(SecurityCheckerInterface::class);
         $mockSecurityChecker->expects($this->exactly(3))
             ->method('checkPermission')
             ->with(
@@ -406,11 +418,87 @@ final class BlockPresetControllerTest extends TestCase
         $this->assertCount(1, $routeAttrs);
         /** @var \Symfony\Component\Routing\Attribute\Route $route */
         $route = $routeAttrs[0]->newInstance();
-        $requirements = $route->getRequirements();
+        $requirements = $route->requirements;
         $this->assertArrayHasKey('id', $requirements);
         $idPattern = $requirements['id'];
         $this->assertIsString($idPattern);
         $this->assertSame(0, \preg_match('~' . $idPattern . '~', 'stats'));
         $this->assertSame(1, \preg_match('~' . $idPattern . '~', '019a0000-0000-7000-8000-000000000001'));
+    }
+
+    public function testEndpointsThrowAccessDeniedWhenSecurityCheckerIsNull(): void
+    {
+        $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
+        $controller = new BlockPresetController($mockProvider);
+
+        $this->expectException(AccessDeniedException::class);
+        $controller->presets(new Request(['locale' => 'en']), 'card');
+    }
+
+    public function testInvalidLocaleReturnsBadRequest(): void
+    {
+        $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
+
+        $response = $controller->presets(new Request(['locale' => '../etc/passwd']), 'card');
+        $this->assertSame(JsonResponse::HTTP_BAD_REQUEST, $response->getStatusCode());
+
+        $saveResponse = $controller->savePreset(new Request([], [], [], [], [], [], (string) \json_encode([
+            'block_type' => 'card',
+            'title' => 'Preset',
+            'locale' => 'en; DROP TABLE',
+        ])));
+        $this->assertSame(JsonResponse::HTTP_BAD_REQUEST, $saveResponse->getStatusCode());
+    }
+
+    public function testSavePresetSanitizesInternalExceptionDetails(): void
+    {
+        $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
+        $mockBus = $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class);
+        $mockBus->method('dispatch')->willThrowException(new \RuntimeException('SQLSTATE[42S02]: secret table missing'));
+
+        $controller = new BlockPresetController(
+            $mockProvider,
+            null,
+            null,
+            null,
+            $mockBus,
+            $this->createAllowingSecurityChecker(),
+        );
+
+        $response = $controller->savePreset(new Request([], [], [], [], [], [], (string) \json_encode([
+            'block_type' => 'card',
+            'title' => 'My Preset',
+            'locale' => 'en',
+        ])));
+
+        $this->assertSame(JsonResponse::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
+        $this->assertStringNotContainsString('SQLSTATE', (string) $response->getContent());
+    }
+
+    public function testSavePresetAndSaveReusableBlockValidateTitleLengthBlockTypeAndPreviewImage(): void
+    {
+        $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
+        $controller = new BlockPresetController($mockProvider, null, null, null, null, $this->createAllowingSecurityChecker());
+
+        $longTitle = \str_repeat('a', 256);
+
+        $presetTooLongResponse = $controller->savePreset(new Request([], [], [], [], [], [], (string) \json_encode([
+            'block_type' => 'card',
+            'title' => $longTitle,
+        ])));
+        $this->assertSame(JsonResponse::HTTP_UNPROCESSABLE_ENTITY, $presetTooLongResponse->getStatusCode());
+
+        $reusableTooLongResponse = $controller->saveReusableBlock(new Request([], [], [], [], [], [], (string) \json_encode([
+            'title' => $longTitle,
+            'block' => ['type' => 'card'],
+        ])));
+        $this->assertSame(JsonResponse::HTTP_UNPROCESSABLE_ENTITY, $reusableTooLongResponse->getStatusCode());
+
+        $reusableInvalidTypeResponse = $controller->saveReusableBlock(new Request([], [], [], [], [], [], (string) \json_encode([
+            'title' => 'Valid Title',
+            'block' => ['type' => 'invalid/block!'],
+        ])));
+        $this->assertSame(JsonResponse::HTTP_UNPROCESSABLE_ENTITY, $reusableInvalidTypeResponse->getStatusCode());
     }
 }

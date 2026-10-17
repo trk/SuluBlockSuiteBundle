@@ -79,7 +79,12 @@ export default class PresetSelectionBlockPreviewTransformer implements BlockPrev
                     }
                 }
             }
-            if (typeof value.visibility === 'string' && value.visibility.trim() !== '' && value.visibility !== 'visible') {
+            if (
+                typeof value.visibility === 'string'
+                && value.visibility.trim() !== ''
+                && value.visibility !== 'all'
+                && value.visibility !== 'visible'
+            ) {
                 visibility = value.visibility.trim();
             }
         }

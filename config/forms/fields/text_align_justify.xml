@@ -1,0 +1,223 @@
+<?xml version="1.0" ?>
+<form xmlns="http://schemas.sulu.io/template/template"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/form-1.0.xsd">
+    <key>block_suite_field_text_align_justify</key>
+    <properties>
+    <property name="text_align" type="single_select" colspan="6" mandatory="false">
+        <meta>
+            <title lang="en">Text Alignment</title>
+            <title lang="tr">Metin Hizalama</title>
+            <title lang="de">Textausrichtung</title>
+            <title lang="ru">Выравнивание текста</title>
+            <title lang="es">Alineación de Texto</title>
+            <title lang="fr">Alignement du Texte</title>
+            <info_text lang="en">Center, left and right alignment may depend on a breakpoint and require a fallback.</info_text>
+            <info_text lang="tr">Orta, sol ve sağ hizalama bir kırılım noktasına bağlı olabilir ve yedek hizalama gerektirebilir.</info_text>
+            <info_text lang="de">Links-, Rechts- und Zentriert-Ausrichtung können von einem Breakpoint abhängen.</info_text>
+            <info_text lang="ru">Выравнивание по левому, правому краю и по центру может зависеть от контрольной точки.</info_text>
+            <info_text lang="es">La alineación centrada, izquierda y derecha puede depender de un punto de ruptura.</info_text>
+            <info_text lang="fr">L'alignement centré, gauche et droite peut dépendre d'un point de rupture.</info_text>
+        </meta>
+        <params>
+            <param name="default_value" value=""/>
+            <param name="values" type="collection">
+                <param name="">
+                    <meta>
+                        <title lang="en">None</title>
+                        <title lang="tr">Yok</title>
+                        <title lang="de">Keine</title>
+                        <title lang="ru">Нет</title>
+                        <title lang="es">Ninguno</title>
+                        <title lang="fr">Aucun</title>
+                    </meta>
+                </param>
+                <param name="left">
+                    <meta>
+                        <title lang="en">Left</title>
+                        <title lang="tr">Sola Hizalı</title>
+                        <title lang="de">Links</title>
+                        <title lang="ru">По левому краю</title>
+                        <title lang="es">Izquierda</title>
+                        <title lang="fr">Gauche</title>
+                    </meta>
+                </param>
+                <param name="center">
+                    <meta>
+                        <title lang="en">Center</title>
+                        <title lang="tr">Ortalı</title>
+                        <title lang="de">Zentriert</title>
+                        <title lang="ru">По центру</title>
+                        <title lang="es">Centro</title>
+                        <title lang="fr">Centre</title>
+                    </meta>
+                </param>
+                <param name="right">
+                    <meta>
+                        <title lang="en">Right</title>
+                        <title lang="tr">Sağa Hizalı</title>
+                        <title lang="de">Rechts</title>
+                        <title lang="ru">По правому краю</title>
+                        <title lang="es">Derecha</title>
+                        <title lang="fr">Droite</title>
+                    </meta>
+                </param>
+                <param name="justify">
+                    <meta>
+                        <title lang="en">Justify</title>
+                        <title lang="tr">İki Yana Yasla</title>
+                        <title lang="de">Blocksatz</title>
+                        <title lang="ru">По ширине</title>
+                        <title lang="es">Justificar</title>
+                        <title lang="fr">Justifier</title>
+                    </meta>
+                </param>
+            </param>
+        </params>
+    </property>
+
+    <property name="text_align_breakpoint" type="single_select" colspan="6" mandatory="false" visibleCondition="text_align &amp;&amp; text_align != 'justify'">
+        <meta>
+            <title lang="en">Text Alignment Breakpoint</title>
+            <title lang="tr">Metin Hizalama Kırılım Noktası</title>
+            <title lang="de">Textausrichtung Breakpoint</title>
+            <title lang="ru">Контрольная точка выравнивания текста</title>
+            <title lang="es">Punto de Ruptura de Alineación de Texto</title>
+            <title lang="fr">Point de Rupture Alignement du Texte</title>
+            <info_text lang="en">Define the device width from which the alignment will apply.</info_text>
+            <info_text lang="tr">Hizalamanın uygulanacağı cihaz genişliğini tanımlayın.</info_text>
+            <info_text lang="de">Definieren Sie die Gerätebreite, ab der die Ausrichtung gilt.</info_text>
+            <info_text lang="ru">Определите ширину экрана, начиная с которой применяется выравнивание.</info_text>
+            <info_text lang="es">Defina el ancho del dispositivo a partir del cual se aplicará la alineación.</info_text>
+            <info_text lang="fr">Définissez la largeur d'écran à partir de laquelle l'alignement s'applique.</info_text>
+        </meta>
+        <params>
+            <param name="default_value" value=""/>
+            <param name="values" type="collection">
+                <param name="">
+                    <meta>
+                        <title lang="en">Always</title>
+                        <title lang="tr">Her Zaman</title>
+                        <title lang="de">Immer</title>
+                        <title lang="ru">Всегда</title>
+                        <title lang="es">Siempre</title>
+                        <title lang="fr">Toujours</title>
+                    </meta>
+                </param>
+                <param name="sm">
+                    <meta>
+                        <title lang="en">Small (Phone Landscape)</title>
+                        <title lang="tr">Küçük (Telefon Yatay - SM)</title>
+                        <title lang="de">Klein (Telefon Querformat - SM)</title>
+                        <title lang="ru">Малый (Телефон горизонтально - SM)</title>
+                        <title lang="es">Pequeño (Teléfono Horizontal - SM)</title>
+                        <title lang="fr">Petit (Téléphone Paysage - SM)</title>
+                    </meta>
+                </param>
+                <param name="md">
+                    <meta>
+                        <title lang="en">Medium (Tablet Landscape)</title>
+                        <title lang="tr">Orta (Tablet Yatay - MD)</title>
+                        <title lang="de">Mittel (Tablet Querformat - MD)</title>
+                        <title lang="ru">Средний (Планшет горизонтально - MD)</title>
+                        <title lang="es">Mediano (Tablet Horizontal - MD)</title>
+                        <title lang="fr">Moyen (Tablette Paysage - MD)</title>
+                    </meta>
+                </param>
+                <param name="lg">
+                    <meta>
+                        <title lang="en">Large (Desktop)</title>
+                        <title lang="tr">Büyük (Masaüstü - LG)</title>
+                        <title lang="de">Groß (Desktop - LG)</title>
+                        <title lang="ru">Большой (Десктоп - LG)</title>
+                        <title lang="es">Grande (Escritorio - LG)</title>
+                        <title lang="fr">Grand (Bureau - LG)</title>
+                    </meta>
+                </param>
+                <param name="xl">
+                    <meta>
+                        <title lang="en">X-Large (Large Screens)</title>
+                        <title lang="tr">Çok Büyük (Geniş Ekranlar - XL)</title>
+                        <title lang="de">Extra Groß (Große Bildschirme - XL)</title>
+                        <title lang="ru">Очень большой (Широкие экраны - XL)</title>
+                        <title lang="es">Extra Grande (Pantallas Grandes - XL)</title>
+                        <title lang="fr">Très Grand (Grands Écrans - XL)</title>
+                    </meta>
+                </param>
+            </param>
+        </params>
+    </property>
+
+    <property name="text_align_fallback" type="single_select" colspan="6" mandatory="false" visibleCondition="text_align &amp;&amp; text_align != 'justify' &amp;&amp; text_align_breakpoint">
+        <meta>
+            <title lang="en">Text Alignment Fallback</title>
+            <title lang="tr">Metin Hizalama Yedeği (Fallback)</title>
+            <title lang="de">Textausrichtung Fallback</title>
+            <title lang="ru">Резервное выравнивание текста</title>
+            <title lang="es">Alineación Alternativa de Texto</title>
+            <title lang="fr">Alignement de Repli du Texte</title>
+            <info_text lang="en">Define an alignment fallback for device widths below the breakpoint.</info_text>
+            <info_text lang="tr">Kırılım noktasının altındaki cihaz genişlikleri için yedek hizalamayı tanımlayın.</info_text>
+            <info_text lang="de">Definieren Sie eine Ausrichtung für Gerätebreiten unterhalb des Breakpoints.</info_text>
+            <info_text lang="ru">Определите резервное выравнивание для экранов меньше контрольной точки.</info_text>
+            <info_text lang="es">Defina una alineación alternativa para anchos inferiores al punto de ruptura.</info_text>
+            <info_text lang="fr">Définissez un alignement de repli pour les écrans inférieurs au point de rupture.</info_text>
+        </meta>
+        <params>
+            <param name="default_value" value=""/>
+            <param name="values" type="collection">
+                <param name="">
+                    <meta>
+                        <title lang="en">None</title>
+                        <title lang="tr">Yok</title>
+                        <title lang="de">Keine</title>
+                        <title lang="ru">Нет</title>
+                        <title lang="es">Ninguno</title>
+                        <title lang="fr">Aucun</title>
+                    </meta>
+                </param>
+                <param name="left">
+                    <meta>
+                        <title lang="en">Left</title>
+                        <title lang="tr">Sola Hizalı</title>
+                        <title lang="de">Links</title>
+                        <title lang="ru">По левому краю</title>
+                        <title lang="es">Izquierda</title>
+                        <title lang="fr">Gauche</title>
+                    </meta>
+                </param>
+                <param name="center">
+                    <meta>
+                        <title lang="en">Center</title>
+                        <title lang="tr">Ortalı</title>
+                        <title lang="de">Zentriert</title>
+                        <title lang="ru">По центру</title>
+                        <title lang="es">Centro</title>
+                        <title lang="fr">Centre</title>
+                    </meta>
+                </param>
+                <param name="right">
+                    <meta>
+                        <title lang="en">Right</title>
+                        <title lang="tr">Sağa Hizalı</title>
+                        <title lang="de">Rechts</title>
+                        <title lang="ru">По правому краю</title>
+                        <title lang="es">Derecha</title>
+                        <title lang="fr">Droite</title>
+                    </meta>
+                </param>
+                <param name="justify">
+                    <meta>
+                        <title lang="en">Justify</title>
+                        <title lang="tr">İki Yana Yasla</title>
+                        <title lang="de">Blocksatz</title>
+                        <title lang="ru">По ширине</title>
+                        <title lang="es">Justificar</title>
+                        <title lang="fr">Justifier</title>
+                    </meta>
+                </param>
+            </param>
+        </params>
+    </property>
+    </properties>
+</form>

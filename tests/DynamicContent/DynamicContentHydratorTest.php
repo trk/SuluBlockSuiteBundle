@@ -1278,4 +1278,48 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertCount(1, $result);
         self::assertSame('Child Page 1', $result[0]['title']);
     }
+
+    public function testRepeaterBlockClonesReceiveUniqueIds(): void
+    {
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $sourceResolver->method('resolveChildren')->willReturn([
+            ['title' => 'First Card'],
+            ['title' => 'Second Card'],
+            ['title' => 'Third Card'],
+        ]);
+
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $block = [
+            'type' => 'card',
+            'id' => 'root-card',
+            'title' => 'Template Card',
+            'props' => [
+                'id' => 'feature-card',
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_children',
+                    'parent_id' => 'parent-uuid',
+                    'mapping' => [
+                        'title' => 'title',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($block);
+
+        self::assertCount(3, $result);
+        self::assertIsArray($result[0]['props']);
+        self::assertIsArray($result[1]['props']);
+        self::assertIsArray($result[2]['props']);
+
+        self::assertSame('feature-card', $result[0]['props']['id']);
+        self::assertSame('feature-card-2', $result[1]['props']['id']);
+        self::assertSame('feature-card-3', $result[2]['props']['id']);
+
+        self::assertSame('root-card', $result[0]['id']);
+        self::assertSame('root-card-2', $result[1]['id']);
+        self::assertSame('root-card-3', $result[2]['id']);
+    }
 }

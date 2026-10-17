@@ -8,6 +8,7 @@ use Sulu\Bundle\CategoryBundle\Api\Category;
 use Sulu\Bundle\CategoryBundle\Category\CategoryManagerInterface;
 use Sulu\Bundle\CategoryBundle\Entity\CategoryInterface;
 use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Bundle\MediaBundle\Entity\MediaInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 
@@ -205,12 +206,13 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
                 }
             }
 
-            $offset = isset($query['offset']) && \is_numeric($query['offset']) && (int) $query['offset'] > 0
-                ? (int) $query['offset']
+            $offset = isset($query['offset']) && \is_numeric($query['offset'])
+                ? \max(0, \min(500, (int) $query['offset']))
                 : 0;
-            $limit = isset($query['limit']) && \is_numeric($query['limit']) && (int) $query['limit'] > 0
+            $rawLimit = isset($query['limit']) && \is_numeric($query['limit'])
                 ? (int) $query['limit']
                 : 50;
+            $limit = \max(1, \min(100, $rawLimit));
 
             if ($offset > 0 || \count($result) > $limit) {
                 $result = \array_slice($result, $offset, $limit);
@@ -240,6 +242,7 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
         $firstImage = null;
         if ([] !== $medias) {
             $firstMedia = $medias[0];
+            $this->referenceStore?->add((string) $firstMedia->getId(), MediaInterface::RESOURCE_KEY);
             $firstImage = [
                 'id' => $firstMedia->getId(),
                 'url' => $firstMedia->getUrl(),

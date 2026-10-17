@@ -137,13 +137,35 @@ final class DefaultAttributesTransformerTest extends TestCase
         $sanitized = DefaultAttributesTransformer::sanitizeAttributesArray([
             'id' => 'ignored-id',
             'class' => 'ignored-class',
+            'style' => 'background:url(javascript:alert(1))',
+            'srcset' => 'javascript:alert(1) 1x',
             'onfocus' => 'alert(1)',
             'href' => " \tjavascript:alert(1)",
+            'action' => 'java&#115;cript:alert(1)',
             'data-hs-overlay' => '#modal-1',
             'disabled' => true,
             'hidden' => false,
         ]);
 
         $this->assertSame(['data-hs-overlay' => '#modal-1', 'disabled' => true], $sanitized);
+    }
+
+    public function testRejectsMalformedElementIdAndStripsCssObfuscation(): void
+    {
+        $transformer = new DefaultAttributesTransformer();
+        $transformed = $transformer->transform([
+            'type' => 'card',
+            'props' => [
+                'id' => 'bad id, body { display:none }',
+                'css' => '.el-element { background: u/**/rl("javascript:alert(1)"); content: \65 xpression(alert(1)); }',
+            ],
+        ], []);
+
+        $this->assertIsString($transformed['_id']);
+        $this->assertStringStartsWith('el-', $transformed['_id']);
+        $this->assertIsString($transformed['_scoped_css']);
+        $this->assertStringNotContainsString('/*', $transformed['_scoped_css']);
+        $this->assertStringNotContainsString('\\', $transformed['_scoped_css']);
+        $this->assertStringNotContainsString('javascript:', $transformed['_scoped_css']);
     }
 }

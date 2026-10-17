@@ -55,7 +55,10 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
         $rawId = $props['id'] ?? ($block['id'] ?? null);
         $elementId = null;
         if (\is_string($rawId) && '' !== \trim($rawId)) {
-            $elementId = \trim($rawId);
+            $candidateId = \trim($rawId);
+            if (1 === \preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $candidateId)) {
+                $elementId = $candidateId;
+            }
         }
 
         // 4. Classes
@@ -79,7 +82,7 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
         $rawCss = $props['css'] ?? ($block['css'] ?? null);
         $scopedCss = null;
         if (\is_string($rawCss) && '' !== \trim($rawCss)) {
-            if (null === $elementId || '' === $elementId) {
+            if (null === $elementId) {
                 // Generate a stable unique element ID for CSS scoping without PHP object serialization
                 $blockType = isset($block['type']) && \is_scalar($block['type']) ? (string) $block['type'] : '';
                 $encoded = \json_encode($block, \JSON_PARTIAL_OUTPUT_ON_ERROR);
@@ -91,7 +94,7 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
         }
 
         // Attach resolved id to attributes and props if present
-        if (null !== $elementId && '' !== $elementId) {
+        if (null !== $elementId) {
             $attributes = \array_merge(['id' => $elementId], $attributes);
             $block['_id'] = $elementId;
             $block['id'] = $elementId;
@@ -218,7 +221,7 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
 
         $lowerName = \strtolower($attrName);
         if (
-            \in_array($lowerName, ['id', 'class', 'srcdoc'], true)
+            \in_array($lowerName, ['id', 'class', 'style', 'srcdoc', 'srcset'], true)
             || \str_starts_with($lowerName, 'on')
             || 1 !== \preg_match('/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/', $attrName)
         ) {
@@ -232,7 +235,8 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
     {
         $lowerName = \strtolower($attrName);
         if (\in_array($lowerName, ['href', 'src', 'xlink:href', 'action', 'formaction', 'data', 'poster'], true)) {
-            $normalized = (string) \preg_replace('/[\x00-\x20]+/', '', $value);
+            $decoded = \html_entity_decode($value, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
+            $normalized = (string) \preg_replace('/[\x00-\x20]+/', '', $decoded);
             if (1 === \preg_match('/^(?:javascript|vbscript|data):/i', $normalized)) {
                 return false;
             }
@@ -259,6 +263,14 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
 
         // Strip any remaining angle brackets so </style> breakout is impossible
         $clean = \str_replace(['<', '>'], '', $clean);
+
+        // Strip backslash escapes first, then CSS comments in a loop to prevent /\**\/ obfuscation
+        $clean = \str_replace('\\', '', $clean);
+        do {
+            $prevCss = $clean;
+            $clean = (string) \preg_replace('/\/\*.*?\*\//s', '', $clean);
+        } while ($clean !== $prevCss);
+        $clean = \str_replace(['/*', '*/'], '', $clean);
 
         // Strip @import and legacy script expressions
         $clean = (string) \preg_replace('/@import\b[^;{}]*;?/i', '', $clean);

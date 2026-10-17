@@ -9,18 +9,6 @@
     <title lang="es">Dise&#xF1;o de P&#xE1;gina</title>
     <title lang="fr">Mise en Page</title>
   </meta>
-  <areas>
-    <area key="page_layout">
-      <meta>
-        <title lang="en">Global Page Layout</title>
-        <title lang="tr">Genel Sayfa D&#xFC;zeni</title>
-        <title lang="de">Globales Seitenlayout</title>
-        <title lang="ru">&#x413;&#x43B;&#x43E;&#x431;&#x430;&#x43B;&#x44C;&#x43D;&#x44B;&#x439; &#x43C;&#x430;&#x43A;&#x435;&#x442; &#x441;&#x442;&#x440;&#x430;&#x43D;&#x438;&#x446;&#x44B;</title>
-        <title lang="es">Dise&#xF1;o Global de P&#xE1;gina</title>
-        <title lang="fr">Mise en Page Globale</title>
-      </meta>
-    </area>
-  </areas>
   <properties>
     <property name="title" type="text_line" mandatory="true">
       <meta>
@@ -76,7 +64,7 @@
         <title lang="es">Bloques del Dise&#xF1;o</title>
         <title lang="fr">Blocs de la Mise en Page</title>
       </meta>
-      <tag name="sulu_block_suite.auto_blocks" default="section" exclude="row,column"/>
+      <tag name="sulu_block_suite.auto_blocks"/>
       <types>
         <type name="default">
           <meta>

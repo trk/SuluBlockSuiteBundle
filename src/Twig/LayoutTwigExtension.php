@@ -105,6 +105,9 @@ final class LayoutTwigExtension extends AbstractExtension
         $attrs = $this->layoutResolver->resolveAttributes($layoutData);
         $result = [];
         foreach ($attrs as $k => $v) {
+            if (1 !== \preg_match('/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/', $k)) {
+                continue;
+            }
             $result[] = \sprintf('%s="%s"', $k, \htmlspecialchars($v, \ENT_QUOTES, 'UTF-8'));
         }
 

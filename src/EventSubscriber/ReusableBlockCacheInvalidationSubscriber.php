@@ -10,6 +10,7 @@ use Sulu\Snippet\Domain\Event\SnippetRemovedEvent;
 use Sulu\Snippet\Domain\Event\SnippetWorkflowTransitionAppliedEvent;
 use Sulu\Snippet\Domain\Model\SnippetInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Totoglu\SuluBlockSuiteBundle\Layout\PageLayoutProvider;
 use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
 use Totoglu\SuluBlockSuiteBundle\Preset\YamlBlockPresetProvider;
 
@@ -22,6 +23,7 @@ final class ReusableBlockCacheInvalidationSubscriber implements EventSubscriberI
     public function __construct(
         private readonly ?CacheManagerInterface $cacheManager = null,
         private readonly ?BlockPresetProviderInterface $presetProvider = null,
+        private readonly ?PageLayoutProvider $pageLayoutProvider = null,
     ) {
     }
 
@@ -54,6 +56,8 @@ final class ReusableBlockCacheInvalidationSubscriber implements EventSubscriberI
         if ($this->presetProvider instanceof YamlBlockPresetProvider) {
             $this->presetProvider->clearCache();
         }
+
+        $this->pageLayoutProvider?->reset();
 
         if (null === $this->cacheManager || '' === \trim($uuid)) {
             return;

@@ -98,7 +98,8 @@ final class SuluDataNormalizer
             return $fallback;
         }
 
-        $normalized = (string) \preg_replace('/[\x00-\x20]+/', '', $trimmed);
+        $decoded = \html_entity_decode($trimmed, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
+        $normalized = (string) \preg_replace('/[\x00-\x20]+/', '', $decoded);
         if (1 === \preg_match('/^(?:javascript|vbscript|data):/i', $normalized)) {
             return $fallback;
         }
@@ -136,10 +137,6 @@ final class SuluDataNormalizer
                 if (\is_string($first) && '' !== \trim($first)) {
                     return self::sanitizeNullableUrl($first, $fallback);
                 }
-            }
-
-            if (isset($media['id']) && (\is_int($media['id']) || \is_string($media['id']))) {
-                return (string) $media['id'];
             }
         }
 
@@ -221,6 +218,11 @@ final class SuluDataNormalizer
                 continue;
             }
 
+            $sanitizedUrl = self::sanitizeUrl($formatUrl, '');
+            if ('' === $sanitizedUrl) {
+                continue;
+            }
+
             $width = $standardWidths[$formatKey] ?? null;
             if (null === $width) {
                 if (1 === \preg_match('/(?:^|[^\d])(\d+)(?:x\d*|w)?$/', $formatKey, $matches)) {
@@ -229,7 +231,7 @@ final class SuluDataNormalizer
             }
 
             if (null !== $width && $width > 0) {
-                $sources[$width] = \sprintf('%s %dw', $formatUrl, $width);
+                $sources[$width] = \sprintf('%s %dw', $sanitizedUrl, $width);
             }
         }
 

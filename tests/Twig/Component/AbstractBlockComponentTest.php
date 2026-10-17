@@ -105,6 +105,26 @@ final class AbstractBlockComponentTest extends TestCase
         self::assertSame('left', $component->stringProp('text_align'));
     }
 
+    public function testExplicitPropsOverrideRootDefaultsInIngestBlockArray(): void
+    {
+        $component = new DummyHeadlineComponent();
+        $component->initializeBlockComponent([
+            'block' => [
+                'type' => 'headline',
+                'title' => 'Hero Heading',
+                'tag' => 'h2',
+                'size' => 'md',
+                'props' => [
+                    'tag' => 'h1',
+                    'size' => 'xl',
+                ],
+            ],
+        ]);
+
+        self::assertSame('h1', $component->stringProp('tag'));
+        self::assertSame('xl', $component->stringProp('size'));
+    }
+
     public function testRichTextAndEmptinessDetection(): void
     {
         $component = new DummyTextComponent();

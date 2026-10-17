@@ -1146,26 +1146,10 @@ abstract class AbstractBlockComponent
      */
     private function ingestBlockArray(array $block): void
     {
-        $extractedProps = SuluDataNormalizer::extractProps($block);
-        if ([] !== $extractedProps) {
-            $this->ingestPropsArray($extractedProps);
-        }
-
-        if (isset($block['props']) && \is_array($block['props'])) {
-            /** @var array<string, mixed> $nestedProps */
-            $nestedProps = $block['props'];
-            $this->ingestPropsArray($nestedProps);
-        }
-
         $knownDataKeys = $this->getKnownDataKeyMap();
 
         foreach ($block as $rawKey => $value) {
-            if ('props' === $rawKey) {
-                continue;
-            }
-
-            if (\str_starts_with($rawKey, self::PROPS_NAMESPACE)) {
-                $this->ingestNamespacedProp($rawKey, $value);
+            if ('props' === $rawKey || \str_starts_with($rawKey, self::PROPS_NAMESPACE)) {
                 continue;
             }
 
@@ -1180,6 +1164,23 @@ abstract class AbstractBlockComponent
                 }
             } elseif (null !== $value && '' !== $value) {
                 $this->props[$key] = $value;
+            }
+        }
+
+        $extractedProps = SuluDataNormalizer::extractProps($block);
+        if ([] !== $extractedProps) {
+            $this->ingestPropsArray($extractedProps);
+        }
+
+        if (isset($block['props']) && \is_array($block['props'])) {
+            /** @var array<string, mixed> $nestedProps */
+            $nestedProps = $block['props'];
+            $this->ingestPropsArray($nestedProps);
+        }
+
+        foreach ($block as $rawKey => $value) {
+            if (\str_starts_with($rawKey, self::PROPS_NAMESPACE)) {
+                $this->ingestNamespacedProp($rawKey, $value);
             }
         }
     }
@@ -1246,15 +1247,11 @@ abstract class AbstractBlockComponent
 
     private function isPassThroughHtmlAttribute(string $key, mixed $value): bool
     {
-        if ('attributes' === $key) {
-            return true;
-        }
-
         if (!\is_scalar($value) && null !== $value && !$value instanceof \Stringable) {
             return false;
         }
 
-        if (\in_array($key, ['class', 'style', 'role', 'tabindex', 'dir', 'lang', 'hidden'], true)) {
+        if (\in_array($key, ['class', 'role', 'tabindex', 'dir', 'lang', 'hidden'], true)) {
             return true;
         }
 

@@ -1,0 +1,209 @@
+<?xml version="1.0" ?>
+<form xmlns="http://schemas.sulu.io/template/template"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/form-1.0.xsd">
+    <key>block_suite_field_position</key>
+    <properties>
+    <property name="position" type="single_select" colspan="12" mandatory="false">
+        <meta>
+            <title lang="en">Position</title>
+            <title lang="tr">Konum</title>
+            <title lang="de">Position</title>
+            <title lang="ru">Позиция</title>
+            <title lang="es">Posición</title>
+            <title lang="fr">Position</title>
+            <info_text lang="en">Position the element in the normal content flow, or in normal flow but with an offset relative to itself, or remove it from the flow and position it relative to the containing column.</info_text>
+            <info_text lang="tr">Öğeyi normal içerik akışında konumlandırın, kendisine göre bir ofsetle normal akışta tutun veya akıştan çıkarıp kapsayıcı sütuna göre konumlandırın.</info_text>
+            <info_text lang="de">Positionieren Sie das Element im normalen Inhaltsfluss, relativ zu sich selbst mit Versatz oder absolut relativ zur umfassenden Spalte.</info_text>
+            <info_text lang="ru">Расположите элемент в обычном потоке контента, со смещением относительно самого себя или абсолютно относительно колонки.</info_text>
+            <info_text lang="es">Posicione el elemento en el flujo normal de contenido, con un desplazamiento relativo a sí mismo o de forma absoluta respecto a la columna contenedora.</info_text>
+            <info_text lang="fr">Positionnez l'élément dans le flux normal, avec un décalage relatif à lui-même, ou retirez-le du flux par rapport à la colonne parente.</info_text>
+        </meta>
+        <params>
+            <param name="default_value" value=""/>
+            <param name="values" type="collection">
+                <param name="">
+                    <meta>
+                        <title lang="en">Static</title>
+                        <title lang="tr">Statik</title>
+                        <title lang="de">Statisch</title>
+                        <title lang="ru">Статическая</title>
+                        <title lang="es">Estático</title>
+                        <title lang="fr">Statique</title>
+                    </meta>
+                </param>
+                <param name="relative">
+                    <meta>
+                        <title lang="en">Relative</title>
+                        <title lang="tr">Göreceli (Relative)</title>
+                        <title lang="de">Relativ</title>
+                        <title lang="ru">Относительная</title>
+                        <title lang="es">Relativo</title>
+                        <title lang="fr">Relatif</title>
+                    </meta>
+                </param>
+                <param name="absolute">
+                    <meta>
+                        <title lang="en">Absolute</title>
+                        <title lang="tr">Mutlak (Absolute)</title>
+                        <title lang="de">Absolut</title>
+                        <title lang="ru">Абсолютная</title>
+                        <title lang="es">Absoluto</title>
+                        <title lang="fr">Absolu</title>
+                    </meta>
+                </param>
+                <param name="sticky">
+                    <meta>
+                        <title lang="en">Sticky</title>
+                        <title lang="tr">Yapışkan (Sticky)</title>
+                        <title lang="de">Sticky</title>
+                        <title lang="ru">Липкая (Sticky)</title>
+                        <title lang="es">Fijo al desplazar (Sticky)</title>
+                        <title lang="fr">Collant (Sticky)</title>
+                    </meta>
+                </param>
+            </param>
+        </params>
+    </property>
+
+    <property name="position_left" type="text_line" colspan="6" mandatory="false" visibleCondition="position &amp;&amp; position != 'static' &amp;&amp; !position_right">
+        <meta>
+            <title lang="en">Left</title>
+            <title lang="tr">Sol</title>
+            <title lang="de">Links</title>
+            <title lang="ru">Слева</title>
+            <title lang="es">Izquierda</title>
+            <title lang="fr">Gauche</title>
+            <info_text lang="en">Set the horizontal position of the element's left edge in pixels. A different unit like % or vw can also be entered.</info_text>
+            <info_text lang="tr">Öğenin sol kenarının yatay konumunu piksel cinsinden ayarlayın. % veya vw gibi farklı bir birim de girilebilir.</info_text>
+            <info_text lang="de">Legen Sie die horizontale Position der linken Kante in Pixeln fest. Eine andere Einheit wie % oder vw ist ebenfalls möglich.</info_text>
+            <info_text lang="ru">Задайте горизонтальную позицию левого края элемента в пикселях. Также можно указать другую единицу, например % или vw.</info_text>
+            <info_text lang="es">Establezca la posición horizontal del borde izquierdo en píxeles. También puede introducir otra unidad como % o vw.</info_text>
+            <info_text lang="fr">Définissez la position horizontale du bord gauche en pixels. Une autre unité comme % ou vw peut aussi être saisie.</info_text>
+        </meta>
+    </property>
+
+    <property name="position_right" type="text_line" colspan="6" mandatory="false" visibleCondition="position &amp;&amp; position != 'static' &amp;&amp; !position_left">
+        <meta>
+            <title lang="en">Right</title>
+            <title lang="tr">Sağ</title>
+            <title lang="de">Rechts</title>
+            <title lang="ru">Справа</title>
+            <title lang="es">Derecha</title>
+            <title lang="fr">Droite</title>
+            <info_text lang="en">Set the horizontal position of the element's right edge in pixels. A different unit like % or vw can also be entered.</info_text>
+            <info_text lang="tr">Öğenin sağ kenarının yatay konumunu piksel cinsinden ayarlayın. % veya vw gibi farklı bir birim de girilebilir.</info_text>
+            <info_text lang="de">Legen Sie die horizontale Position der rechten Kante in Pixeln fest. Eine andere Einheit wie % oder vw ist ebenfalls möglich.</info_text>
+            <info_text lang="ru">Задайте горизонтальную позицию правого края элемента в пикселях. Также можно указать другую единицу, например % или vw.</info_text>
+            <info_text lang="es">Establezca la posición horizontal del borde derecho en píxeles. También puede introducir otra unidad como % o vw.</info_text>
+            <info_text lang="fr">Définissez la position horizontale du bord droit en pixels. Une autre unité comme % ou vw peut aussi être saisie.</info_text>
+        </meta>
+    </property>
+
+    <property name="position_top" type="text_line" colspan="6" mandatory="false" visibleCondition="position &amp;&amp; position != 'static' &amp;&amp; !position_bottom">
+        <meta>
+            <title lang="en">Top</title>
+            <title lang="tr">Üst</title>
+            <title lang="de">Oben</title>
+            <title lang="ru">Сверху</title>
+            <title lang="es">Arriba</title>
+            <title lang="fr">Haut</title>
+            <info_text lang="en">Set the vertical position of the element's top edge in pixels. A different unit like % or vw can also be entered.</info_text>
+            <info_text lang="tr">Öğenin üst kenarının dikey konumunu piksel cinsinden ayarlayın. % veya vw gibi farklı bir birim de girilebilir.</info_text>
+            <info_text lang="de">Legen Sie die vertikale Position der oberen Kante in Pixeln fest. Eine andere Einheit wie % oder vw ist ebenfalls möglich.</info_text>
+            <info_text lang="ru">Задайте вертикальную позицию верхнего края элемента в пикселях. Также можно указать другую единицу, например % или vw.</info_text>
+            <info_text lang="es">Establezca la posición vertical del borde superior en píxeles. También puede introducir otra unidad como % o vw.</info_text>
+            <info_text lang="fr">Définissez la position verticale du bord supérieur en pixels. Une autre unité comme % ou vw peut aussi être saisie.</info_text>
+        </meta>
+    </property>
+
+    <property name="position_bottom" type="text_line" colspan="6" mandatory="false" visibleCondition="position &amp;&amp; position != 'static' &amp;&amp; !position_top">
+        <meta>
+            <title lang="en">Bottom</title>
+            <title lang="tr">Alt</title>
+            <title lang="de">Unten</title>
+            <title lang="ru">Снизу</title>
+            <title lang="es">Abajo</title>
+            <title lang="fr">Bas</title>
+            <info_text lang="en">Set the vertical position of the element's bottom edge in pixels. A different unit like % or vw can also be entered.</info_text>
+            <info_text lang="tr">Öğenin alt kenarının dikey konumunu piksel cinsinden ayarlayın. % veya vw gibi farklı bir birim de girilebilir.</info_text>
+            <info_text lang="de">Legen Sie die vertikale Position der unteren Kante in Pixeln fest. Eine andere Einheit wie % oder vw ist ebenfalls möglich.</info_text>
+            <info_text lang="ru">Задайте вертикальную позицию нижнего края элемента в пикселях. Также можно указать другую единицу, например % или vw.</info_text>
+            <info_text lang="es">Establezca la posición vertical del borde inferior en píxeles. También puede introducir otra unidad como % o vw.</info_text>
+            <info_text lang="fr">Définissez la position verticale du bord inférieur en pixels. Une autre unité comme % ou vw peut aussi être saisie.</info_text>
+        </meta>
+    </property>
+
+    <property name="position_z_index" type="single_select" colspan="6" mandatory="false" visibleCondition="position &amp;&amp; position != 'static'">
+        <meta>
+            <title lang="en">Z Index</title>
+            <title lang="tr">Z İndeksi (Katman Sırası)</title>
+            <title lang="de">Z-Index</title>
+            <title lang="ru">Z-индекс</title>
+            <title lang="es">Índice Z</title>
+            <title lang="fr">Indice Z</title>
+            <info_text lang="en">Position the element above or below other elements. If they have the same stack level, the position depends on the order in the layout.</info_text>
+            <info_text lang="tr">Öğeyi diğer öğelerin üstünde veya altında konumlandırın. Aynı yığın seviyesine sahiplerse konum, düzendeki sıraya bağlıdır.</info_text>
+            <info_text lang="de">Positionieren Sie das Element über oder unter anderen Elementen. Bei gleicher Ebene entscheidet die Reihenfolge im Layout.</info_text>
+            <info_text lang="ru">Расположите элемент поверх или под другими элементами. При одинаковом уровне порядок зависит от расположения в макете.</info_text>
+            <info_text lang="es">Posicione el elemento por encima o por debajo de otros elementos. Si tienen el mismo nivel, depende del orden en el diseño.</info_text>
+            <info_text lang="fr">Positionnez l'élément au-dessus ou en dessous d'autres éléments. À niveau égal, l'ordre dans la mise en page prévaut.</info_text>
+        </meta>
+        <params>
+            <param name="default_value" value=""/>
+            <param name="values" type="collection">
+                <param name="">
+                    <meta>
+                        <title lang="en">None</title>
+                        <title lang="tr">Yok</title>
+                        <title lang="de">Keine</title>
+                        <title lang="ru">Нет</title>
+                        <title lang="es">Ninguno</title>
+                        <title lang="fr">Aucun</title>
+                    </meta>
+                </param>
+                <param name="0">
+                    <meta>
+                        <title lang="en">0</title>
+                        <title lang="tr">0</title>
+                        <title lang="de">0</title>
+                        <title lang="ru">0</title>
+                        <title lang="es">0</title>
+                        <title lang="fr">0</title>
+                    </meta>
+                </param>
+                <param name="1">
+                    <meta>
+                        <title lang="en">1</title>
+                        <title lang="tr">1</title>
+                        <title lang="de">1</title>
+                        <title lang="ru">1</title>
+                        <title lang="es">1</title>
+                        <title lang="fr">1</title>
+                    </meta>
+                </param>
+                <param name="2">
+                    <meta>
+                        <title lang="en">2</title>
+                        <title lang="tr">2</title>
+                        <title lang="de">2</title>
+                        <title lang="ru">2</title>
+                        <title lang="es">2</title>
+                        <title lang="fr">2</title>
+                    </meta>
+                </param>
+                <param name="3">
+                    <meta>
+                        <title lang="en">3</title>
+                        <title lang="tr">3</title>
+                        <title lang="de">3</title>
+                        <title lang="ru">3</title>
+                        <title lang="es">3</title>
+                        <title lang="fr">3</title>
+                    </meta>
+                </param>
+            </param>
+        </params>
+    </property>
+    </properties>
+</form>

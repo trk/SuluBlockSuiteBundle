@@ -25,17 +25,21 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
     @observable searchTerm: string = '';
     @observable statsMap: {[string]: number} = {};
     lastLoadedId: ?string = null;
+    lastLoadedLocale: ?string = null;
 
     componentDidMount() {
         if (this.props.value) {
+            this.lastLoadedLocale = this.currentLocale;
             this.loadSelectedSnippet(this.props.value);
             this.loadUsage(this.props.value);
         }
     }
 
     componentDidUpdate(prevProps: Props) {
-        if (this.props.value !== prevProps.value) {
-            if (this.props.value && this.props.value !== this.lastLoadedId) {
+        const currentLocale = this.currentLocale;
+        if (this.props.value !== prevProps.value || (this.props.value && currentLocale !== this.lastLoadedLocale)) {
+            if (this.props.value && (this.props.value !== this.lastLoadedId || currentLocale !== this.lastLoadedLocale)) {
+                this.lastLoadedLocale = currentLocale;
                 this.loadSelectedSnippet(this.props.value);
                 this.loadUsage(this.props.value);
             } else if (!this.props.value) {
@@ -43,6 +47,7 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
                     this.selectedSnippet = null;
                     this.usageData = null;
                     this.lastLoadedId = null;
+                    this.lastLoadedLocale = null;
                 })();
             }
         }
@@ -87,7 +92,7 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
             .then(action((data) => {
                 if (data && !data.error) {
                     this.selectedSnippet = data;
-                    reusableBlockStore.set(id, data);
+                    reusableBlockStore.set(id, data, this.currentLocale);
                 } else {
                     this.selectedSnippet = null;
                 }
@@ -161,7 +166,7 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
         const {onChange, onFinish} = this.props;
         const block = this.availableBlocks.find((b) => b.id === snippetId);
         if (block) {
-            reusableBlockStore.set(snippetId, block);
+            reusableBlockStore.set(snippetId, block, this.currentLocale);
         }
         if (onChange) {
             onChange(snippetId);

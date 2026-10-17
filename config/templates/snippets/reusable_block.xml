@@ -4,12 +4,12 @@
           xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/template-1.0.xsd">
     <key>reusable_block</key>
     <meta>
-        <title lang="en">Reusable Block Section</title>
+        <title lang="en">Reusable Block</title>
         <title lang="tr">Ortak Paylaşılan Blok</title>
-        <title lang="de">Wiederverwendbarer Blockabschnitt</title>
-        <title lang="ru">Повторно используемая секция блоков</title>
-        <title lang="es">Sección de Bloque Reutilizable</title>
-        <title lang="fr">Section de Blocs Réutilisables</title>
+        <title lang="de">Wiederverwendbarer Block</title>
+        <title lang="ru">Повторно используемый блок</title>
+        <title lang="es">Bloque Reutilizable</title>
+        <title lang="fr">Bloc Réutilisable</title>
     </meta>
     <properties>
         <property name="title" type="text_line" mandatory="true">
@@ -72,7 +72,7 @@
                 <title lang="es">Bloques de Contenido de la Sección</title>
                 <title lang="fr">Blocs de Contenu de la Section</title>
             </meta>
-            <tag name="sulu_block_suite.auto_blocks" default="headline" exclude="reusable,row,column"/>
+            <tag name="sulu_block_suite.auto_blocks" exclude="reusable"/>
             <types>
                 <type name="default">
                     <meta>

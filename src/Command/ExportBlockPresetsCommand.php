@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Command;
 
+use Sulu\Content\Domain\Model\DimensionContentInterface;
+use Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface;
+use Sulu\Snippet\Domain\Model\SnippetInterface;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -86,95 +89,94 @@ final class ExportBlockPresetsCommand extends Command
         $exportedCount = 0;
 
         foreach ($snippets as $snippet) {
-            foreach ($snippet->getDimensionContents() as $content) {
-                if ('block_preset' !== $content->getTemplateKey()) {
-                    continue;
-                }
-
-                $templateData = $content->getTemplateData();
-                $rawTitle = $content->getTitle();
-                if ((null === $rawTitle || '' === \trim($rawTitle)) && isset($templateData['title']) && \is_string($templateData['title'])) {
-                    $rawTitle = $templateData['title'];
-                }
-                $title = \trim((string) ($rawTitle ?? ''));
-                if ('' === $title || 1 === \preg_match('/^test(\b|_|-|\s|$)/i', $title)) {
-                    continue;
-                }
-
-                $blockEntry = null;
-                if (isset($templateData['block']) && \is_array($templateData['block']) && isset($templateData['block'][0]) && \is_array($templateData['block'][0])) {
-                    $blockEntry = $templateData['block'][0];
-                }
-
-                $configuredType = null;
-                if (null !== $blockEntry && isset($blockEntry['type']) && \is_string($blockEntry['type'])) {
-                    $configuredType = \trim($blockEntry['type']);
-                } elseif (isset($templateData['target_block']) && \is_string($templateData['target_block'])) {
-                    $configuredType = \trim($templateData['target_block']);
-                }
-
-                if (null === $configuredType || '' === $configuredType) {
-                    continue;
-                }
-
-                if (null !== $filterBlockType && $configuredType !== $filterBlockType) {
-                    continue;
-                }
-
-                $presetKeyFromData = isset($templateData['preset_key']) && \is_string($templateData['preset_key']) ? \trim($templateData['preset_key']) : '';
-                $slug = '' !== $presetKeyFromData
-                    ? \strtolower((string) \preg_replace('/[^a-zA-Z0-9]+/', '_', $presetKeyFromData))
-                    : \strtolower((string) \preg_replace('/[^a-zA-Z0-9]+/', '_', $title));
-                $slug = \trim($slug, '_');
-                if ('' === $slug) {
-                    $slug = 'preset_' . \substr($snippet->getUuid(), 0, 8);
-                }
-
-                /** @var array<string, mixed> $props */
-                $props = [];
-                $rawProps = null;
-                if (null !== $blockEntry && isset($blockEntry['props']) && \is_array($blockEntry['props'])) {
-                    $rawProps = $blockEntry['props'];
-                } elseif (isset($templateData['props']) && \is_array($templateData['props'])) {
-                    $rawProps = $templateData['props'];
-                }
-
-                if (\is_array($rawProps)) {
-                    foreach ($rawProps as $k => $v) {
-                        $propKey = (string) $k;
-                        if (!\in_array($propKey, ['preset', '_preset'], true) && null !== $v && '' !== $v) {
-                            $props[$propKey] = $v;
-                        }
-                    }
-                }
-
-                /** @var array<string, mixed> $values */
-                $values = [];
-                if (null !== $blockEntry) {
-                    foreach ($blockEntry as $k => $v) {
-                        $keyStr = (string) $k;
-                        if (!\in_array($keyStr, ['type', 'props', 'preset', '_preset', '_id'], true) && null !== $v && '' !== $v) {
-                            $values[$keyStr] = $v;
-                        }
-                    }
-                }
-
-                $presetDef = [
-                    'title' => [$locale => $title],
-                ];
-
-                if (isset($templateData['description']) && \is_string($templateData['description']) && '' !== \trim($templateData['description'])) {
-                    $presetDef['description'] = [$locale => \trim($templateData['description'])];
-                }
-
-                $presetDef['props'] = $props;
-                if ([] !== $values) {
-                    $presetDef['values'] = $values;
-                }
-
-                $exportedByBlock[$configuredType][$slug] = $presetDef;
-                ++$exportedCount;
+            $content = $this->selectMatchingDimensionContent($snippet, $locale);
+            if (null === $content) {
+                continue;
             }
+
+            $templateData = $content->getTemplateData();
+            $rawTitle = $content->getTitle();
+            if ((null === $rawTitle || '' === \trim($rawTitle)) && isset($templateData['title']) && \is_string($templateData['title'])) {
+                $rawTitle = $templateData['title'];
+            }
+            $title = \trim((string) ($rawTitle ?? ''));
+            if ('' === $title || 1 === \preg_match('/^test(\b|_|-|\s|$)/i', $title)) {
+                continue;
+            }
+
+            $blockEntry = null;
+            if (isset($templateData['block']) && \is_array($templateData['block']) && isset($templateData['block'][0]) && \is_array($templateData['block'][0])) {
+                $blockEntry = $templateData['block'][0];
+            }
+
+            $configuredType = null;
+            if (null !== $blockEntry && isset($blockEntry['type']) && \is_string($blockEntry['type'])) {
+                $configuredType = \trim($blockEntry['type']);
+            } elseif (isset($templateData['target_block']) && \is_string($templateData['target_block'])) {
+                $configuredType = \trim($templateData['target_block']);
+            }
+
+            if (null === $configuredType || '' === $configuredType) {
+                continue;
+            }
+
+            if (null !== $filterBlockType && $configuredType !== $filterBlockType) {
+                continue;
+            }
+
+            $presetKeyFromData = isset($templateData['preset_key']) && \is_string($templateData['preset_key']) ? \trim($templateData['preset_key']) : '';
+            $slug = '' !== $presetKeyFromData
+                ? \strtolower((string) \preg_replace('/[^a-zA-Z0-9]+/', '_', $presetKeyFromData))
+                : \strtolower((string) \preg_replace('/[^a-zA-Z0-9]+/', '_', $title));
+            $slug = \trim($slug, '_');
+            if ('' === $slug) {
+                $slug = 'preset_' . \substr($snippet->getUuid(), 0, 8);
+            }
+
+            /** @var array<string, mixed> $props */
+            $props = [];
+            $rawProps = null;
+            if (null !== $blockEntry && isset($blockEntry['props']) && \is_array($blockEntry['props'])) {
+                $rawProps = $blockEntry['props'];
+            } elseif (isset($templateData['props']) && \is_array($templateData['props'])) {
+                $rawProps = $templateData['props'];
+            }
+
+            if (\is_array($rawProps)) {
+                foreach ($rawProps as $k => $v) {
+                    $propKey = (string) $k;
+                    if (!\in_array($propKey, ['preset', '_preset'], true) && null !== $v && '' !== $v) {
+                        $props[$propKey] = $v;
+                    }
+                }
+            }
+
+            /** @var array<string, mixed> $values */
+            $values = [];
+            if (null !== $blockEntry) {
+                foreach ($blockEntry as $k => $v) {
+                    $keyStr = (string) $k;
+                    if (!\in_array($keyStr, ['type', 'props', 'preset', '_preset', '_id'], true) && null !== $v && '' !== $v) {
+                        $values[$keyStr] = $v;
+                    }
+                }
+            }
+
+            $presetDef = [
+                'title' => [$locale => $title],
+            ];
+
+            if (isset($templateData['description']) && \is_string($templateData['description']) && '' !== \trim($templateData['description'])) {
+                $presetDef['description'] = [$locale => \trim($templateData['description'])];
+            }
+
+            $presetDef['props'] = $props;
+            if ([] !== $values) {
+                $presetDef['values'] = $values;
+            }
+
+            $exportedByBlock[$configuredType][$slug] = $presetDef;
+            ++$exportedCount;
         }
 
         if (0 === $exportedCount) {
@@ -219,5 +221,32 @@ final class ExportBlockPresetsCommand extends Command
         $io->success(\sprintf('Successfully processed %d snippet preset(s).', $exportedCount));
 
         return Command::SUCCESS;
+    }
+
+    private function selectMatchingDimensionContent(
+        SnippetInterface $snippet,
+        string $locale,
+    ): ?SnippetDimensionContentInterface {
+        $bestMatch = null;
+        foreach ($snippet->getDimensionContents() as $content) {
+            if ('block_preset' !== $content->getTemplateKey()) {
+                continue;
+            }
+            if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()) {
+                continue;
+            }
+            if ($content->getLocale() === $locale) {
+                if (DimensionContentInterface::STAGE_LIVE === $content->getStage()) {
+                    return $content;
+                }
+                if (null === $bestMatch || null === $bestMatch->getLocale()) {
+                    $bestMatch = $content;
+                }
+            } elseif (null === $content->getLocale() && null === $bestMatch) {
+                $bestMatch = $content;
+            }
+        }
+
+        return $bestMatch;
     }
 }

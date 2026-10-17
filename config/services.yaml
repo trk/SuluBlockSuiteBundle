@@ -18,11 +18,15 @@ services:
             $enableSnippetPresets: '%sulu_block_suite.presets.enable_snippet_presets%'
             $mediaManager: '@?sulu_media.media_manager'
             $mediaPreviewUrlResolver: '@Totoglu\SuluBlockSuiteBundle\Preset\MediaPreviewUrlResolver'
+            $referenceStore: '@?sulu_http_cache.reference_store'
+        tags:
+            - { name: 'kernel.reset', method: 'reset' }
 
     Totoglu\SuluBlockSuiteBundle\Preset\PresetBlockVisitor:
         arguments:
             $presetProvider: '@Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
             $presetsEnabled: '%sulu_block_suite.presets.enabled%'
+            $requestStack: '@?request_stack'
         tags: ['sulu_content.block_visitor']
 
     Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor:
@@ -53,6 +57,7 @@ services:
             $messageBus: '@?Symfony\Component\Messenger\MessageBusInterface'
             $securityChecker: '@?sulu_security.security_checker'
             $mediaPreviewUrlResolver: '@Totoglu\SuluBlockSuiteBundle\Preset\MediaPreviewUrlResolver'
+            $logger: '@?logger'
         tags: ['controller.service_arguments']
 
     Totoglu\SuluBlockSuiteBundle\Layout\LayoutResolverInterface:
@@ -72,6 +77,9 @@ services:
             $requestStack: '@?request_stack'
             $layoutsDirectory: '%sulu_block_suite.layout.yaml_dir%'
             $referenceStore: '@?sulu_http_cache.reference_store'
+            $contentResolver: '@?sulu_content.content_resolver'
+        tags:
+            - { name: 'kernel.reset', method: 'reset' }
 
     Totoglu\SuluBlockSuiteBundle\Twig\LayoutTwigExtension:
         tags: ['twig.extension']
@@ -85,6 +93,7 @@ services:
         arguments:
             $cacheManager: '@?sulu_http_cache.cache_manager'
             $presetProvider: '@?Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
+            $pageLayoutProvider: '@?Totoglu\SuluBlockSuiteBundle\Layout\PageLayoutProvider'
         tags: ['kernel.event_subscriber']
 
     Totoglu\SuluBlockSuiteBundle\EventSubscriber\BlockComponentPreRenderSubscriber:
@@ -107,6 +116,17 @@ services:
             $layoutEnabled: '%sulu_block_suite.layout.enabled%'
         tags: ['sulu.admin']
 
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge:
+        arguments:
+            $smartContentProviders: !tagged_iterator
+                tag: 'sulu_content.smart_content_provider'
+                index_by: 'type'
+                default_index_method: 'getType'
+            $resourceLoaderProvider: '@?sulu_content.resource_loader_provider'
+            $tagManager: '@?sulu_tag.tag_manager'
+            $requestAnalyzer: '@?sulu_core.webspace.request_analyzer'
+            $referenceStore: '@?sulu_http_cache.reference_store'
+
     Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface:
         alias: Totoglu\SuluBlockSuiteBundle\DynamicContent\SuluPageSourceResolver
 
@@ -118,6 +138,9 @@ services:
             $referenceStore: '@?sulu_http_cache.reference_store'
             $contentAggregator: '@?sulu_content.content_aggregator'
             $requestAnalyzer: '@?sulu_core.webspace.request_analyzer'
+            $smartContentBridge: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge'
+        tags:
+            - { name: 'kernel.reset', method: 'reset' }
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluPageSourceProvider:
         arguments:
@@ -131,7 +154,10 @@ services:
             $requestStack: '@?request_stack'
             $referenceStore: '@?sulu_http_cache.reference_store'
             $contentAggregator: '@?sulu_content.content_aggregator'
-        tags: ['sulu_block_suite.dynamic_source_provider']
+            $smartContentBridge: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge'
+        tags:
+            - 'sulu_block_suite.dynamic_source_provider'
+            - { name: 'kernel.reset', method: 'reset' }
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluCategorySourceProvider:
         arguments:
@@ -145,6 +171,7 @@ services:
             $mediaManager: '@?sulu_media.media_manager'
             $requestStack: '@?request_stack'
             $referenceStore: '@?sulu_http_cache.reference_store'
+            $smartContentBridge: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge'
         tags: ['sulu_block_suite.dynamic_source_provider']
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface:
@@ -155,6 +182,11 @@ services:
             $sourceResolver: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface'
             $customProviders: !tagged_iterator sulu_block_suite.dynamic_source_provider
             $targetFieldResolver: '@Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver'
+            $smartContentBridge: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge'
+            $contentResolver: '@?sulu_content.content_resolver'
+            $contentAggregator: '@?sulu_content.content_aggregator'
+            $requestStack: '@?request_stack'
+            $referenceStore: '@?sulu_http_cache.reference_store'
 
     Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface:
         alias: Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipeline
@@ -162,6 +194,14 @@ services:
     Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipeline:
         arguments:
             $transformers: !tagged_iterator sulu_block_suite.block_transformer
+
+    Totoglu\SuluBlockSuiteBundle\Transformer\ReusableBlockTransformer:
+        arguments:
+            $layoutProvider: '@?Totoglu\SuluBlockSuiteBundle\Layout\PageLayoutProviderInterface'
+            $referenceStore: '@?sulu_http_cache.reference_store'
+        tags:
+            - 'sulu_block_suite.block_transformer'
+            - { name: 'kernel.reset', method: 'reset' }
 
     Totoglu\SuluBlockSuiteBundle\Transformer\DynamicContentTransformer:
         arguments:
@@ -178,6 +218,8 @@ services:
             $templateNamespaces: '%sulu_block_suite.rendering.template_namespaces%'
         calls:
             - [setCollectionRenderer, ['@?Totoglu\SuluBlockSuiteBundle\Renderer\BlockCollectionRendererInterface']]
+        tags:
+            - { name: 'kernel.reset', method: 'reset' }
 
     Totoglu\SuluBlockSuiteBundle\Renderer\DefaultBlockCollectionRenderer:
         arguments:

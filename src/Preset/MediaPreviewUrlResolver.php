@@ -41,7 +41,9 @@ final class MediaPreviewUrlResolver
         }
 
         if (\is_string($previewImageData) && '' !== \trim($previewImageData)) {
-            return \trim($previewImageData);
+            $clean = \Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer::sanitizeUrl(\trim($previewImageData), '');
+
+            return '' !== $clean ? $clean : null;
         }
 
         return null;

@@ -1,0 +1,119 @@
+<?xml version="1.0" ?>
+<form xmlns="http://schemas.sulu.io/template/template"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://schemas.sulu.io/template/template http://schemas.sulu.io/template/form-1.0.xsd">
+    <key>block_suite_field_visibility</key>
+    <properties>
+    <property name="visibility" type="single_select" colspan="6" mandatory="false">
+        <meta>
+            <title lang="en">Visibility</title>
+            <title lang="tr">Görünürlük</title>
+            <title lang="de">Sichtbarkeit</title>
+            <title lang="ru">Видимость</title>
+            <title lang="es">Visibilidad</title>
+            <title lang="fr">Visibilité</title>
+            <info_text lang="en">Display or hide the element on this device width and larger.</info_text>
+            <info_text lang="tr">Öğeyi bu cihaz genişliğinde ve daha büyük ekranlarda gösterin veya gizleyin.</info_text>
+            <info_text lang="de">Element ab dieser Gerätebreite anzeigen oder ausblenden.</info_text>
+            <info_text lang="ru">Отобразить или скрыть элемент начиная с этой ширины экрана и выше.</info_text>
+            <info_text lang="es">Mostrar u ocultar el elemento en este ancho de dispositivo y superiores.</info_text>
+            <info_text lang="fr">Afficher ou masquer l'élément à partir de cette largeur d'écran.</info_text>
+        </meta>
+        <params>
+            <param name="default_value" value=""/>
+            <param name="values" type="collection">
+                <param name="">
+                    <meta>
+                        <title lang="en">Always</title>
+                        <title lang="tr">Her Zaman</title>
+                        <title lang="de">Immer</title>
+                        <title lang="ru">Всегда</title>
+                        <title lang="es">Siempre</title>
+                        <title lang="fr">Toujours</title>
+                    </meta>
+                </param>
+                <param name="sm">
+                    <meta>
+                        <title lang="en">Visible Small (Phone Landscape)</title>
+                        <title lang="tr">Görünür Küçük (Telefon Yatay - SM ve Üzeri)</title>
+                        <title lang="de">Sichtbar Klein (ab SM)</title>
+                        <title lang="ru">Видимо с малого (SM и выше)</title>
+                        <title lang="es">Visible Pequeño (desde SM)</title>
+                        <title lang="fr">Visible Petit (dès SM)</title>
+                    </meta>
+                </param>
+                <param name="md">
+                    <meta>
+                        <title lang="en">Visible Medium (Tablet Landscape)</title>
+                        <title lang="tr">Görünür Orta (Tablet Yatay - MD ve Üzeri)</title>
+                        <title lang="de">Sichtbar Mittel (ab MD)</title>
+                        <title lang="ru">Видимо со среднего (MD и выше)</title>
+                        <title lang="es">Visible Mediano (desde MD)</title>
+                        <title lang="fr">Visible Moyen (dès MD)</title>
+                    </meta>
+                </param>
+                <param name="lg">
+                    <meta>
+                        <title lang="en">Visible Large (Desktop)</title>
+                        <title lang="tr">Görünür Büyük (Masaüstü - LG ve Üzeri)</title>
+                        <title lang="de">Sichtbar Groß (ab LG)</title>
+                        <title lang="ru">Видимо с большого (LG и выше)</title>
+                        <title lang="es">Visible Grande (desde LG)</title>
+                        <title lang="fr">Visible Grand (dès LG)</title>
+                    </meta>
+                </param>
+                <param name="xl">
+                    <meta>
+                        <title lang="en">Visible X-Large (Large Screens)</title>
+                        <title lang="tr">Görünür Çok Büyük (Geniş Ekran - XL ve Üzeri)</title>
+                        <title lang="de">Sichtbar Extra Groß (ab XL)</title>
+                        <title lang="ru">Видимо с очень большого (XL и выше)</title>
+                        <title lang="es">Visible Extra Grande (desde XL)</title>
+                        <title lang="fr">Visible Très Grand (dès XL)</title>
+                    </meta>
+                </param>
+                <param name="hidden-sm">
+                    <meta>
+                        <title lang="en">Hidden Small (Phone Landscape)</title>
+                        <title lang="tr">Gizli Küçük (Telefon Yatay - SM ve Üzeri)</title>
+                        <title lang="de">Ausgeblendet Klein (ab SM)</title>
+                        <title lang="ru">Скрыто с малого (SM и выше)</title>
+                        <title lang="es">Oculto Pequeño (desde SM)</title>
+                        <title lang="fr">Masqué Petit (dès SM)</title>
+                    </meta>
+                </param>
+                <param name="hidden-md">
+                    <meta>
+                        <title lang="en">Hidden Medium (Tablet Landscape)</title>
+                        <title lang="tr">Gizli Orta (Tablet Yatay - MD ve Üzeri)</title>
+                        <title lang="de">Ausgeblendet Mittel (ab MD)</title>
+                        <title lang="ru">Скрыто со среднего (MD и выше)</title>
+                        <title lang="es">Oculto Mediano (desde MD)</title>
+                        <title lang="fr">Masqué Moyen (dès MD)</title>
+                    </meta>
+                </param>
+                <param name="hidden-lg">
+                    <meta>
+                        <title lang="en">Hidden Large (Desktop)</title>
+                        <title lang="tr">Gizli Büyük (Masaüstü - LG ve Üzeri)</title>
+                        <title lang="de">Ausgeblendet Groß (ab LG)</title>
+                        <title lang="ru">Скрыто с большого (LG и выше)</title>
+                        <title lang="es">Oculto Grande (desde LG)</title>
+                        <title lang="fr">Masqué Grand (dès LG)</title>
+                    </meta>
+                </param>
+                <param name="hidden-xl">
+                    <meta>
+                        <title lang="en">Hidden X-Large (Large Screens)</title>
+                        <title lang="tr">Gizli Çok Büyük (Geniş Ekran - XL ve Üzeri)</title>
+                        <title lang="de">Ausgeblendet Extra Groß (ab XL)</title>
+                        <title lang="ru">Скрыто с очень большого (XL и выше)</title>
+                        <title lang="es">Oculto Extra Grande (desde XL)</title>
+                        <title lang="fr">Masqué Très Grand (dès XL)</title>
+                    </meta>
+                </param>
+            </param>
+        </params>
+    </property>
+    </properties>
+</form>

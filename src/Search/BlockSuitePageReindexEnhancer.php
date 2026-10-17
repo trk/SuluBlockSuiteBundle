@@ -214,15 +214,33 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
                 return;
             }
 
+            $matchedContent = null;
             foreach ($snippet->getDimensionContents() as $content) {
                 if (
-                    $content->getLocale() !== $locale
-                    || DimensionContentInterface::STAGE_LIVE !== $content->getStage()
+                    DimensionContentInterface::CURRENT_VERSION === $content->getVersion()
+                    && $content->getLocale() === $locale
+                    && (DimensionContentInterface::STAGE_LIVE === $content->getStage() || '' === $content->getStage())
                 ) {
-                    continue;
+                    $matchedContent = $content;
+                    break;
                 }
+            }
 
-                $templateData = $content->getTemplateData();
+            if (null === $matchedContent) {
+                foreach ($snippet->getDimensionContents() as $content) {
+                    if (
+                        DimensionContentInterface::CURRENT_VERSION === $content->getVersion()
+                        && null === $content->getLocale()
+                        && (DimensionContentInterface::STAGE_LIVE === $content->getStage() || '' === $content->getStage())
+                    ) {
+                        $matchedContent = $content;
+                        break;
+                    }
+                }
+            }
+
+            if (null !== $matchedContent) {
+                $templateData = $matchedContent->getTemplateData();
                 if (isset($templateData['title']) && \is_string($templateData['title'])) {
                     $plainTitle = $this->normalizePlainText($templateData['title']);
                     if ('' !== $plainTitle) {
@@ -250,6 +268,13 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
             }
             if (\is_array($val) && isset($val['id']) && \is_string($val['id']) && '' !== \trim($val['id'])) {
                 return \trim($val['id']);
+            }
+        }
+
+        if (isset($block['view']) && \is_array($block['view']) && isset($block['view']['snippet']) && \is_array($block['view']['snippet'])) {
+            $viewId = $block['view']['snippet']['id'] ?? null;
+            if (\is_string($viewId) && '' !== \trim($viewId)) {
+                return \trim($viewId);
             }
         }
 

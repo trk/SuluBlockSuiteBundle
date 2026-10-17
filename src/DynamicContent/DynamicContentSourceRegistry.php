@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\DynamicContent;
 
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
+use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SmartContentSourceProviderAdapter;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluArticleSourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluCategorySourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluMediaCollectionSourceProvider;
@@ -17,6 +23,13 @@ use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluPageSourceProvider;
  */
 final class DynamicContentSourceRegistry
 {
+    private const DEDICATED_SMART_CONTENT_TYPES = [
+        'pages',
+        'articles',
+        'articles_page_tree',
+        'media',
+    ];
+
     /**
      * @var array<string, DynamicContentSourceProviderInterface>
      */
@@ -33,20 +46,64 @@ final class DynamicContentSourceRegistry
     public function __construct(
         iterable $providers = [],
         ?PageSourceResolverInterface $pageSourceResolver = null,
+        ?SuluSmartContentQueryBridge $smartContentBridge = null,
+        ?ContentResolverInterface $contentResolver = null,
+        ?ContentAggregatorInterface $contentAggregator = null,
+        ?RequestStack $requestStack = null,
+        ?ReferenceStoreInterface $referenceStore = null,
     ) {
-        $defaultProviders = [
-            new SuluPageSourceProvider($pageSourceResolver),
-            new SuluArticleSourceProvider(),
-            new SuluCategorySourceProvider(),
-            new SuluMediaCollectionSourceProvider(),
-        ];
-
-        foreach ($defaultProviders as $defaultProvider) {
-            $this->registerProvider($defaultProvider);
-        }
-
         foreach ($providers as $provider) {
             $this->registerProvider($provider);
+        }
+
+        if (!isset($this->providers['sulu_pages'])) {
+            $this->registerProvider(new SuluPageSourceProvider($pageSourceResolver));
+        }
+
+        if (!isset($this->providers['sulu_articles'])) {
+            $this->registerProvider(new SuluArticleSourceProvider(
+                contentResolver: $contentResolver,
+                requestStack: $requestStack,
+                referenceStore: $referenceStore,
+                contentAggregator: $contentAggregator,
+                smartContentBridge: $smartContentBridge,
+            ));
+        }
+
+        if (!isset($this->providers['sulu_categories'])) {
+            $this->registerProvider(new SuluCategorySourceProvider(
+                requestStack: $requestStack,
+                referenceStore: $referenceStore,
+            ));
+        }
+
+        if (!isset($this->providers['sulu_media_collection'])) {
+            $this->registerProvider(new SuluMediaCollectionSourceProvider(
+                requestStack: $requestStack,
+                referenceStore: $referenceStore,
+                smartContentBridge: $smartContentBridge,
+            ));
+        }
+
+        if (null !== $smartContentBridge) {
+            foreach ($smartContentBridge->getProviders() as $type => $smartProvider) {
+                if (\in_array($type, self::DEDICATED_SMART_CONTENT_TYPES, true)) {
+                    continue;
+                }
+
+                $adapter = new SmartContentSourceProviderAdapter(
+                    smartContentProvider: $smartProvider,
+                    smartContentBridge: $smartContentBridge,
+                    contentResolver: $contentResolver,
+                    contentAggregator: $contentAggregator,
+                    requestStack: $requestStack,
+                    referenceStore: $referenceStore,
+                );
+
+                if (!isset($this->providers[$adapter->getKey()])) {
+                    $this->registerProvider($adapter);
+                }
+            }
         }
     }
 

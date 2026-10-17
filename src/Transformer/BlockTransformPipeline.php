@@ -80,6 +80,8 @@ final class BlockTransformPipeline implements BlockTransformPipelineInterface
             }
         }
 
+        $collectionContext = \array_merge($context, ['_in_collection' => true]);
+
         foreach ($this->transformers as $item) {
             $transformer = $item['transformer'];
             /** @var list<array<string, mixed>> $nextBlocks */
@@ -91,13 +93,15 @@ final class BlockTransformPipeline implements BlockTransformPipelineInterface
                     continue;
                 }
 
-                if ($transformer->supports($block, $context)) {
-                    $transformed = $transformer->transform($block, $context);
+                if ($transformer->supports($block, $collectionContext)) {
+                    $transformed = $transformer->transform($block, $collectionContext);
                     if (isset($transformed['_expanded_blocks']) && \is_array($transformed['_expanded_blocks'])) {
                         foreach ($transformed['_expanded_blocks'] as $expanded) {
                             if (\is_array($expanded)) {
                                 /** @var array<string, mixed> $expanded */
-                                $expanded['_dynamic_content_resolved'] = true;
+                                if ($transformer instanceof DynamicContentTransformer) {
+                                    $expanded['_dynamic_content_resolved'] = true;
+                                }
                                 unset($expanded['_expanded_blocks']);
                                 $nextBlocks[] = $expanded;
                             }

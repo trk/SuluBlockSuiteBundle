@@ -7,6 +7,7 @@ namespace Totoglu\SuluBlockSuiteBundle\Controller\Admin;
 use Sulu\Bundle\ReferenceBundle\Domain\Repository\ReferenceRepositoryInterface;
 use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Component\Security\Authorization\SecurityCheckerInterface;
+use Sulu\Component\Security\Authorization\SecurityCondition;
 use Sulu\Snippet\Domain\Model\SnippetInterface;
 use Sulu\Snippet\Infrastructure\Sulu\Admin\SnippetAdmin;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,7 +27,11 @@ final class ReusableBlockUsageController extends AbstractController
     #[Route('/admin/api/reusable-blocks/{id}/usage', name: 'sulu_block_suite_reusable_block_usage', methods: ['GET'])]
     public function usage(Request $request, string $id): JsonResponse
     {
-        if (null !== $this->securityChecker && !$this->securityChecker->hasPermission(SnippetAdmin::SECURITY_CONTEXT, PermissionTypes::VIEW)) {
+        $locale = $request->query->getString('locale') ?: null;
+        if (
+            null === $this->securityChecker
+            || !$this->securityChecker->hasPermission(new SecurityCondition(SnippetAdmin::SECURITY_CONTEXT, $locale), PermissionTypes::VIEW)
+        ) {
             return new JsonResponse(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
@@ -95,7 +100,11 @@ final class ReusableBlockUsageController extends AbstractController
     #[Route('/admin/api/reusable-blocks/stats', name: 'sulu_block_suite_reusable_block_stats', methods: ['GET'])]
     public function stats(Request $request): JsonResponse
     {
-        if (null !== $this->securityChecker && !$this->securityChecker->hasPermission(SnippetAdmin::SECURITY_CONTEXT, PermissionTypes::VIEW)) {
+        $locale = $request->query->getString('locale') ?: null;
+        if (
+            null === $this->securityChecker
+            || !$this->securityChecker->hasPermission(new SecurityCondition(SnippetAdmin::SECURITY_CONTEXT, $locale), PermissionTypes::VIEW)
+        ) {
             return new JsonResponse(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
@@ -105,9 +114,13 @@ final class ReusableBlockUsageController extends AbstractController
         foreach ($rawIds as $rawId) {
             $trimmed = \trim($rawId);
             if ('' !== $trimmed && 1 === \preg_match('/^[a-z0-9_-]+$/i', $trimmed)) {
-                $ids[] = $trimmed;
+                $ids[$trimmed] = $trimmed;
+                if (\count($ids) >= 50) {
+                    break;
+                }
             }
         }
+        $ids = \array_values($ids);
 
         if ([] === $ids || null === $this->referenceRepository) {
             return new JsonResponse(['counts' => []]);

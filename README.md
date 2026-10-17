@@ -118,18 +118,12 @@ sulu_block_suite:
         enabled: true
     layout:
         enabled: true
-    exclude_dynamic_blocks:
-        - section
-        - row
-        - column
-        - row_item
-        - column_item
-        - divider
-        - icon
-        - html
-        - code
-        - scroll_to
-        - reusable
+        yaml_dir: '%kernel.project_dir%/config/blocks/layouts'
+        mappings: {}
+    rendering:
+        template_namespaces:
+            - 'blocks'
+            - '@SuluBlockSuite/blocks'
 ```
 
 ---
@@ -186,11 +180,9 @@ Define blocks using standard Sulu XML `<section>` elements in `config/templates/
 
 ---
 
-### 2. Selective Tab Exclusion (`sulu_block_suite.tabs` & `exclude_dynamic_blocks`)
+### 2. Selective Tab Exclusion (`sulu_block_suite.tabs`)
 
-Structural or static blocks (`section`, `row`, `column`, `divider`, `icon`, `html`, `code`, `scroll_to`, `reusable`) are automatically excluded from receiving the `Dynamic Content` tab via `sulu_block_suite.exclude_dynamic_blocks`.
-
-You can also exclude one or more shared tabs (`general`, `dynamic_content`, `advanced`) directly in a block XML template using `<tag name="sulu_block_suite.tabs" exclude="..."/>`:
+You can exclude one or more shared tabs (`general`, `dynamic_content`, `advanced`) directly in a block XML template using `<tag name="sulu_block_suite.tabs" exclude="..."/>`:
 
 ```xml
 <template xmlns="http://schemas.sulu.io/template/template"
@@ -233,7 +225,8 @@ Blocks can dynamically pull single items or collections from Sulu CMS sources wi
 | `page_selection` / `page_children` / `sibling_pages` / `custom_query` | Multiple | `SuluPageSourceProvider` | Published Sulu 3 page collections with parent filtering, sorting, limit, offset, and tag/category filters. |
 | `single_article` / `sulu_articles` | Single / Multiple | `SuluArticleSourceProvider` | Published Sulu 3 articles (`SuluArticleBundle`) with template data, route URL, excerpt, and media fields. |
 | `single_category` / `sulu_categories` | Single / Multiple | `SuluCategorySourceProvider` | Sulu categories (`CategoryManagerInterface`) with optional parent category filtering and localized translations. |
-| `single_media` / `sulu_media` | Single / Multiple | `SuluMediaCollectionSourceProvider` | Media assets from Sulu collections (`MediaManagerInterface`) with resolved image/thumbnail structures. |
+| `single_media` / `sulu_media_collection` | Single / Multiple | `SuluMediaCollectionSourceProvider` | Media assets from Sulu collections (`MediaManagerInterface`) with resolved image/thumbnail structures. |
+| `sulu_snippets` / `sulu_contacts` / `sulu_accounts` / `sulu_*` | Single / Multiple | `SmartContentSourceProviderAdapter` | Automatic bridge for any Sulu 3 `SmartContentProviderInterface` (`sulu_content.smart_content_provider` — snippets, contacts, accounts, or custom bundle SmartContent providers) with cached `ResourceLoaderProvider` loading and `ReferenceStoreInterface` tracking. |
 
 #### Empty Values: Smart Fallback vs. "Hide When Empty"
 
@@ -271,14 +264,10 @@ Instead of maintaining hardcoded `<type ref="..."/>` lists across page templates
 
 ### 7. Reusable Global Blocks, Page Layouts & Fallback Chains (`|`)
 
-- When a `reusable_block` or `page_layout` snippet is rendered on the website, `SingleReusableBlockSelectionPropertyResolver` and `PageLayoutProvider` automatically register the snippet UUID in Sulu's `ReferenceStoreInterface` (`snippet` reference pool).
-- `ReusableBlockCacheInvalidationSubscriber` listens to `SnippetModifiedEvent`, `SnippetWorkflowTransitionAppliedEvent`, and `SnippetRemovedEvent`, automatically invalidating Sulu HTTP cache tags and references.
+- **`ReusableBlockTransformer`**: Expands `reusable` blocks at the start of the block collection pipeline (priority `110`, before `DynamicContentTransformer` at `100`) so expanded blocks undergo dynamic content hydration, attribute normalization, and auto-section grouping uniformly. When a `reusable` block is placed inside a column, any inner `section` or nested `reusable` blocks are recursively unwrapped into leaf blocks to prevent nested `<section>` tags.
+- **HTTP Cache Reference Tracking & Invalidation**: When a `reusable_block` or `page_layout` snippet is resolved or expanded, `SingleReusableBlockSelectionPropertyResolver`, `ReusableBlockTransformer`, and `PageLayoutProvider` automatically register the snippet UUID in Sulu's `ReferenceStoreInterface` (`snippets`). `ReusableBlockCacheInvalidationSubscriber` listens to `SnippetModifiedEvent`, `SnippetWorkflowTransitionAppliedEvent`, and `SnippetRemovedEvent`, automatically invalidating Sulu HTTP cache tags and references.
 - **Pipe-Separated Layout Fallback Chains**: `layout_render()` and `layout_load()` support `|`-delimited fallback chains (e.g. `homepage|default`, `article|default`, `search|default`, `error|default`). The first matching published `page_layout` snippet (or YAML layout) in the chain is rendered; if none of the candidates exist, `layout_render()` returns an empty string `''`:
   ```twig
-  {# Global Header & Footer layouts with static partial fallback #}
-  {% set header_layout = layout_render(content.header_layout|default('header'), _context) %}
-  {{ header_layout is not empty ? header_layout|raw : include('includes/navbar.html.twig') }}
-
   {# Page / Search / Error template layout with fallback to 'default' #}
   {{ layout_render(content.layout|default('search|default'), _context) }}
   ```

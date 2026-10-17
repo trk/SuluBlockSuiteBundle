@@ -332,4 +332,59 @@ final class PageLayoutProviderTest extends TestCase
         self::assertSame('', $provider->renderLayout('error|default', [], 'en'));
         self::assertSame('', $provider->renderLayout('homepage|default', [], 'en'));
     }
+
+    public function testGetLayoutAndReusableBlockTagReferenceStoreOnCacheHitAndUseContentResolver(): void
+    {
+        $snippet = $this->createStub(SnippetInterface::class);
+        $snippet->method('getUuid')->willReturn('reusable-uuid-1');
+
+        $historicalDim = $this->createStub(SnippetDimensionContentInterface::class);
+        $historicalDim->method('getTemplateKey')->willReturn('reusable_block');
+        $historicalDim->method('getStage')->willReturn('live');
+        $historicalDim->method('getLocale')->willReturn('en');
+        $historicalDim->method('getVersion')->willReturn(1);
+        $historicalDim->method('getTitle')->willReturn('Old Historical Title');
+
+        $liveDim = $this->createStub(SnippetDimensionContentInterface::class);
+        $liveDim->method('getTemplateKey')->willReturn('reusable_block');
+        $liveDim->method('getStage')->willReturn('live');
+        $liveDim->method('getLocale')->willReturn('en');
+        $liveDim->method('getVersion')->willReturn(0);
+        $liveDim->method('getTitle')->willReturn('Current Live Title');
+        $liveDim->method('getTemplateData')->willReturn([
+            'blocks' => [['type' => 'headline', 'title' => 'Raw Title']],
+        ]);
+
+        $snippet->method('getDimensionContents')->willReturn(new ArrayCollection([$historicalDim, $liveDim]));
+
+        $repo = $this->createMock(SnippetRepositoryInterface::class);
+        $repo->expects(self::once())->method('getOneBy')->willReturn($snippet);
+
+        $referenceStore = $this->createMock(\Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface::class);
+        $referenceStore->expects(self::exactly(2))
+            ->method('add')
+            ->with('reusable-uuid-1', SnippetInterface::RESOURCE_KEY);
+
+        $contentResolver = $this->createMock(\Sulu\Content\Application\ContentResolver\ContentResolverInterface::class);
+        $contentResolver->expects(self::once())
+            ->method('resolve')
+            ->with($liveDim)
+            ->willReturn([
+                'content' => [
+                    'blocks' => [['type' => 'headline', 'title' => 'Resolved Title']],
+                ],
+            ]);
+
+        $provider = new PageLayoutProvider($repo, null, null, [], $referenceStore, $contentResolver);
+
+        $first = $provider->getReusableBlock('reusable-uuid-1', 'en');
+        $second = $provider->getReusableBlock('reusable-uuid-1', 'en');
+
+        self::assertNotNull($first);
+        self::assertSame($first, $second);
+        self::assertSame('Current Live Title', $first['title']);
+        self::assertIsArray($first['blocks']);
+        self::assertIsArray($first['blocks'][0]);
+        self::assertSame('Resolved Title', $first['blocks'][0]['title'] ?? null);
+    }
 }

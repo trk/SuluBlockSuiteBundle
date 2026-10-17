@@ -111,6 +111,9 @@ YAML;
 
         $mockDimension = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetDimensionContent::class);
         $mockDimension->method('getTemplateKey')->willReturn('block_preset');
+        $mockDimension->method('getStage')->willReturn('live');
+        $mockDimension->method('getLocale')->willReturn('en');
+        $mockDimension->method('getVersion')->willReturn(0);
         $mockDimension->method('getTitle')->willReturn('Card Preset Title');
         $mockDimension->method('getTemplateData')->willReturn([
             'description' => 'Card Preset Description',
@@ -128,14 +131,31 @@ YAML;
 
         $mockSnippet->method('getDimensionContents')->willReturn(new \Doctrine\Common\Collections\ArrayCollection([$mockDimension]));
 
-        $mockSnippetRepo = $this->createStub(\Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface::class);
-        $mockSnippetRepo->method('findBy')->willReturn([$mockSnippet]);
+        $mockSnippetRepo = $this->createMock(\Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface::class);
+        $mockSnippetRepo->expects($this->once())
+            ->method('findBy')
+            ->with(
+                [
+                    'templateKeys' => ['block_preset'],
+                    'locale' => 'en',
+                    'stage' => 'live',
+                ],
+                ['title' => 'asc'],
+                [\Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => []],
+            )
+            ->willReturn([$mockSnippet]);
+
+        $referenceStore = $this->createMock(\Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface::class);
+        $referenceStore->expects($this->once())
+            ->method('add')
+            ->with('snippet-uuid-1', \Sulu\Snippet\Domain\Model\SnippetInterface::RESOURCE_KEY);
 
         $provider = new YamlBlockPresetProvider(
             $this->tempDir,
             null,
             $mockSnippetRepo,
             true,
+            referenceStore: $referenceStore,
         );
 
         $presets = $provider->getPresets('card', 'en');

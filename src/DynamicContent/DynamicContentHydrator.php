@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\DynamicContent;
 
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
+use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
 
 final class DynamicContentHydrator implements DynamicContentHydratorInterface
@@ -17,8 +22,21 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         ?PageSourceResolverInterface $sourceResolver = null,
         iterable $customProviders = [],
         private readonly ?BlockTargetFieldMetadataResolver $targetFieldResolver = null,
+        ?SuluSmartContentQueryBridge $smartContentBridge = null,
+        ?ContentResolverInterface $contentResolver = null,
+        ?ContentAggregatorInterface $contentAggregator = null,
+        ?RequestStack $requestStack = null,
+        ?ReferenceStoreInterface $referenceStore = null,
     ) {
-        $this->registry = new DynamicContentSourceRegistry($customProviders, $sourceResolver);
+        $this->registry = new DynamicContentSourceRegistry(
+            $customProviders,
+            $sourceResolver,
+            $smartContentBridge,
+            $contentResolver,
+            $contentAggregator,
+            $requestStack,
+            $referenceStore,
+        );
     }
 
     /**
@@ -202,6 +220,24 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             if ($hideIfEmpty && 0 === $appliedCount) {
                 continue;
             }
+
+            $cloneIndex = \count($hydratedList);
+            if ($cloneIndex > 0) {
+                $suffix = '-' . ($cloneIndex + 1);
+                if (isset($hydratedItem['props']) && \is_array($hydratedItem['props']) && isset($hydratedItem['props']['id']) && \is_string($hydratedItem['props']['id'])) {
+                    $trimmedId = \trim($hydratedItem['props']['id']);
+                    if ('' !== $trimmedId) {
+                        $hydratedItem['props']['id'] = $trimmedId . $suffix;
+                    }
+                }
+                if (isset($hydratedItem['id']) && \is_string($hydratedItem['id'])) {
+                    $trimmedRootId = \trim($hydratedItem['id']);
+                    if ('' !== $trimmedRootId) {
+                        $hydratedItem['id'] = $trimmedRootId . $suffix;
+                    }
+                }
+            }
+
             $hydratedList[] = $hydratedItem;
         }
 
@@ -280,6 +316,24 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
      */
     private function buildDynamicConfigFromFlatProps(array $props): array
     {
+        $resolvedTagIds = null;
+        $rawTagSelection = $props['dynamic_tag_names'] ?? null;
+        if (\is_object($rawTagSelection) && \method_exists($rawTagSelection, 'getView')) {
+            /** @var mixed $view */
+            $view = $rawTagSelection->getView();
+            if (\is_array($view) && isset($view['ids']) && \is_array($view['ids'])) {
+                $ids = [];
+                foreach ($view['ids'] as $id) {
+                    if (\is_numeric($id)) {
+                        $ids[] = (int) $id;
+                    }
+                }
+                if ([] !== $ids) {
+                    $resolvedTagIds = $ids;
+                }
+            }
+        }
+
         $props = $this->unwrapContentViews($props);
         if (!\is_array($props)) {
             $props = [];
@@ -357,6 +411,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             'collection_id' => $props['dynamic_collection_id'] ?? null,
             'template_keys' => $props['dynamic_template_keys'] ?? null,
             'tag_names' => $props['dynamic_tag_names'] ?? null,
+            'tag_ids' => $resolvedTagIds ?? ($props['dynamic_tag_ids'] ?? null),
             'category_keys' => $props['dynamic_category_keys'] ?? null,
             'exclude_current' => (bool) ($props['dynamic_exclude_current'] ?? true),
             'sort_by' => $props['dynamic_sort_by'] ?? 'published',
@@ -510,6 +565,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         $spaced = \preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr|section|article)>|<br\s*\/?>/i', ' ', $value) ?? $value;
         $stripped = \strip_tags($spaced);
         $decoded = \html_entity_decode($stripped, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
+        $decoded = \str_replace(['<', '>'], '', $decoded);
         $normalized = \trim(\preg_replace('/\s+/u', ' ', $decoded) ?? $decoded);
 
         if ('' === $normalized || $maxLength <= 0) {

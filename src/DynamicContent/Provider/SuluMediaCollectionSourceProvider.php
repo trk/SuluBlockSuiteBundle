@@ -10,6 +10,7 @@ use Sulu\Bundle\MediaBundle\Entity\MediaInterface;
 use Sulu\Bundle\MediaBundle\Media\Manager\MediaManagerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 
 /**
  * Built-in Dynamic Content source provider for Sulu Media Collections & Single Media Items.
@@ -20,6 +21,7 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
         private readonly ?MediaManagerInterface $mediaManager = null,
         private readonly ?RequestStack $requestStack = null,
         private readonly ?ReferenceStoreInterface $referenceStore = null,
+        private readonly ?SuluSmartContentQueryBridge $smartContentBridge = null,
     ) {
     }
 
@@ -91,6 +93,7 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
                 colSpan: 6,
             ),
             ...$this->createPaginationAndSortFields(24),
+            ...$this->createTaxonomyFilterFields(includeTemplateFilter: false, includeTags: true, includeCategories: true),
         ];
     }
 
@@ -139,23 +142,56 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
 
     public function resolveCollection(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
     {
-        if (null === $this->mediaManager) {
-            return [];
-        }
-
         $resolvedLocale = $this->resolveLocale($locale, $this->requestStack);
         $query = isset($config['query']) && \is_array($config['query'])
             ? \array_merge($config, $config['query'])
             : $config;
 
-        $filter = [];
-
+        $ids = $this->normalizeIntList($query['ids'] ?? ($query['media_ids'] ?? null));
         $collectionId = $query['collection_id'] ?? ($query['collection'] ?? ($query['parent_id'] ?? ($query['page_id'] ?? null)));
-        if (\is_numeric($collectionId) && (int) $collectionId > 0) {
-            $filter['collection'] = (int) $collectionId;
+        $dataSource = (\is_numeric($collectionId) && (int) $collectionId > 0) ? (string) (int) $collectionId : null;
+
+        if ([] === $ids && null !== $this->smartContentBridge && $this->smartContentBridge->hasProvider('media')) {
+            $flatIds = $this->smartContentBridge->queryFlatIds(
+                providerType: 'media',
+                config: $query,
+                locale: $resolvedLocale,
+                dataSource: $dataSource,
+                includeSubFolders: false,
+            );
+
+            if ([] === $flatIds) {
+                return [];
+            }
+
+            $loaded = $this->smartContentBridge->loadOrderedResources('media', $flatIds, $resolvedLocale);
+            if ([] === $loaded && null !== $this->mediaManager) {
+                try {
+                    $intIds = \array_values(\array_map('intval', \array_filter($flatIds, 'is_numeric')));
+                    $loaded = $this->mediaManager->getByIds($intIds, $resolvedLocale);
+                } catch (\Throwable) {
+                    $loaded = [];
+                }
+            }
+
+            $result = [];
+            foreach ($loaded as $media) {
+                if ($media instanceof Media) {
+                    $result[] = $this->normalizeMedia($media);
+                }
+            }
+
+            return $result;
         }
 
-        $ids = $this->normalizeIntList($query['ids'] ?? ($query['media_ids'] ?? null));
+        if (null === $this->mediaManager) {
+            return [];
+        }
+
+        $filter = [];
+        if (null !== $dataSource) {
+            $filter['collection'] = (int) $dataSource;
+        }
         if ([] !== $ids) {
             $filter['ids'] = $ids;
         }
@@ -164,11 +200,12 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
             $filter['types'] = \array_values(\array_filter(\array_map('trim', \explode(',', $query['types']))));
         }
 
-        $limit = isset($query['limit']) && \is_numeric($query['limit']) && (int) $query['limit'] > 0
+        $rawLimit = isset($query['limit']) && \is_numeric($query['limit'])
             ? (int) $query['limit']
             : 24;
-        $offset = isset($query['offset']) && \is_numeric($query['offset']) && (int) $query['offset'] >= 0
-            ? (int) $query['offset']
+        $limit = \max(1, \min(100, $rawLimit));
+        $offset = isset($query['offset']) && \is_numeric($query['offset'])
+            ? \max(0, \min(500, (int) $query['offset']))
             : 0;
 
         try {
