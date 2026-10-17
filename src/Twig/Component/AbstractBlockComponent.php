@@ -6,6 +6,8 @@ namespace Totoglu\SuluBlockSuiteBundle\Twig\Component;
 
 use Symfony\UX\TwigComponent\Attribute\PreMount;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
+use Totoglu\SuluBlockSuiteBundle\Util\ClassList;
+use Totoglu\SuluBlockSuiteBundle\Util\PropReader;
 
 /**
  * Base class for Sulu Block Suite Twig Components.
@@ -311,7 +313,7 @@ abstract class AbstractBlockComponent
     public function string(string $key, string $default = '', bool $trim = true, ?string $fn = null): string
     {
         $value = $this->get($key);
-        $resolved = $this->coerceScalarToString($value);
+        $resolved = PropReader::toString($value);
         if (null === $resolved) {
             return $default;
         }
@@ -351,7 +353,7 @@ abstract class AbstractBlockComponent
     {
         $value = $this->get($key);
 
-        return self::parseBoolean($value, $default);
+        return PropReader::toBool($value, $default);
     }
 
     /**
@@ -512,7 +514,7 @@ abstract class AbstractBlockComponent
     public function stringProp(string $key, string $default = '', bool $trim = true, ?string $fn = null): string
     {
         $value = $this->prop($key);
-        $resolved = $this->coerceScalarToString($value);
+        $resolved = PropReader::toString($value);
         if (null === $resolved) {
             return $default;
         }
@@ -540,11 +542,11 @@ abstract class AbstractBlockComponent
         $normalized = self::toSnakeCase($key);
 
         if (\array_key_exists($normalized, $this->props) && null !== $this->props[$normalized]) {
-            return self::parseBoolean($this->props[$normalized], $default);
+            return PropReader::toBool($this->props[$normalized], $default);
         }
 
         if (\array_key_exists($normalized, $this->data) && null !== $this->data[$normalized]) {
-            return self::parseBoolean($this->data[$normalized], $default);
+            return PropReader::toBool($this->data[$normalized], $default);
         }
 
         return $default;
@@ -592,7 +594,7 @@ abstract class AbstractBlockComponent
 
     public function trim(mixed $value, string $default = '', string $characters = " \n\r\t\v\x00"): string
     {
-        $str = $this->coerceScalarToString($value);
+        $str = PropReader::toString($value);
         if (null === $str) {
             return $default;
         }
@@ -604,7 +606,7 @@ abstract class AbstractBlockComponent
 
     public function ltrim(mixed $value, string $characters = " \n\r\t\v\x00", string $default = ''): string
     {
-        $str = $this->coerceScalarToString($value);
+        $str = PropReader::toString($value);
         if (null === $str) {
             return $default;
         }
@@ -616,7 +618,7 @@ abstract class AbstractBlockComponent
 
     public function rtrim(mixed $value, string $characters = " \n\r\t\v\x00", string $default = ''): string
     {
-        $str = $this->coerceScalarToString($value);
+        $str = PropReader::toString($value);
         if (null === $str) {
             return $default;
         }
@@ -683,7 +685,7 @@ abstract class AbstractBlockComponent
             if (\is_array($part) && isset($part['name']) && \is_string($part['name'])) {
                 $str = $part['name'];
             } else {
-                $str = $this->coerceScalarToString($part);
+                $str = PropReader::toString($part);
             }
 
             if (null === $str) {
@@ -713,7 +715,7 @@ abstract class AbstractBlockComponent
     {
         $parts = [];
         foreach ($items as $item) {
-            $str = $this->coerceScalarToString($item);
+            $str = PropReader::toString($item);
             if (null === $str) {
                 continue;
             }
@@ -737,40 +739,7 @@ abstract class AbstractBlockComponent
      */
     public function classes(string|array|null|false ...$parts): string
     {
-        return self::joinClasses(...$parts);
-    }
-
-    /**
-     * @param string|array<int|string, mixed>|null|false ...$parts
-     */
-    public static function joinClasses(string|array|null|false ...$parts): string
-    {
-        $tokens = [];
-
-        foreach ($parts as $part) {
-            if (\is_array($part)) {
-                foreach ($part as $nested) {
-                    if (\is_string($nested) || \is_array($nested) || null === $nested || false === $nested) {
-                        $sub = self::joinClasses($nested);
-                        if ('' !== $sub) {
-                            $tokens[] = $sub;
-                        }
-                    }
-                }
-                continue;
-            }
-
-            if (!\is_string($part)) {
-                continue;
-            }
-
-            $normalized = \trim((string) \preg_replace('/\s+/', ' ', $part));
-            if ('' !== $normalized) {
-                $tokens[] = $normalized;
-            }
-        }
-
-        return \implode(' ', $tokens);
+        return ClassList::join(...$parts);
     }
 
     /**
@@ -847,7 +816,7 @@ abstract class AbstractBlockComponent
         ?string $fn = null,
     ): string {
         $raw = $this->itemValue($item, $key);
-        $resolved = $this->coerceScalarToString($raw);
+        $resolved = PropReader::toString($raw);
         if (null === $resolved) {
             return $default;
         }
@@ -920,7 +889,7 @@ abstract class AbstractBlockComponent
     {
         $raw = $this->itemValue($item, $key);
 
-        return null !== $raw ? self::parseBoolean($raw, $default) : $default;
+        return null !== $raw ? PropReader::toBool($raw, $default) : $default;
     }
 
     /**
@@ -965,18 +934,6 @@ abstract class AbstractBlockComponent
         $raw = $this->itemValue($item, $key);
 
         return \is_array($raw) ? $raw : [];
-    }
-
-    private function coerceScalarToString(mixed $value): ?string
-    {
-        if (\is_string($value)) {
-            return $value;
-        }
-        if (\is_int($value) || \is_float($value) || $value instanceof \Stringable) {
-            return (string) $value;
-        }
-
-        return null;
     }
 
     private function applyStringFunction(string $value, string $fn): string
@@ -1347,31 +1304,6 @@ abstract class AbstractBlockComponent
         $normalized = \preg_replace('/[\s\x{00A0}\x{200B}]+/u', '', $decoded);
 
         return null !== $normalized && '' !== $normalized;
-    }
-
-    private static function parseBoolean(mixed $value, bool $default): bool
-    {
-        if (\is_bool($value)) {
-            return $value;
-        }
-
-        if (\is_int($value)) {
-            return 0 !== $value;
-        }
-
-        if (\is_string($value)) {
-            $lower = \strtolower(\trim($value));
-            if (\in_array($lower, ['true', '1', 'yes', 'on'], true)) {
-                return true;
-            }
-            if (\in_array($lower, ['false', '0', 'no', 'off', 'none', ''], true)) {
-                return false;
-            }
-
-            return true;
-        }
-
-        return $default;
     }
 
     public static function toSnakeCase(string $input): string

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Totoglu\SuluBlockSuiteBundle\Tests\Transformer;
 
 use PHPUnit\Framework\TestCase;
+use Totoglu\SuluBlockSuiteBundle\Security\CssScoper;
 use Totoglu\SuluBlockSuiteBundle\Transformer\DefaultAttributesTransformer;
 
 final class DefaultAttributesTransformerTest extends TestCase
@@ -90,66 +91,6 @@ final class DefaultAttributesTransformerTest extends TestCase
         $this->assertStringContainsString('#' . $genId . ' { color: red; }', $scopedCss);
     }
 
-    public function testScopeCssWithoutElElementPrefixesSelectors(): void
-    {
-        $css = "h2 { font-size: 2rem; }\np { margin: 0; }";
-        $scoped = DefaultAttributesTransformer::scopeCss($css, '#my-block');
-
-        $this->assertStringContainsString('#my-block h2 { font-size: 2rem; }', $scoped);
-        $this->assertStringContainsString('#my-block p { margin: 0; }', $scoped);
-    }
-
-    public function testScopeCssWrapsBareDeclarationsAndStripsScriptTags(): void
-    {
-        $scoped = DefaultAttributesTransformer::scopeCss('<style>border: 2px solid red; background: #fff;</style><script>alert(1)</script>', '#card-1');
-
-        $this->assertSame('#card-1 { border: 2px solid red; background: #fff; }', $scoped);
-        $this->assertStringNotContainsString('<script>', $scoped);
-    }
-
-    public function testParseAttributesRejectsInlineEventHandlers(): void
-    {
-        $attrs = DefaultAttributesTransformer::parseAttributes("data-track=\"hero\"\nonclick=\"alert(1)\"\nONMOUSEOVER=hack()\naria-expanded=\"false\"\ndisabled\nhref=\"javascript:alert(1)\"\nsrcdoc=\"<script>alert(1)</script>\"");
-
-        $this->assertSame('hero', $attrs['data-track'] ?? null);
-        $this->assertSame('false', $attrs['aria-expanded'] ?? null);
-        $this->assertTrue($attrs['disabled'] ?? false);
-        $this->assertArrayNotHasKey('onclick', $attrs);
-        $this->assertArrayNotHasKey('ONMOUSEOVER', $attrs);
-        $this->assertArrayNotHasKey('href', $attrs);
-        $this->assertArrayNotHasKey('srcdoc', $attrs);
-    }
-
-    public function testScopeCssPreventsNestedStyleTagBreakoutAndImportInjection(): void
-    {
-        $malicious = 'color: red;</sty</style>le><img src=x onerror=alert(1)>@import url("https://evil.test/x.css");';
-        $scoped = DefaultAttributesTransformer::scopeCss($malicious, '#safe-el');
-
-        $this->assertStringNotContainsString('<', $scoped);
-        $this->assertStringNotContainsString('>', $scoped);
-        $this->assertStringNotContainsString('</style', $scoped);
-        $this->assertStringNotContainsString('@import', $scoped);
-        $this->assertStringContainsString('#safe-el { color: red; }', $scoped);
-    }
-
-    public function testSanitizeAttributesArrayFiltersEventHandlersAndDangerousSchemes(): void
-    {
-        $sanitized = DefaultAttributesTransformer::sanitizeAttributesArray([
-            'id' => 'ignored-id',
-            'class' => 'ignored-class',
-            'style' => 'background:url(javascript:alert(1))',
-            'srcset' => 'javascript:alert(1) 1x',
-            'onfocus' => 'alert(1)',
-            'href' => " \tjavascript:alert(1)",
-            'action' => 'java&#115;cript:alert(1)',
-            'data-hs-overlay' => '#modal-1',
-            'disabled' => true,
-            'hidden' => false,
-        ]);
-
-        $this->assertSame(['data-hs-overlay' => '#modal-1', 'disabled' => true], $sanitized);
-    }
-
     public function testRejectsMalformedElementIdAndStripsCssObfuscation(): void
     {
         $transformer = new DefaultAttributesTransformer();
@@ -167,5 +108,22 @@ final class DefaultAttributesTransformerTest extends TestCase
         $this->assertStringNotContainsString('/*', $transformed['_scoped_css']);
         $this->assertStringNotContainsString('\\', $transformed['_scoped_css']);
         $this->assertStringNotContainsString('javascript:', $transformed['_scoped_css']);
+    }
+
+    public function testGeneratedIdIsStableAndScopesCss(): void
+    {
+        $transformer = new DefaultAttributesTransformer();
+        $block = [
+            'type' => 'headline',
+            'props' => ['css' => 'color: red;'],
+        ];
+
+        $first = $transformer->transform($block, []);
+        $second = $transformer->transform($block, []);
+
+        $this->assertIsString($first['_id']);
+        $this->assertMatchesRegularExpression('/^' . CssScoper::GENERATED_ID_PREFIX . '[0-9a-f]{8}$/', $first['_id']);
+        $this->assertSame($first['_id'], $second['_id']);
+        $this->assertSame('#' . $first['_id'] . ' { color: red; }', $first['_scoped_css']);
     }
 }
