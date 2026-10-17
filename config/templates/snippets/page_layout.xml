@@ -64,7 +64,6 @@
         <title lang="es">Bloques del Dise&#xF1;o</title>
         <title lang="fr">Blocs de la Mise en Page</title>
       </meta>
-      <tag name="sulu_block_suite.auto_blocks"/>
       <types>
         <type name="default">
           <meta>

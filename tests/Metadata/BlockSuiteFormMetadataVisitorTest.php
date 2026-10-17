@@ -493,54 +493,6 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $this->assertSame('Başlık', $firstTargetOption->getTitle('tr'));
     }
 
-    public function testExcludedTopLevelBlockStillRegistersSchemaDefinitionForNestedReferences(): void
-    {
-        $visitor = new BlockSuiteFormMetadataVisitor();
-
-        $reusableBlockForm = new FormMetadata();
-        $reusableBlockForm->setKey('reusable');
-        $reusableContent = new SectionMetadata('content');
-        $snippetField = new FieldMetadata('snippet');
-        $snippetField->setType('single_reusable_block_selection');
-        $reusableContent->addItem($snippetField);
-        $reusableBlockForm->addItem($reusableContent);
-
-        $sectionBlockForm = new FormMetadata();
-        $sectionBlockForm->setKey('section');
-        $sectionContent = new SectionMetadata('content');
-        $rowsField = new FieldMetadata('rows');
-        $rowsField->setType('block');
-        $sectionContent->addItem($rowsField);
-        $sectionBlockForm->addItem($sectionContent);
-
-        $typedBlockForms = new TypedFormMetadata();
-        $typedBlockForms->addForm('reusable', $reusableBlockForm);
-        $typedBlockForms->addForm('section', $sectionBlockForm);
-
-        $visitor->visitTypedFormMetadata($typedBlockForms, 'block', 'en');
-
-        $snippetForm = new FormMetadata();
-        $snippetForm->setKey('reusable_block');
-        $blocksField = new FieldMetadata('blocks');
-        $blocksField->setType('block');
-        $autoBlocksTag = new TagMetadata();
-        $autoBlocksTag->setName('sulu_block_suite.auto_blocks');
-        $autoBlocksTag->setAttributes(['exclude' => 'reusable']);
-        $blocksField->addTag($autoBlocksTag);
-        $snippetForm->addItem($blocksField);
-
-        $visitor->visitFormMetadata($snippetForm, 'en');
-
-        $this->assertArrayNotHasKey('reusable', $blocksField->getTypes());
-        $this->assertArrayHasKey('section', $blocksField->getTypes());
-
-        $jsonSchema = $snippetForm->getSchema()->toJsonSchema();
-        $this->assertArrayHasKey('definitions', $jsonSchema);
-        $this->assertIsArray($jsonSchema['definitions']);
-        $this->assertArrayHasKey('section', $jsonSchema['definitions']);
-        $this->assertArrayHasKey('reusable', $jsonSchema['definitions']);
-    }
-
     public function testBlocksAreSortedAlphabeticallyByTitle(): void
     {
         $visitor = new BlockSuiteFormMetadataVisitor();
@@ -561,58 +513,45 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $visitor->visitTypedFormMetadata($typedBlockForms, 'block', 'en');
 
         $this->assertSame(['accordion', 'button', 'headline', 'video'], \array_keys($typedBlockForms->getForms()));
-
-        $pageForm = new FormMetadata();
-        $pageForm->setKey('default');
-        $blocksField = new FieldMetadata('blocks');
-        $blocksField->setType('block');
-        $autoBlocksTag = new TagMetadata();
-        $autoBlocksTag->setName('sulu_block_suite.auto_blocks');
-        $blocksField->addTag($autoBlocksTag);
-        $pageForm->addItem($blocksField);
-
-        $visitor->visitFormMetadata($pageForm, 'en');
-
-        $this->assertSame(['accordion', 'button', 'headline', 'video'], \array_keys($blocksField->getTypes()));
     }
 
-    public function testAutoBlocksTagSupportsIncludeExcludeAndDefaultAttributes(): void
+    public function testBlockPresetTargetBlockOptionsAreDerivedFromBlockFieldTypes(): void
     {
         $visitor = new BlockSuiteFormMetadataVisitor();
 
-        $typedBlockForms = new TypedFormMetadata();
-        foreach (['section' => 'Section', 'headline' => 'Headline', 'text' => 'Text', 'reusable' => 'Reusable Block'] as $key => $title) {
-            $blockForm = new FormMetadata();
-            $blockForm->setKey($key);
-            $blockForm->setTitle($title, 'en');
-            $content = new SectionMetadata('content');
-            $field = new FieldMetadata('title');
-            $field->setType('text_line');
-            $content->addItem($field);
-            $blockForm->addItem($content);
-            $typedBlockForms->addForm($key, $blockForm);
+        $presetForm = new FormMetadata();
+        $presetForm->setKey('block_preset');
+
+        $targetBlockField = new FieldMetadata('target_block');
+        $targetBlockField->setType('single_select');
+        $presetForm->addItem($targetBlockField);
+
+        $blockField = new FieldMetadata('block');
+        $blockField->setType('block');
+
+        foreach (['headline' => 'Headline', 'text' => 'Text', 'button' => 'Button'] as $key => $title) {
+            $typeForm = new FormMetadata();
+            $typeForm->setKey($key);
+            $typeForm->setTitle($title, 'en');
+            $blockField->addType($typeForm);
         }
+        $presetForm->addItem($blockField);
 
-        $visitor->visitTypedFormMetadata($typedBlockForms, 'block', 'en');
+        $visitor->visitFormMetadata($presetForm, 'en');
 
-        $layoutForm = new FormMetadata();
-        $layoutForm->setKey('custom_layout');
-        $blocksField = new FieldMetadata('blocks');
-        $blocksField->setType('block');
-        $autoBlocksTag = new TagMetadata();
-        $autoBlocksTag->setName('sulu_block_suite.auto_blocks');
-        $autoBlocksTag->setAttributes([
-            'include' => 'section,headline,reusable',
-            'exclude' => 'reusable',
-            'default' => 'section',
-        ]);
-        $blocksField->addTag($autoBlocksTag);
-        $layoutForm->addItem($blocksField);
+        $this->assertSame('headline', $targetBlockField->findOption('default_value')?->getValue());
 
-        $visitor->visitFormMetadata($layoutForm, 'en');
-
-        $this->assertSame(['headline', 'section'], \array_keys($blocksField->getTypes()));
-        $this->assertSame('section', $blocksField->getDefaultType());
+        $valuesOption = $targetBlockField->findOption('values');
+        $this->assertNotNull($valuesOption);
+        $values = $valuesOption->getValue();
+        $this->assertIsArray($values);
+        $this->assertCount(3, $values);
+        $this->assertSame('button', $values[0]->getName());
+        $this->assertSame('Button', $values[0]->getTitle('en'));
+        $this->assertSame('headline', $values[1]->getName());
+        $this->assertSame('Headline', $values[1]->getTitle('en'));
+        $this->assertSame('text', $values[2]->getName());
+        $this->assertSame('Text', $values[2]->getTitle('en'));
     }
 
     public function testInlineSubTypeInheritsTabsTagWithSharedTabsAndNamespacedProps(): void

@@ -29,11 +29,9 @@ use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
  * 2. Automatically prefixes all non-`content` tab fields with `props/` so Sulu natively persists and resolves
  *    them under `$block['props']` without polluting root content properties.
  * 3. Injects compile-time options into `props/dynamic_source`, `props/dynamic_mapping`, and `props/preset`.
- * 4. Populates `<block>` fields carrying `<tag name="sulu_block_suite.auto_blocks" .../>`.
  */
 final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterface, TypedFormMetadataVisitorInterface
 {
-    public const AUTO_BLOCKS_TAG = 'sulu_block_suite.auto_blocks';
     public const TABS_TAG = 'sulu_block_suite.tabs';
     public const TABS_SECTION_NAME = '__tabs';
 
@@ -131,42 +129,33 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
      */
     public function visitFormMetadata(FormMetadata $formMetadata, string $locale, array $metadataOptions = []): void
     {
-        $key = $formMetadata->getKey();
-
-        // 1. Recursively enhance inline block types and <block> fields tagged with sulu_block_suite.auto_blocks
-        $this->enhanceAutoBlocksInItems($formMetadata->getItems(), $formMetadata, $locale, [$key]);
+        // 1. Recursively enhance inline block types with tabs
+        $this->enhanceAutoBlocksInItems($formMetadata->getItems(), $formMetadata, $locale);
 
         // 2. Enhance block preview tags for any block form (or container containing blocks)
         $this->enhanceBlockPreviewTags($formMetadata);
 
-        // 3. Legacy/programmatic support for snippet forms constructed without tags
-        if ('reusable_block' === $key) {
-            $this->enhanceBlockTypes($formMetadata, $locale, 'blocks', ['reusable']);
-
-            return;
-        }
-
-        if ('page_layout' === $key) {
-            $this->enhanceBlockTypes($formMetadata, $locale, 'blocks', []);
-
-            return;
-        }
-
-        if ('block_preset' !== $key) {
-            return;
-        }
-
-        $this->enhanceBlockTypes($formMetadata, $locale, 'block', ['reusable']);
-
         $items = $formMetadata->getItems();
-        if (!isset($items['target_block']) || !$items['target_block'] instanceof FieldMetadata) {
+        if (
+            !isset($items['target_block'], $items['block'])
+            || !$items['target_block'] instanceof FieldMetadata
+            || !$items['block'] instanceof FieldMetadata
+        ) {
             return;
         }
 
-        /** @var FieldMetadata $targetBlockProperty */
         $targetBlockProperty = $items['target_block'];
+        $blockProperty = $items['block'];
 
-        $blockTypes = $this->discoverAvailableBlockTypes($locale);
+        /** @var list<string> $blockTypes */
+        $blockTypes = [];
+        $typeForms = $blockProperty->getTypes();
+        foreach (\array_keys($typeForms) as $typeKey) {
+            if (\is_string($typeKey) && '' !== $typeKey && 'default' !== $typeKey) {
+                $blockTypes[] = $typeKey;
+            }
+        }
+
         if (0 === \count($blockTypes)) {
             return;
         }
@@ -175,11 +164,13 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $options = [];
         $allLocales = \array_values(\array_unique(['en', 'tr', 'de', 'ru', 'es', 'fr', $locale]));
         foreach ($blockTypes as $blockType) {
+            $typeTitles = isset($typeForms[$blockType]) ? $typeForms[$blockType]->getTitles() : [];
             $option = new OptionMetadata();
             $option->setName($blockType);
             $option->setValue($blockType);
             foreach ($allLocales as $loc) {
-                $option->setTitle($this->resolveBlockTitle($blockType, $loc), $loc);
+                $title = $typeTitles[$loc] ?? '';
+                $option->setTitle('' !== $title ? $title : $this->resolveBlockTitle($blockType, $loc), $loc);
             }
 
             $options[] = $option;
@@ -1356,25 +1347,22 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
     /**
      * Recursively traverses form items (sections, inline block types, and block fields)
-     * to enhance inline sub-types with tabs and populate any `<block>` field carrying
-     * `<tag name="sulu_block_suite.auto_blocks" .../>`.
+     * to enhance inline sub-types with tabs.
      *
      * @param array<array-key, ItemMetadata> $items
-     * @param list<string> $ancestorKeys
      * @param array<int, true> $visitedFormIds
      */
     private function enhanceAutoBlocksInItems(
         array $items,
         FormMetadata $rootForm,
         string $locale,
-        array $ancestorKeys,
         array $visitedFormIds = [],
     ): void {
         $visitedFormIds[\spl_object_id($rootForm)] = true;
 
         foreach ($items as $item) {
             if ($item instanceof SectionMetadata) {
-                $this->enhanceAutoBlocksInItems($item->getItems(), $rootForm, $locale, $ancestorKeys, $visitedFormIds);
+                $this->enhanceAutoBlocksInItems($item->getItems(), $rootForm, $locale, $visitedFormIds);
 
                 continue;
             }
@@ -1383,7 +1371,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 continue;
             }
 
-            // First traverse inline sub-types
             $fieldTabsTag = $this->findFieldTag($item, self::TABS_TAG);
             $existingTypes = $item->getTypes();
             foreach ($existingTypes as $typeKey => $typeForm) {
@@ -1417,42 +1404,10 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                         $typeForm->getItems(),
                         $rootForm,
                         $locale,
-                        [...$ancestorKeys, $typeKey],
                         $nextVisited,
                     );
                 }
             }
-
-            $autoBlocksTag = $this->findFieldTag($item, self::AUTO_BLOCKS_TAG);
-            if (null === $autoBlocksTag) {
-                continue;
-            }
-
-            $attributes = $autoBlocksTag->getAttributes();
-            $includeAttr = isset($attributes['include']) && \is_string($attributes['include']) ? $attributes['include'] : '';
-            $includedTypes = \array_values(\array_filter(
-                \array_map('trim', \explode(',', $includeAttr)),
-                static fn (string $val): bool => '' !== $val,
-            ));
-
-            $excludeAttr = isset($attributes['exclude']) && \is_string($attributes['exclude']) ? $attributes['exclude'] : '';
-            $excludedTypes = \array_values(\array_filter(
-                \array_map('trim', \explode(',', $excludeAttr)),
-                static fn (string $val): bool => '' !== $val,
-            ));
-
-            $preferredDefault = isset($attributes['default']) && \is_string($attributes['default']) && '' !== \trim($attributes['default'])
-                ? \trim($attributes['default'])
-                : null;
-
-            $this->enhanceBlockField(
-                $item,
-                $rootForm,
-                $locale,
-                \array_values(\array_unique([...$excludedTypes, ...$ancestorKeys])),
-                $preferredDefault,
-                $includedTypes,
-            );
         }
     }
 
@@ -1628,121 +1583,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $tag->setName('sulu.block_preview');
         $tag->setPriority($priority);
         $field->addTag($tag);
-    }
-
-    /**
-     * @param list<string> $excludedTypes
-     */
-    private function enhanceBlockTypes(FormMetadata $formMetadata, string $locale, string $propertyName = 'blocks', array $excludedTypes = ['reusable']): void
-    {
-        $items = $formMetadata->getItems();
-        if (!isset($items[$propertyName]) || !$items[$propertyName] instanceof FieldMetadata) {
-            return;
-        }
-
-        /** @var FieldMetadata $blocksProperty */
-        $blocksProperty = $items[$propertyName];
-        if ($blocksProperty->hasTag(self::AUTO_BLOCKS_TAG)) {
-            return;
-        }
-
-        $this->enhanceBlockField($blocksProperty, $formMetadata, $locale, $excludedTypes, null);
-    }
-
-    /**
-     * @param list<string> $excludedTypes
-     * @param list<string> $includedTypes
-     */
-    private function enhanceBlockField(
-        FieldMetadata $blocksProperty,
-        FormMetadata $rootForm,
-        string $locale,
-        array $excludedTypes = [],
-        ?string $preferredDefault = null,
-        array $includedTypes = [],
-    ): void {
-        $blockForms = $this->getRegisteredBlockForms($locale);
-        if ([] === $blockForms) {
-            return;
-        }
-
-        $rootKey = $rootForm->getKey();
-        $isGlobalBlockRoot = isset($blockForms[$rootKey]);
-        $excludedMap = \array_fill_keys(['default', '', $rootKey, ...$excludedTypes], true);
-        $includedMap = [] !== $includedTypes ? \array_fill_keys($includedTypes, true) : null;
-        $existingTypes = $blocksProperty->getTypes();
-
-        $addedCount = 0;
-        foreach ($blockForms as $typeKey => $blockForm) {
-            if (isset($excludedMap[$typeKey])) {
-                continue;
-            }
-            if (null !== $includedMap && !isset($includedMap[$typeKey])) {
-                continue;
-            }
-
-            $this->enhanceBlockTabs($blockForm, $locale, includeSharedTabs: true);
-            $this->enhanceBlockPreviewTags($blockForm);
-
-            if (!isset($existingTypes[$typeKey])) {
-                $globalBlockStub = new FormMetadata();
-                $globalBlockStub->setKey($typeKey);
-                $globalBlockStub->setTitles($blockForm->getTitles());
-
-                $globalTag = new TagMetadata();
-                $globalTag->setName('sulu.global_block');
-                $globalTag->setAttributes(['global_block' => $typeKey]);
-                $globalBlockStub->addTag($globalTag);
-
-                $blocksProperty->addType($globalBlockStub);
-                ++$addedCount;
-            } else {
-                ++$addedCount;
-            }
-        }
-
-        if ($addedCount > 0 && isset($existingTypes['default'])) {
-            $blocksProperty->removeType('default');
-        }
-
-        /** @var array<string, FormMetadata> $currentTypes */
-        $currentTypes = [];
-        foreach ($blocksProperty->getTypes() as $tKey => $tForm) {
-            if (\is_string($tKey)) {
-                $currentTypes[$tKey] = $tForm;
-            }
-        }
-        $sortedTypes = $this->sortBlockFormsAlphabetically($currentTypes, $locale);
-        foreach (\array_keys($currentTypes) as $tKey) {
-            $blocksProperty->removeType($tKey);
-        }
-        foreach ($sortedTypes as $tForm) {
-            $blocksProperty->addType($tForm);
-        }
-
-        $updatedTypes = $blocksProperty->getTypes();
-        if (null !== $preferredDefault && isset($updatedTypes[$preferredDefault])) {
-            $blocksProperty->setDefaultType($preferredDefault);
-        } else {
-            $currentDefault = $blocksProperty->getDefaultType();
-            if ((null === $currentDefault || !isset($updatedTypes[$currentDefault]) || 'default' === $currentDefault) && [] !== $updatedTypes) {
-                $firstTypeKey = (string) \array_key_first($updatedTypes);
-                $blocksProperty->setDefaultType($firstTypeKey);
-            }
-        }
-
-        if (!$isGlobalBlockRoot) {
-            if (null !== $this->schemaMetadataProvider) {
-                $rootForm->setSchema($this->schemaMetadataProvider->getMetadata($rootForm->getItems()));
-            }
-
-            $rootSchema = $rootForm->getSchema();
-            foreach ($blockForms as $typeKey => $blockForm) {
-                if ('default' !== $typeKey && '' !== $typeKey && $rootKey !== $typeKey) {
-                    $rootSchema->addDefinition($typeKey, $blockForm->getSchema());
-                }
-            }
-        }
     }
 
     /**
