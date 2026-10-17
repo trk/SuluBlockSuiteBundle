@@ -6,6 +6,7 @@ namespace Totoglu\SuluBlockSuiteBundle\Transformer;
 
 use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Snippet\Domain\Model\SnippetInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Contracts\Service\ResetInterface;
 use Totoglu\SuluBlockSuiteBundle\Layout\PageLayoutProviderInterface;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
@@ -13,7 +14,7 @@ use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 /**
  * Expands `reusable` blocks into their inner block list at the start of the collection pipeline
  * so merged page and reusable blocks undergo dynamic content hydration, attribute normalization,
- * and auto-section grouping uniformly without producing nested `<section>` wrappers.
+ * and auto-grouping uniformly without producing nested layout wrappers.
  *
  * Priority: 110 (Runs before DynamicContentTransformer at 100).
  */
@@ -28,10 +29,25 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
      */
     private array $activeSnippets = [];
 
+    /**
+     * @var list<NestedBlockFlattenerInterface>
+     */
+    private readonly array $flatteners;
+
+    /**
+     * @param iterable<NestedBlockFlattenerInterface> $flatteners
+     */
     public function __construct(
         private readonly ?PageLayoutProviderInterface $layoutProvider = null,
         private readonly ?ReferenceStoreInterface $referenceStore = null,
+        #[AutowireIterator('sulu_block_suite.nested_block_flattener')]
+        iterable $flatteners = [],
     ) {
+        $list = [];
+        foreach ($flatteners as $flattener) {
+            $list[] = $flattener;
+        }
+        $this->flatteners = $list;
     }
 
     public static function getDefaultPriority(): int
@@ -47,11 +63,25 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
 
     public function supports(array $block, array $context): bool
     {
-        return 'reusable' === ($block['type'] ?? null) && !empty($context['_in_collection']);
+        if (empty($context['_in_collection'])) {
+            return false;
+        }
+
+        if ('reusable' === ($block['type'] ?? null)) {
+            return true;
+        }
+
+        return $this->hasNestedReusable($block);
     }
 
     public function transform(array $block, array $context): array
     {
+        $locale = $this->extractLocale($context);
+
+        if ('reusable' !== ($block['type'] ?? null)) {
+            return $this->expandNestedReusablesInContainer($block, $locale, 0);
+        }
+
         $props = SuluDataNormalizer::extractProps($block);
         $status = $props['status'] ?? ($block['status'] ?? null);
         if ('disabled' === $status) {
@@ -61,10 +91,9 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
         }
 
         $groupId = 'reusable_' . (++$this->groupSequence);
-        $isInColumn = !empty($context['_in_column']) || isset($context['_slot']);
-        $locale = $this->extractLocale($context);
+        $isNested = !empty($context['_in_column']) || isset($context['_slot']);
 
-        $expanded = $this->expandReusableBlock($block, $locale, $groupId, $isInColumn, 0);
+        $expanded = $this->expandReusableBlock($block, $locale, $groupId, $isNested, 0);
         if ([] === $expanded) {
             $block['_hidden'] = true;
 
@@ -85,7 +114,7 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
         array $block,
         ?string $locale,
         string $groupId,
-        bool $isInColumn,
+        bool $isNested,
         int $depth,
     ): array {
         if ($depth >= self::MAX_EXPANSION_DEPTH) {
@@ -127,20 +156,25 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
 
                 if ('reusable' === $innerType) {
                     $nestedGroupId = 'reusable_' . (++$this->groupSequence);
-                    foreach ($this->expandReusableBlock($normalized, $locale, $nestedGroupId, $isInColumn, $depth + 1) as $nestedItem) {
+                    foreach ($this->expandReusableBlock($normalized, $locale, $nestedGroupId, $isNested, $depth + 1) as $nestedItem) {
                         $result[] = $nestedItem;
                     }
 
                     continue;
                 }
 
-                if ($isInColumn && 'section' === $innerType) {
-                    foreach ($this->unwrapSectionBlocks($normalized, $locale, $groupId, $depth) as $leafBlock) {
-                        $leafBlock['_section_group'] ??= $groupId;
-                        $result[] = $leafBlock;
-                    }
+                if ($isNested) {
+                    $flattener = $this->findFlattener($normalized);
+                    if (null !== $flattener) {
+                        foreach ($this->flattenBlock($flattener, $normalized, $locale, $groupId, $depth) as $leafBlock) {
+                            $leafBlock['_section_group'] ??= $groupId;
+                            $result[] = $leafBlock;
+                        }
 
-                    continue;
+                        continue;
+                    }
+                } elseif ($this->hasNestedReusable($normalized)) {
+                    $normalized = $this->expandNestedReusablesInContainer($normalized, $locale, $depth + 1);
                 }
 
                 $normalized['_section_group'] ??= $groupId;
@@ -153,6 +187,175 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
                 unset($this->activeSnippets[$snippetId]);
             }
         }
+    }
+
+    /**
+     * @param array<string, mixed> $block
+     */
+    private function findFlattener(array $block): ?NestedBlockFlattenerInterface
+    {
+        foreach ($this->flatteners as $flattener) {
+            if ($flattener->supports($block)) {
+                return $flattener;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $block
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function flattenBlock(
+        NestedBlockFlattenerInterface $flattener,
+        array $block,
+        ?string $locale,
+        string $groupId,
+        int $depth,
+    ): array {
+        if ($depth >= self::MAX_EXPANSION_DEPTH) {
+            return [];
+        }
+
+        return $flattener->flatten(
+            $block,
+            function (array $child) use ($locale, $groupId, $depth): array {
+                $normalizedChild = $this->normalizeBlock($child);
+                if (null === $normalizedChild) {
+                    return [];
+                }
+
+                $childType = isset($normalizedChild['type']) && \is_scalar($normalizedChild['type'])
+                    ? (string) $normalizedChild['type']
+                    : '';
+
+                if ('reusable' === $childType) {
+                    $nestedGroupId = 'reusable_' . (++$this->groupSequence);
+
+                    return $this->expandReusableBlock($normalizedChild, $locale, $nestedGroupId, true, $depth + 1);
+                }
+
+                $nestedFlattener = $this->findFlattener($normalizedChild);
+                if (null !== $nestedFlattener) {
+                    $flattened = [];
+                    foreach ($this->flattenBlock($nestedFlattener, $normalizedChild, $locale, $groupId, $depth + 1) as $leafBlock) {
+                        $leafBlock['_section_group'] ??= $groupId;
+                        $flattened[] = $leafBlock;
+                    }
+
+                    return $flattened;
+                }
+
+                if ($this->hasNestedReusable($normalizedChild)) {
+                    $normalizedChild = $this->expandNestedReusablesInContainer($normalizedChild, $locale, $depth + 1);
+                }
+
+                $normalizedChild['_section_group'] ??= $groupId;
+
+                return [$normalizedChild];
+            },
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $block
+     */
+    private function hasNestedReusable(array $block): bool
+    {
+        foreach ($block as $key => $value) {
+            if (\str_starts_with($key, '_')) {
+                continue;
+            }
+            if (\is_array($value) && $this->arrayContainsReusable($value)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
+    private function arrayContainsReusable(array $data): bool
+    {
+        if ('reusable' === ($data['type'] ?? null)) {
+            return true;
+        }
+
+        foreach ($data as $key => $value) {
+            if (\is_string($key) && \str_starts_with($key, '_')) {
+                continue;
+            }
+            $normalized = \is_object($value) ? $this->normalizeBlock($value) : (\is_array($value) ? $value : null);
+            if (\is_array($normalized) && $this->arrayContainsReusable($normalized)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string, mixed> $container
+     *
+     * @return array<string, mixed>
+     */
+    private function expandNestedReusablesInContainer(array $container, ?string $locale, int $depth): array
+    {
+        if ($depth >= self::MAX_EXPANSION_DEPTH) {
+            return $container;
+        }
+
+        foreach ($container as $key => $value) {
+            if (\str_starts_with($key, '_') || !\is_array($value)) {
+                continue;
+            }
+
+            if (\array_is_list($value)) {
+                $expandedList = [];
+                foreach ($value as $item) {
+                    $normalizedItem = $this->normalizeBlock($item);
+                    if (null === $normalizedItem) {
+                        $expandedList[] = $item;
+
+                        continue;
+                    }
+
+                    $itemType = isset($normalizedItem['type']) && \is_scalar($normalizedItem['type'])
+                        ? (string) $normalizedItem['type']
+                        : '';
+
+                    if ('reusable' === $itemType) {
+                        $nestedGroupId = 'reusable_' . (++$this->groupSequence);
+                        foreach ($this->expandReusableBlock($normalizedItem, $locale, $nestedGroupId, true, $depth) as $nestedItem) {
+                            $expandedList[] = $nestedItem;
+                        }
+
+                        continue;
+                    }
+
+                    if ($this->hasNestedReusable($normalizedItem)) {
+                        $normalizedItem = $this->expandNestedReusablesInContainer($normalizedItem, $locale, $depth);
+                    }
+
+                    $expandedList[] = $normalizedItem;
+                }
+
+                $container[$key] = $expandedList;
+
+                continue;
+            }
+
+            /** @var array<string, mixed> $value */
+            if ($this->hasNestedReusable($value)) {
+                $container[$key] = $this->expandNestedReusablesInContainer($value, $locale, $depth);
+            }
+        }
+
+        return $container;
     }
 
     /**
@@ -240,84 +443,6 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
         }
 
         return null;
-    }
-
-    /**
-     * Unwraps a `section > rows > columns > blocks` hierarchy into flat leaf blocks when a reusable block
-     * is placed inside an already active column, preventing nested `<section>` elements.
-     *
-     * @param array<string, mixed> $sectionBlock
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function unwrapSectionBlocks(
-        array $sectionBlock,
-        ?string $locale = null,
-        string $groupId = '',
-        int $depth = 0,
-    ): array {
-        if ($depth >= self::MAX_EXPANSION_DEPTH) {
-            return [];
-        }
-
-        $rows = $sectionBlock['rows'] ?? null;
-        if (!\is_iterable($rows)) {
-            return [];
-        }
-
-        /** @var list<array<string, mixed>> $leafBlocks */
-        $leafBlocks = [];
-        foreach ($rows as $row) {
-            $normalizedRow = $this->normalizeBlock($row);
-            if (null === $normalizedRow) {
-                continue;
-            }
-            $columns = $normalizedRow['columns'] ?? null;
-            if (!\is_iterable($columns)) {
-                continue;
-            }
-            foreach ($columns as $column) {
-                $normalizedCol = $this->normalizeBlock($column);
-                if (null === $normalizedCol) {
-                    continue;
-                }
-                $blocks = $normalizedCol['blocks'] ?? null;
-                if (!\is_iterable($blocks)) {
-                    continue;
-                }
-                foreach ($blocks as $leaf) {
-                    $normalizedLeaf = $this->normalizeBlock($leaf);
-                    if (null === $normalizedLeaf) {
-                        continue;
-                    }
-
-                    $leafType = isset($normalizedLeaf['type']) && \is_scalar($normalizedLeaf['type'])
-                        ? (string) $normalizedLeaf['type']
-                        : '';
-
-                    if ('reusable' === $leafType) {
-                        $nestedGroupId = 'reusable_' . (++$this->groupSequence);
-                        foreach ($this->expandReusableBlock($normalizedLeaf, $locale, $nestedGroupId, true, $depth + 1) as $nestedItem) {
-                            $leafBlocks[] = $nestedItem;
-                        }
-
-                        continue;
-                    }
-
-                    if ('section' === $leafType) {
-                        foreach ($this->unwrapSectionBlocks($normalizedLeaf, $locale, $groupId, $depth + 1) as $nestedLeaf) {
-                            $leafBlocks[] = $nestedLeaf;
-                        }
-
-                        continue;
-                    }
-
-                    $leafBlocks[] = $normalizedLeaf;
-                }
-            }
-        }
-
-        return $leafBlocks;
     }
 
     /**

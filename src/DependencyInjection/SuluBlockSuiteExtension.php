@@ -12,6 +12,7 @@ use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformerInterface;
+use Totoglu\SuluBlockSuiteBundle\Transformer\NestedBlockFlattenerInterface;
 
 final class SuluBlockSuiteExtension extends Extension implements PrependExtensionInterface
 {
@@ -55,6 +56,9 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
     {
         $container->registerForAutoconfiguration(BlockTransformerInterface::class)
             ->addTag('sulu_block_suite.block_transformer');
+
+        $container->registerForAutoconfiguration(NestedBlockFlattenerInterface::class)
+            ->addTag('sulu_block_suite.nested_block_flattener');
 
         $container->registerForAutoconfiguration(DynamicContentSourceProviderInterface::class)
             ->addTag('sulu_block_suite.dynamic_source_provider');

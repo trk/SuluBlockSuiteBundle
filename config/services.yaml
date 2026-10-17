@@ -199,6 +199,7 @@ services:
         arguments:
             $layoutProvider: '@?Totoglu\SuluBlockSuiteBundle\Layout\PageLayoutProviderInterface'
             $referenceStore: '@?sulu_http_cache.reference_store'
+            $flatteners: !tagged_iterator sulu_block_suite.nested_block_flattener
         tags:
             - 'sulu_block_suite.block_transformer'
             - { name: 'kernel.reset', method: 'reset' }
