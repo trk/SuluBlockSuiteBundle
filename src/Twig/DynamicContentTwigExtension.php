@@ -52,8 +52,7 @@ final class DynamicContentTwigExtension extends AbstractExtension
      */
     public function hydrateBlocks(iterable $blocks, array|object|null $context = null): array
     {
-        /** @var array<string, mixed> $normalizedContext */
-        $normalizedContext = \is_array($context) ? $context : (\is_object($context) ? (array) $context : []);
+        $normalizedContext = $this->normalizeContext($context);
 
         /** @var list<array<string, mixed>> $rawBlocks */
         $rawBlocks = [];
@@ -97,8 +96,7 @@ final class DynamicContentTwigExtension extends AbstractExtension
             return $block;
         }
 
-        /** @var array<string, mixed> $normalizedContext */
-        $normalizedContext = \is_array($context) ? $context : (\is_object($context) ? (array) $context : []);
+        $normalizedContext = $this->normalizeContext($context);
 
         $sourceCount = 0;
         $visibleCount = 0;
@@ -172,8 +170,7 @@ final class DynamicContentTwigExtension extends AbstractExtension
             return null;
         }
 
-        /** @var array<string, mixed> $normalizedContext */
-        $normalizedContext = \is_array($context) ? $context : (\is_object($context) ? (array) $context : []);
+        $normalizedContext = $this->normalizeContext($context);
 
         $processed = $this->pipeline->process($normalizedBlock, $normalizedContext);
 
@@ -198,8 +195,7 @@ final class DynamicContentTwigExtension extends AbstractExtension
             return '';
         }
 
-        /** @var array<string, mixed> $normalizedContext */
-        $normalizedContext = \is_array($context) ? $context : (\is_object($context) ? (array) $context : []);
+        $normalizedContext = $this->normalizeContext($context);
 
         return $this->blockRenderer->renderBlock($normalizedBlock, $normalizedContext);
     }
@@ -214,10 +210,37 @@ final class DynamicContentTwigExtension extends AbstractExtension
             return '';
         }
 
-        /** @var array<string, mixed> $normalizedContext */
-        $normalizedContext = \is_array($context) ? $context : (\is_object($context) ? (array) $context : []);
+        $normalizedContext = $this->normalizeContext($context);
 
         return $this->blockRenderer->renderBlocks($blocks, $normalizedContext);
+    }
+
+    /**
+     * @param array<string, mixed>|object|null $context
+     *
+     * @return array<string, mixed>
+     */
+    private function normalizeContext(array|object|null $context): array
+    {
+        if (\is_array($context)) {
+            return $context;
+        }
+
+        if ($context instanceof \stdClass) {
+            /** @var array<string, mixed> $cast */
+            $cast = (array) $context;
+
+            return $cast;
+        }
+
+        if ($context instanceof \Traversable) {
+            /** @var array<string, mixed> $iterated */
+            $iterated = \iterator_to_array($context);
+
+            return $iterated;
+        }
+
+        return [];
     }
 
     /**

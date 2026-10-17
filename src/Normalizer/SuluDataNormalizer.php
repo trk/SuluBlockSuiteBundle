@@ -34,8 +34,12 @@ final class SuluDataNormalizer
             } elseif (\method_exists($props, 'toArray')) {
                 /** @var mixed $props */
                 $props = $props->toArray();
-            } else {
+            } elseif ($props instanceof \stdClass) {
                 $props = (array) $props;
+            } elseif ($props instanceof \Traversable) {
+                $props = \iterator_to_array($props);
+            } else {
+                return [];
             }
         } elseif (\is_string($props) && '' !== \trim($props)) {
             $decoded = \json_decode($props, true);

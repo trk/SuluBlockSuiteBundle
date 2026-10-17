@@ -1,6 +1,6 @@
 {
     "name": "trk/sulu-block-suite-bundle",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "Component block props, visual presets, reusable global blocks, and template layout engine for Sulu CMS",
     "type": "symfony-bundle",
     "license": "MIT",

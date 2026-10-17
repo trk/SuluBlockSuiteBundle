@@ -153,7 +153,7 @@ export default class HotspotPicker extends React.Component<Props> {
         this.lastResolvedMediaId = id;
 
         const locale = this.currentLocale;
-        Requester.get(`/admin/api/media/${id}?locale=${locale}`)
+        Requester.get(`/admin/api/media/${encodeURIComponent(String(id))}?locale=${encodeURIComponent(locale)}`)
             .then(action((response) => {
                 this.imageLoading = false;
                 if (!response) {

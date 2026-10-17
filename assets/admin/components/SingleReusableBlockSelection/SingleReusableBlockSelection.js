@@ -88,7 +88,7 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
 
     loadSelectedSnippet = (id: string) => {
         this.lastLoadedId = id;
-        Requester.get(`/admin/api/reusable-blocks/${id}?locale=${this.currentLocale}`)
+        Requester.get(`/admin/api/reusable-blocks/${encodeURIComponent(id)}?locale=${encodeURIComponent(this.currentLocale)}`)
             .then(action((data) => {
                 if (data && !data.error) {
                     this.selectedSnippet = data;
@@ -103,7 +103,7 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
     };
 
     loadUsage = (id: string) => {
-        Requester.get(`/admin/api/reusable-blocks/${id}/usage`)
+        Requester.get(`/admin/api/reusable-blocks/${encodeURIComponent(id)}/usage`)
             .then(action((data) => {
                 if (data && !data.error) {
                     this.usageData = data;
@@ -120,7 +120,7 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
         action(() => {
             this.blocksLoading = true;
         })();
-        Requester.get(`/admin/api/snippets?templateKeys=reusable_block&locale=${this.currentLocale}&limit=100`)
+        Requester.get(`/admin/api/snippets?templateKeys=reusable_block&locale=${encodeURIComponent(this.currentLocale)}&limit=100`)
             .then(action((data) => {
                 const items = (data && data._embedded && data._embedded.snippets) || (data && data.snippets) || [];
                 this.availableBlocks = items;

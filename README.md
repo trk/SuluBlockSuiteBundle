@@ -153,17 +153,17 @@ sulu_block_suite:
 
 ## Core Data Contract
 
-When a block passes through `BlockTransformPipeline` (specifically `DefaultAttributesTransformer` at priority `50`, after `ReusableBlockTransformer` at `110` and `DynamicContentTransformer` at `100`), Core enriches the normalized block array with a deterministic, framework-agnostic contract:
+When a block passes through `BlockTransformPipeline` (specifically `DefaultAttributesTransformer` at priority `90`, after `ReusableBlockTransformer` at `110` and `DynamicContentTransformer` at `100`), Core enriches the normalized block array with a deterministic, framework-agnostic contract:
 
 | Key | Type | Source & Behavior |
 | --- | --- | --- |
 | `_id` | `string` | Explicit `props.id` sanitized via `AttributeSanitizer::sanitizeId()`, or an auto-generated deterministic `el-<8-hex>` ID when `props.css` contains `.el-element` rules (or bare CSS declarations). |
 | `_class` | `string` | Trimmed custom CSS class string from `props.class` / `props.custom_class`. |
-| `_attributes` | `array<string, string>` | Parsed `key="value"` pairs from `props.attributes`, sanitized by `AttributeSanitizer::parseAndSanitize()` (blocks `on*` inline event handlers, `style`, `id`, `class`, and `javascript:`/`vbscript:`/`data:` URIs). |
+| `_attributes` | `array<string, string>` | Parsed `key="value"` pairs from `props.attributes`, sanitized by `AttributeSanitizer::parse()` / `AttributeSanitizer::sanitize()` (blocks `on*` inline event handlers, `style`, `id`, `class`, and `javascript:`/`vbscript:`/`data:` URIs). |
 | `_scoped_css` | `string` | Sanitized CSS from `props.css` processed by `CssScoper::scope()`, rewriting `.el-element` (or wrapping bare declarations) to `#<_id>` and stripping `<script>`/`<style>` tags, `expression()`, `@import`, and `javascript:` URLs. `BlockRenderer` automatically prepends `<style>...</style>` when non-empty. |
 | `<field>_url` | `string` | Automatically derived for every **media-type** (`single_media_selection`, `media_selection`) and **link-type** (`link`) field in the block's Sulu form metadata (e.g. `image` → `image_url`, `hover_image` → `hover_image_url`, `link` → `link_url`, `card_link` → `card_link_url`). |
 | `<field>_srcset` | `string` | Automatically derived responsive `srcset` string for every **media-type** field using the configured `sulu_block_suite.media.srcset_formats` map (e.g. `image_srcset`, `hover_image_srcset`). |
-| `<field>_focus_style` | `string` | Automatically derived CSS `object-position: X% Y%` focal point string from Sulu media focus point coordinates (`focusPointX`, `focusPointY`) for every **media-type** field (e.g. `image_focus_style`). |
+| `<field>_focus_style` | `string` | Automatically derived CSS `object-position: X% Y%;` focal point string from Sulu media focus point coordinates (`focusPoint: {x, y}` / `focalPoint: {x, y}` or `getFocusPoint()->getX()` / `getY()`) for every **media-type** field (e.g. `image_focus_style`). |
 
 ---
 
@@ -189,7 +189,7 @@ When a block passes through `BlockTransformPipeline` (specifically `DefaultAttri
 6. **`sulu_block_suite.tabs` XML Tag**:
    - Place `<tag name="sulu_block_suite.tabs" .../>` on a block `<template>` or `<type>` in XML:
      - `exclude="dynamic_content,advanced"`: Opt out of specific Core-injected tabs (`dynamic_content` and/or `advanced`).
-     - `enabled="false"`: Disable tab wrapping entirely for a block type.
+     - `enabled="false"`: Disable tab wrapping entirely for a block type (e.g. `reusable.xml`).
      - `shared="false"`: Wrap the block's own `<section>` elements into tabs without injecting Core's shared `dynamic_content` and `advanced` tabs.
      - `namespace_props="false"`: Keep fields in non-`content` sections at the root level instead of prefixing them with `props/` (used for structural sub-items like `row_item` or `column_item`).
 
@@ -392,7 +392,7 @@ Blocks can dynamically pull single items or collections from Sulu CMS sources wi
 
 ### 5. Reusable Global Blocks, Page Layouts & Fallback Chains (`|`)
 
-- **`ReusableBlockTransformer`**: Expands `reusable` blocks at priority `110` (before `DynamicContentTransformer` at `100` and `DefaultAttributesTransformer` at `50`) so expanded blocks undergo dynamic content hydration and attribute normalization uniformly. When a `reusable` block is expanded inside a nested slot/column, registered `NestedBlockFlattenerInterface` services unwrap container blocks into leaf blocks.
+- **`ReusableBlockTransformer`**: Expands `reusable` blocks at priority `110` (before `DynamicContentTransformer` at `100` and `DefaultAttributesTransformer` at `90`) so expanded blocks undergo dynamic content hydration and attribute normalization uniformly. When a `reusable` block is expanded inside a nested slot/column, registered `NestedBlockFlattenerInterface` services unwrap container blocks into leaf blocks.
 - **HTTP Cache Reference Tracking & Invalidation**: When a `reusable_block` or `page_layout` snippet is resolved or expanded, `SingleReusableBlockSelectionPropertyResolver`, `ReusableBlockTransformer`, and `PageLayoutProvider` register the snippet UUID in Sulu's `ReferenceStoreInterface` (`snippets`). `ReusableBlockCacheInvalidationSubscriber` listens to snippet modification, workflow transition, and removal events to invalidate Sulu HTTP cache tags and references.
 - **Pipe-Separated Layout Fallback Chains**: `layout_render()` and `layout_load()` support `|`-delimited fallback chains (e.g. `homepage|default`, `article|default`, `search|default`, `error|default`):
   ```twig
@@ -410,11 +410,11 @@ Complete admin translations (`sulu_block_suite.*`) are bundled for **6 languages
 ## Verification & Quality Assurance
 
 ```bash
-# Run PHPUnit 12 test suite (including Architecture/FrameworkAgnosticTest)
-../../vendor/bin/phpunit packages/sulu-block-suite-bundle/tests
+# Run PHPUnit 12 test suite from project root (including Architecture/FrameworkAgnosticTest)
+vendor/bin/phpunit packages/sulu-block-suite-bundle/tests
 
-# Run PHPStan static analysis at level max (from project root)
-../../vendor/bin/phpstan analyse --debug --memory-limit=1G packages/sulu-block-suite-bundle/src packages/sulu-block-suite-bundle/tests
+# Run PHPStan static analysis at level max from project root
+vendor/bin/phpstan analyse --debug --memory-limit=1G packages/sulu-block-suite-bundle/src packages/sulu-block-suite-bundle/tests
 ```
 
 ---

@@ -44,7 +44,7 @@ class ReusableBlockStore {
             return this.loadingPromises.get(key);
         }
 
-        const promise = Requester.get(`/admin/api/reusable-blocks/${id}?locale=${loc}`)
+        const promise = Requester.get(`/admin/api/reusable-blocks/${encodeURIComponent(id)}?locale=${encodeURIComponent(loc)}`)
             .then((data) => runInAction(() => {
                 this.loadingPromises.delete(key);
                 if (data && !data.error) {

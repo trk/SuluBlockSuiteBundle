@@ -202,7 +202,7 @@ export default class PresetSelection extends React.Component<Props> {
 
         this.presetsLoading = true;
 
-        const url = `/admin/api/block-presets/${type}?locale=${locale}`;
+        const url = `/admin/api/block-presets/${encodeURIComponent(type)}?locale=${encodeURIComponent(locale)}`;
         const fetchPromise = Requester.get(url)
             .then((data) => {
                 const list = (data && Array.isArray(data.presets)) ? data.presets : [];
