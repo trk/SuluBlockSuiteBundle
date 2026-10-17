@@ -47,7 +47,7 @@ final class ExportBlockPresetsCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('block-type', 'b', InputOption::VALUE_OPTIONAL, 'Filter export to a single block type (e.g. card, headline)')
+            ->addOption('block-type', 'b', InputOption::VALUE_OPTIONAL, 'Filter export to a single block type')
             ->addOption('locale', 'l', InputOption::VALUE_OPTIONAL, 'Snippet locale to export from', 'en')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Preview exported YAML without writing files');
     }
