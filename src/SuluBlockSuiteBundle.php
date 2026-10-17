@@ -14,6 +14,7 @@ final class SuluBlockSuiteBundle extends Bundle
         parent::boot();
 
         if (null !== $this->container) {
+            /** @var array<string, int> $formats */
             $formats = $this->container->getParameter('sulu_block_suite.media.srcset_formats');
             SuluDataNormalizer::setDefaultSrcSetFormats($formats);
         }

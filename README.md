@@ -1,7 +1,7 @@
 # Sulu Block Suite Bundle
 
-[![Latest Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/trk/SuluBlockSuiteBundle)
-[![PHP Version](https://img.shields.io/badge/PHP-%3E%3D%208.2%20%7C%208.5-8892BF.svg)](https://php.net)
+[![Latest Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/trk/SuluBlockSuiteBundle)
+[![PHP Version](https://img.shields.io/badge/PHP-%3E%3D%208.3%20%7C%208.5-8892BF.svg)](https://php.net)
 [![Sulu CMS](https://img.shields.io/badge/Sulu%20CMS-%5E3.0-orange.svg)](https://sulu.io)
 [![Symfony](https://img.shields.io/badge/Symfony-%5E7.4-black.svg)](https://symfony.com)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen.svg)](https://phpstan.org)
@@ -54,7 +54,7 @@ A **100% UI-framework-agnostic block infrastructure engine** for **Sulu CMS 3.x*
 
 ## Requirements
 
-- **PHP**: `^8.2` or `^8.5` (strictly typed PHP 8.5 supported)
+- **PHP**: `>= 8.3` (strictly typed PHP 8.5 supported)
 - **Sulu CMS**: `~3.0.10`
 - **Symfony**: `^7.4`
 - **Doctrine ORM**: `^3.0`
