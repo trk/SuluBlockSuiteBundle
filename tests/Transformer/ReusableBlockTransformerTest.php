@@ -292,6 +292,85 @@ final class ReusableBlockTransformerTest extends TestCase
         self::assertSame('reusable_1', $slotBlocks[1]['_section_group'] ?? null);
     }
 
+    public function testContainerWithCircularDomainObjectsDoesNotRecurseInfinitelyOrMutateObjects(): void
+    {
+        $entity = new class {
+            public ?object $media = null;
+        };
+        $mediaObject = new class($entity) {
+            public function __construct(private readonly object $entity)
+            {
+            }
+
+            public function getEntity(): object
+            {
+                return $this->entity;
+            }
+
+            public function getUrl(): string
+            {
+                return '/uploads/media/hero.jpg';
+            }
+        };
+        $entity->media = $mediaObject;
+
+        $pipeline = new BlockTransformPipeline([
+            new ReusableBlockTransformer(null, null, [$this->createFixtureFlattener()]),
+            new DefaultAttributesTransformer(),
+        ]);
+
+        $processed = $pipeline->processCollection([
+            [
+                'type' => 'fixture_container',
+                'background_image' => $mediaObject,
+                'gallery_images' => [$mediaObject],
+                'slots' => [
+                    [
+                        'slot_media' => $mediaObject,
+                        'blocks' => [
+                            [
+                                'type' => 'image',
+                                'image' => $mediaObject,
+                                'images' => [$mediaObject],
+                            ],
+                            [
+                                'type' => 'reusable',
+                                'snippet' => [
+                                    'uuid' => 'media-reusable-uuid',
+                                    'blocks' => [
+                                        [
+                                            'type' => 'headline',
+                                            'title' => 'With Media Sibling',
+                                            'icon_media' => $mediaObject,
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        self::assertCount(1, $processed);
+        self::assertSame($mediaObject, $processed[0]['background_image']);
+        self::assertIsArray($processed[0]['gallery_images']);
+        self::assertSame($mediaObject, $processed[0]['gallery_images'][0]);
+        self::assertIsArray($processed[0]['slots']);
+        self::assertIsArray($processed[0]['slots'][0]);
+        self::assertSame($mediaObject, $processed[0]['slots'][0]['slot_media']);
+        $slotBlocks = $processed[0]['slots'][0]['blocks'] ?? null;
+        self::assertIsArray($slotBlocks);
+        self::assertCount(2, $slotBlocks);
+        self::assertIsArray($slotBlocks[0]);
+        self::assertSame($mediaObject, $slotBlocks[0]['image']);
+        self::assertIsArray($slotBlocks[0]['images']);
+        self::assertSame($mediaObject, $slotBlocks[0]['images'][0]);
+        self::assertIsArray($slotBlocks[1]);
+        self::assertSame('headline', $slotBlocks[1]['type'] ?? null);
+        self::assertSame($mediaObject, $slotBlocks[1]['icon_media'] ?? null);
+    }
+
     private function createFixtureFlattener(): NestedBlockFlattenerInterface
     {
         return new class implements NestedBlockFlattenerInterface {

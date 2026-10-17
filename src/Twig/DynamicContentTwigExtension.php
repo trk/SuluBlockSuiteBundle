@@ -236,8 +236,10 @@ final class DynamicContentTwigExtension extends AbstractExtension
             } elseif (\method_exists($block, 'toArray')) {
                 /** @var mixed $block */
                 $block = $block->toArray();
-            } else {
+            } elseif ($block instanceof \stdClass) {
                 $block = (array) $block;
+            } else {
+                return null;
             }
         }
 

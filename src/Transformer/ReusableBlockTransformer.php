@@ -262,13 +262,17 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
     /**
      * @param array<string, mixed> $block
      */
-    private function hasNestedReusable(array $block): bool
+    private function hasNestedReusable(array $block, int $depth = 0): bool
     {
+        if ($depth >= self::MAX_EXPANSION_DEPTH) {
+            return false;
+        }
+
         foreach ($block as $key => $value) {
             if (\str_starts_with($key, '_')) {
                 continue;
             }
-            if (\is_array($value) && $this->arrayContainsReusable($value)) {
+            if (\is_array($value) && $this->arrayContainsReusable($value, $depth + 1)) {
                 return true;
             }
         }
@@ -279,8 +283,12 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
     /**
      * @param array<mixed> $data
      */
-    private function arrayContainsReusable(array $data): bool
+    private function arrayContainsReusable(array $data, int $depth = 0): bool
     {
+        if ($depth >= self::MAX_EXPANSION_DEPTH) {
+            return false;
+        }
+
         if ('reusable' === ($data['type'] ?? null)) {
             return true;
         }
@@ -290,7 +298,7 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
                 continue;
             }
             $normalized = \is_object($value) ? $this->normalizeBlock($value) : (\is_array($value) ? $value : null);
-            if (\is_array($normalized) && $this->arrayContainsReusable($normalized)) {
+            if (\is_array($normalized) && $this->arrayContainsReusable($normalized, $depth + 1)) {
                 return true;
             }
         }
@@ -315,6 +323,10 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
             }
 
             if (\array_is_list($value)) {
+                if (!$this->arrayContainsReusable($value, $depth + 1)) {
+                    continue;
+                }
+
                 $expandedList = [];
                 foreach ($value as $item) {
                     $normalizedItem = $this->normalizeBlock($item);
@@ -337,8 +349,8 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
                         continue;
                     }
 
-                    if ($this->hasNestedReusable($normalizedItem)) {
-                        $normalizedItem = $this->expandNestedReusablesInContainer($normalizedItem, $locale, $depth);
+                    if ($this->hasNestedReusable($normalizedItem, $depth + 1)) {
+                        $normalizedItem = $this->expandNestedReusablesInContainer($normalizedItem, $locale, $depth + 1);
                     }
 
                     $expandedList[] = $normalizedItem;
@@ -350,8 +362,8 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
             }
 
             /** @var array<string, mixed> $value */
-            if ($this->hasNestedReusable($value)) {
-                $container[$key] = $this->expandNestedReusablesInContainer($value, $locale, $depth);
+            if ($this->hasNestedReusable($value, $depth + 1)) {
+                $container[$key] = $this->expandNestedReusablesInContainer($value, $locale, $depth + 1);
             }
         }
 
@@ -483,8 +495,10 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
             } elseif (\method_exists($block, 'toArray')) {
                 /** @var mixed $block */
                 $block = $block->toArray();
-            } else {
+            } elseif ($block instanceof \stdClass) {
                 $block = (array) $block;
+            } else {
+                return null;
             }
         }
 

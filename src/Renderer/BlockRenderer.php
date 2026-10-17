@@ -357,8 +357,10 @@ final class BlockRenderer implements ResetInterface
             } elseif (\method_exists($block, 'toArray')) {
                 /** @var mixed $block */
                 $block = $block->toArray();
-            } else {
+            } elseif ($block instanceof \stdClass) {
                 $block = (array) $block;
+            } else {
+                return null;
             }
         }
 
