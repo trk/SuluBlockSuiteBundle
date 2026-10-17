@@ -89,6 +89,17 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $settingsSection->addItem($tagField);
         $headlineForm->addItem($settingsSection);
 
+        $generalSection = new SectionMetadata('general');
+        $generalSection->setLabel('General', 'en');
+        $positionField = new FieldMetadata('position');
+        $positionField->setType('single_select');
+        $generalSection->addItem($positionField);
+        $positionLeftField = new FieldMetadata('position_left');
+        $positionLeftField->setType('text_line');
+        $positionLeftField->setVisibleCondition('position == "relative" || position == "absolute"');
+        $generalSection->addItem($positionLeftField);
+        $headlineForm->addItem($generalSection);
+
         $typedForm = new TypedFormMetadata();
         $typedForm->addForm('headline', $headlineForm);
 
@@ -99,14 +110,10 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
 
         $tabsSection = $items['__tabs'];
         $this->assertInstanceOf(SectionMetadata::class, $tabsSection);
-        $this->assertSame('__tabs', $tabsSection->getLabel('en'));
+        $this->assertSame(['en' => '__tabs'], $tabsSection->getLabels());
 
         $tabItems = $tabsSection->getItems();
-        $this->assertArrayHasKey('content', $tabItems);
-        $this->assertArrayHasKey('settings', $tabItems);
-        $this->assertArrayHasKey('general', $tabItems);
-        $this->assertArrayHasKey('dynamic_content', $tabItems);
-        $this->assertArrayHasKey('advanced', $tabItems);
+        $this->assertSame(['content', 'settings', 'general', 'dynamic_content', 'advanced'], \array_keys($tabItems));
 
         /** @var SectionMetadata $resolvedContent */
         $resolvedContent = $tabItems['content'];
@@ -120,32 +127,42 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $resolvedGeneral = $tabItems['general'];
         $this->assertArrayHasKey('props/position', $resolvedGeneral->getItems());
         $this->assertArrayHasKey('props/position_left', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/position_right', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/position_top', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/position_bottom', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/position_z_index', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/blend', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/margin_top', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/margin_bottom', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/max_width', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/max_width_breakpoint', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/block_align', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/block_align_breakpoint', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/block_align_fallback', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/text_align', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/text_align_breakpoint', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/text_align_fallback', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/animation', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/parallax', $resolvedGeneral->getItems());
-        $this->assertArrayHasKey('props/visibility', $resolvedGeneral->getItems());
-        $this->assertArrayNotHasKey('props/item_animation', $resolvedGeneral->getItems());
-        $this->assertArrayNotHasKey('props/container_padding_remove', $resolvedGeneral->getItems());
+        /** @var FieldMetadata $resolvedPositionLeft */
+        $resolvedPositionLeft = $resolvedGeneral->getItems()['props/position_left'];
+        $this->assertSame(
+            'position == "relative" || position == "absolute"',
+            $resolvedPositionLeft->getVisibleCondition(),
+        );
 
         /** @var SectionMetadata $resolvedAdvanced */
         $resolvedAdvanced = $tabItems['advanced'];
         $this->assertArrayHasKey('props/preset', $resolvedAdvanced->getItems());
         $this->assertArrayHasKey('props/id', $resolvedAdvanced->getItems());
         $this->assertArrayHasKey('props/class', $resolvedAdvanced->getItems());
+    }
+
+    public function testVisitTypedFormMetadataDoesNotInjectGeneralTabWhenBlockDoesNotDefineOne(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor();
+
+        $reusableForm = new FormMetadata();
+        $reusableForm->setKey('reusable');
+
+        $contentSection = new SectionMetadata('content');
+        $contentSection->setLabel('Content', 'en');
+        $snippetField = new FieldMetadata('snippets');
+        $snippetField->setType('snippet_selection');
+        $contentSection->addItem($snippetField);
+        $reusableForm->addItem($contentSection);
+
+        $typedForm = new TypedFormMetadata();
+        $typedForm->addForm('reusable', $reusableForm);
+
+        $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
+
+        /** @var SectionMetadata $tabsSection */
+        $tabsSection = $reusableForm->getItems()['__tabs'];
+        $this->assertSame(['content', 'dynamic_content', 'advanced'], \array_keys($tabsSection->getItems()));
     }
 
     public function testVisitTypedFormMetadataRespectsTabsExcludeTagAndCustomTabOrder(): void
@@ -157,7 +174,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
 
         $excludeTag = new TagMetadata();
         $excludeTag->setName('sulu_block_suite.tabs');
-        $excludeTag->setAttributes(['exclude' => 'dynamic_content,general']);
+        $excludeTag->setAttributes(['exclude' => 'dynamic_content']);
         $customBlock->addTag($excludeTag);
 
         $contentSection = new SectionMetadata('content');
@@ -250,7 +267,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $blockTagConfigs = [
             'reusable' => ['exclude' => 'dynamic_content'],
             'spacer' => ['exclude' => 'dynamic_content'],
-            'section' => ['exclude' => 'dynamic_content,general'],
+            'section' => ['exclude' => 'dynamic_content'],
             'divider' => ['exclude' => 'dynamic_content'],
             'icon' => ['exclude' => 'dynamic_content'],
             'html' => ['exclude' => 'dynamic_content'],
@@ -284,7 +301,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
 
         $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
 
-        foreach ($blockTagConfigs as $key => $attributes) {
+        foreach (\array_keys($blockTagConfigs) as $key) {
             $blockForm = $typedForm->getForms()[$key];
             /** @var SectionMetadata $tabsSection */
             $tabsSection = $blockForm->getItems()['__tabs'];
@@ -295,140 +312,11 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
                 $tabKeys,
                 \sprintf('Block "%s" must not expose the dynamic_content tab.', $key),
             );
-            if (\str_contains($attributes['exclude'], 'general')) {
-                $this->assertSame(['content', 'advanced'], $tabKeys);
-            } else {
-                $this->assertSame(['content', 'general', 'advanced'], $tabKeys);
-            }
+            $this->assertSame(['content', 'advanced'], $tabKeys);
         }
     }
 
-    public function testYoothemeGeneralTabFieldMatrixPerBlock(): void
-    {
-        $visitor = new BlockSuiteFormMetadataVisitor();
-        $blockTagConfigs = [
-            'code' => [
-                'exclude' => 'dynamic_content',
-                'exclude_fields' => 'max_width,max_width_breakpoint,block_align,block_align_breakpoint,block_align_fallback,text_align,text_align_breakpoint,text_align_fallback',
-            ],
-            'countdown' => [
-                'exclude' => 'dynamic_content',
-                'exclude_fields' => 'max_width,max_width_breakpoint,block_align,block_align_breakpoint,block_align_fallback',
-                'text_align' => 'standard',
-            ],
-            'reusable' => [
-                'exclude' => 'dynamic_content',
-                'exclude_fields' => 'max_width,max_width_breakpoint,block_align,block_align_breakpoint,block_align_fallback,text_align,text_align_breakpoint,text_align_fallback',
-            ],
-            'divider' => [
-                'exclude' => 'dynamic_content',
-                'exclude_fields' => 'text_align,text_align_breakpoint,text_align_fallback',
-            ],
-            'map' => [
-                'exclude' => 'dynamic_content',
-                'exclude_fields' => 'text_align,text_align_breakpoint,text_align_fallback',
-                'include_fields' => 'container_padding_remove',
-            ],
-            'button' => [
-                'text_align' => 'standard',
-            ],
-            'headline' => [],
-            'gallery' => [
-                'include_fields' => 'item_animation,container_padding_remove',
-            ],
-            'grid' => [
-                'include_fields' => 'item_animation,container_padding_remove',
-            ],
-            'video' => [
-                'include_fields' => 'container_padding_remove',
-                'text_align' => 'standard',
-            ],
-        ];
-
-        $typedForm = new TypedFormMetadata();
-        foreach ($blockTagConfigs as $key => $attributes) {
-            $blockForm = new FormMetadata();
-            $blockForm->setKey($key);
-            if ([] !== $attributes) {
-                $tabsTag = new TagMetadata();
-                $tabsTag->setName('sulu_block_suite.tabs');
-                $tabsTag->setAttributes($attributes);
-                $blockForm->addTag($tabsTag);
-            }
-            $contentSection = new SectionMetadata('content');
-            $field = new FieldMetadata('sample');
-            $field->setType('text_line');
-            $contentSection->addItem($field);
-            $blockForm->addItem($contentSection);
-            $typedForm->addForm($key, $blockForm);
-        }
-
-        $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
-
-        $getGeneralItems = static function (string $key) use ($typedForm): array {
-            /** @var SectionMetadata $tabs */
-            $tabs = $typedForm->getForms()[$key]->getItems()['__tabs'];
-            /** @var SectionMetadata $general */
-            $general = $tabs->getItems()['general'];
-
-            return $general->getItems();
-        };
-
-        // 1. max_width & block_align excluded on code, countdown, reusable
-        foreach (['code', 'countdown', 'reusable'] as $noMaxWidthKey) {
-            $items = $getGeneralItems($noMaxWidthKey);
-            $this->assertArrayNotHasKey('props/max_width', $items);
-            $this->assertArrayNotHasKey('props/max_width_breakpoint', $items);
-            $this->assertArrayNotHasKey('props/block_align', $items);
-            $this->assertArrayNotHasKey('props/block_align_breakpoint', $items);
-            $this->assertArrayNotHasKey('props/block_align_fallback', $items);
-        }
-        $this->assertArrayHasKey('props/max_width', $getGeneralItems('button'));
-
-        // 2. text_align excluded on code, divider, reusable, map
-        foreach (['code', 'divider', 'reusable', 'map'] as $noTextAlignKey) {
-            $items = $getGeneralItems($noTextAlignKey);
-            $this->assertArrayNotHasKey('props/text_align', $items);
-            $this->assertArrayNotHasKey('props/text_align_breakpoint', $items);
-            $this->assertArrayNotHasKey('props/text_align_fallback', $items);
-        }
-
-        // 3. button has standard text_align (without justify), headline has text_align_justify (with justify)
-        /** @var FieldMetadata $buttonTextAlign */
-        $buttonTextAlign = $getGeneralItems('button')['props/text_align'];
-        /** @var list<OptionMetadata> $buttonValues */
-        $buttonValues = (array) $buttonTextAlign->findOption('values')?->getValue();
-        $buttonOptionNames = \array_map(
-            static fn (OptionMetadata $opt): string => (string) $opt->getName(),
-            $buttonValues,
-        );
-        $this->assertSame(['', 'left', 'center', 'right'], $buttonOptionNames);
-
-        /** @var FieldMetadata $headlineTextAlign */
-        $headlineTextAlign = $getGeneralItems('headline')['props/text_align'];
-        /** @var list<OptionMetadata> $headlineValues */
-        $headlineValues = (array) $headlineTextAlign->findOption('values')?->getValue();
-        $headlineOptionNames = \array_map(
-            static fn (OptionMetadata $opt): string => (string) $opt->getName(),
-            $headlineValues,
-        );
-        $this->assertSame(['', 'left', 'center', 'right', 'justify'], $headlineOptionNames);
-
-        // 4. item_animation only on gallery and grid
-        $this->assertArrayHasKey('props/item_animation', $getGeneralItems('gallery'));
-        $this->assertArrayHasKey('props/item_animation', $getGeneralItems('grid'));
-        $this->assertArrayNotHasKey('props/item_animation', $getGeneralItems('headline'));
-        $this->assertArrayNotHasKey('props/item_animation', $getGeneralItems('video'));
-
-        // 5. container_padding_remove on gallery, grid, map, video (not on headline or button)
-        $this->assertArrayHasKey('props/container_padding_remove', $getGeneralItems('gallery'));
-        $this->assertArrayHasKey('props/container_padding_remove', $getGeneralItems('map'));
-        $this->assertArrayHasKey('props/container_padding_remove', $getGeneralItems('video'));
-        $this->assertArrayNotHasKey('props/container_padding_remove', $getGeneralItems('headline'));
-        $this->assertArrayNotHasKey('props/container_padding_remove', $getGeneralItems('button'));
-    }
-
-    public function testDynamicMappingFieldMapOptionsAreIsolatedPerBlock(): void
+    public function testDynamicMappingFieldMapOptionsAreIsolatedPerBlockAndSingleLocale(): void
     {
         $visitor = new BlockSuiteFormMetadataVisitor();
 
@@ -483,14 +371,33 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $hlTargetValues = $hlTarget->findOption('values')?->getValue();
         $this->assertIsArray($hlTargetValues);
         $this->assertNotEmpty($hlTargetValues);
+        /** @var OptionMetadata $firstTargetOption */
         $firstTargetOption = $hlTargetValues[0];
-        foreach (['en', 'tr', 'de', 'ru', 'es', 'fr'] as $lang) {
-            $title = $firstTargetOption->getTitle($lang);
-            $this->assertIsString($title);
-            $this->assertNotSame('', $title);
-            $this->assertStringNotContainsString('(title)', $title);
-        }
-        $this->assertSame('Başlık', $firstTargetOption->getTitle('tr'));
+        $this->assertSame(['en' => 'Title'], $firstTargetOption->getTitles());
+
+        $trHeadlineForm = new FormMetadata();
+        $trHeadlineForm->setKey('headline');
+        $trHlContent = new SectionMetadata('content');
+        $trHlTitle = new FieldMetadata('title');
+        $trHlTitle->setType('text_line');
+        $trHlContent->addItem($trHlTitle);
+        $trHeadlineForm->addItem($trHlContent);
+
+        $trTypedForm = new TypedFormMetadata();
+        $trTypedForm->addForm('headline', $trHeadlineForm);
+        $visitor->visitTypedFormMetadata($trTypedForm, 'block', 'tr');
+
+        /** @var SectionMetadata $trTabs */
+        $trTabs = $trHeadlineForm->getItems()['__tabs'];
+        /** @var SectionMetadata $trDyn */
+        $trDyn = $trTabs->getItems()['dynamic_content'];
+        /** @var FieldMetadata $trMapping */
+        $trMapping = $trDyn->getItems()['props/dynamic_mapping'];
+        /** @var FieldMetadata $trTarget */
+        $trTarget = $trMapping->getTypes()['field_map']->getItems()['target_field'];
+        /** @var list<OptionMetadata> $trTargetValues */
+        $trTargetValues = (array) $trTarget->findOption('values')?->getValue();
+        $this->assertSame(['tr' => 'Başlık'], $trTargetValues[0]->getTitles());
     }
 
     public function testBlocksAreSortedAlphabeticallyByTitle(): void
@@ -547,11 +454,11 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $this->assertIsArray($values);
         $this->assertCount(3, $values);
         $this->assertSame('button', $values[0]->getName());
-        $this->assertSame('Button', $values[0]->getTitle('en'));
+        $this->assertSame(['en' => 'Button'], $values[0]->getTitles());
         $this->assertSame('headline', $values[1]->getName());
-        $this->assertSame('Headline', $values[1]->getTitle('en'));
+        $this->assertSame(['en' => 'Headline'], $values[1]->getTitles());
         $this->assertSame('text', $values[2]->getName());
-        $this->assertSame('Text', $values[2]->getTitle('en'));
+        $this->assertSame(['en' => 'Text'], $values[2]->getTitles());
     }
 
     public function testInlineSubTypeInheritsTabsTagWithSharedTabsAndNamespacedProps(): void
@@ -581,7 +488,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $tabsTag->setName('sulu_block_suite.tabs');
         $tabsTag->setAttributes([
             'shared' => 'true',
-            'exclude' => 'dynamic_content,general',
+            'exclude' => 'dynamic_content',
         ]);
         $rowsBlockField->addTag($tabsTag);
         $rowsBlockField->addType($inlineItem);

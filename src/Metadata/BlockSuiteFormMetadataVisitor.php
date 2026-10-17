@@ -48,17 +48,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     ];
 
     /**
-     * Optional shared `general` tab fields that are omitted by default unless opted into via
-     * `<tag name="sulu_block_suite.tabs" include_fields="..."/>`.
-     *
-     * @var array<string, true>
-     */
-    private const OPT_IN_GENERAL_FIELDS = [
-        'item_animation' => true,
-        'container_padding_remove' => true,
-    ];
-
-    /**
      * @var array<string, array<string, FormMetadata>>
      */
     private array $registeredBlocksCache = [];
@@ -162,16 +151,13 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
         /** @var list<OptionMetadata> $options */
         $options = [];
-        $allLocales = \array_values(\array_unique(['en', 'tr', 'de', 'ru', 'es', 'fr', $locale]));
         foreach ($blockTypes as $blockType) {
             $typeTitles = isset($typeForms[$blockType]) ? $typeForms[$blockType]->getTitles() : [];
             $option = new OptionMetadata();
             $option->setName($blockType);
             $option->setValue($blockType);
-            foreach ($allLocales as $loc) {
-                $title = $typeTitles[$loc] ?? '';
-                $option->setTitle('' !== $title ? $title : $this->resolveBlockTitle($blockType, $loc), $loc);
-            }
+            $title = $typeTitles[$locale] ?? '';
+            $option->setTitle('' !== $title ? $title : $this->resolveBlockTitle($blockType, $locale), $locale);
 
             $options[] = $option;
         }
@@ -201,7 +187,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
     /**
      * Wraps a block FormMetadata's sections into `<section name="__tabs">`, optionally namespaces all non-`content`
-     * tab fields under `props/`, and appends shared suite tabs (`general`, `dynamic_content`, `advanced`).
+     * tab fields under `props/`, and appends shared suite tabs (`dynamic_content`, `advanced`).
      */
     public function enhanceBlockTabs(
         FormMetadata $blockForm,
@@ -231,18 +217,8 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             ? \array_fill_keys(\array_map('trim', \explode(',', $excludeTabsAttr)), true)
             : [];
 
-        $excludedFields = $this->resolveExcludedGeneralFields($tabsTag);
-        $textAlignMode = $tabsTag?->getAttribute('text_align');
-
         $contentSection = new SectionMetadata('content');
-        $contentSection->setLabels([
-            'en' => 'Content',
-            'tr' => 'İçerik',
-            'de' => 'Inhalt',
-            'ru' => 'Контент',
-            'es' => 'Contenido',
-            'fr' => 'Contenu',
-        ]);
+        $contentSection->setLabel($this->resolveContentSectionLabel($locale), $locale);
 
         /** @var array<string, SectionMetadata> $nonContentSections */
         $nonContentSections = [];
@@ -251,8 +227,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             if ($item instanceof SectionMetadata) {
                 $sectionName = $item->getName();
                 if ('content' === $sectionName) {
-                    if ([] !== $item->getLabels()) {
-                        $contentSection->setLabels($item->getLabels());
+                    $label = $item->getLabel($locale);
+                    if (null !== $label && '' !== $label) {
+                        $contentSection->setLabel($label, $locale);
                     }
                     foreach ($item->getItems() as $childItem) {
                         $contentSection->addItem($childItem);
@@ -276,21 +253,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $this->normalizeSectionFieldDefaults($contentSection);
 
         if ($includeSharedTabs) {
-            if (!isset($excludedTabs['general'])) {
-                $generalSection = $this->loadSharedSection('block_suite_general', 'general');
-                if (null !== $generalSection) {
-                    $generalSection = $this->filterDuplicateSharedFields($generalSection, $nonContentSections, $excludedFields);
-                    if ('standard' === $textAlignMode) {
-                        $this->stripJustifyFromTextAlignFields($generalSection);
-                    }
-                    if (isset($nonContentSections['general'])) {
-                        $nonContentSections['general'] = $this->mergeSections($nonContentSections['general'], $generalSection);
-                    } else {
-                        $nonContentSections['general'] = $generalSection;
-                    }
-                }
-            }
-
             if (!isset($excludedTabs['dynamic_content'])) {
                 $dynamicSection = $this->loadSharedSection('block_suite_dynamic', 'dynamic_content');
                 if (null !== $dynamicSection) {
@@ -349,6 +311,18 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         if ($updateSchema && null !== $this->schemaMetadataProvider) {
             $blockForm->setSchema($this->schemaMetadataProvider->getMetadata($blockForm->getItems()));
         }
+    }
+
+    private function resolveContentSectionLabel(string $locale): string
+    {
+        return match ($locale) {
+            'tr' => 'İçerik',
+            'de' => 'Inhalt',
+            'ru' => 'Контент',
+            'es' => 'Contenido',
+            'fr' => 'Contenu',
+            default => 'Content',
+        };
     }
 
     /**
@@ -530,144 +504,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         }
 
         return $merged;
-    }
-
-    /**
-     * @param array<string, SectionMetadata> $nonContentSections
-     * @param array<string, true> $excludedFields
-     */
-    private function filterDuplicateSharedFields(SectionMetadata $sharedSection, array $nonContentSections, array $excludedFields = []): SectionMetadata
-    {
-        /** @var array<string, true> $existingFieldNames */
-        $existingFieldNames = $excludedFields;
-        foreach ($nonContentSections as $sectionName => $section) {
-            if ($sectionName === $sharedSection->getName()) {
-                continue;
-            }
-            foreach ($this->collectSectionFieldNames($section) as $fieldName) {
-                $existingFieldNames[$fieldName] = true;
-            }
-        }
-
-        if ([] === $existingFieldNames) {
-            return $sharedSection;
-        }
-
-        $filtered = new SectionMetadata($sharedSection->getName());
-        $filtered->setLabels($sharedSection->getLabels());
-        $filtered->setDescriptions($sharedSection->getDescriptions());
-        $filtered->setColSpan($sharedSection->getColSpan());
-        $filtered->setDisabledCondition($sharedSection->getDisabledCondition());
-        $filtered->setVisibleCondition($sharedSection->getVisibleCondition());
-
-        foreach ($sharedSection->getItems() as $item) {
-            if ($item instanceof FieldMetadata) {
-                $rawName = \str_starts_with($item->getName(), 'props/')
-                    ? \substr($item->getName(), 6)
-                    : $item->getName();
-                if (isset($existingFieldNames[$rawName])) {
-                    continue;
-                }
-            }
-
-            $filtered->addItem($item);
-        }
-
-        return $filtered;
-    }
-
-    /**
-     * Resolves the set of `general` tab fields to exclude based on `<tag name="sulu_block_suite.tabs" .../>`.
-     *
-     * @return array<string, true>
-     */
-    private function resolveExcludedGeneralFields(?TagMetadata $tabsTag): array
-    {
-        /** @var array<string, true> $excluded */
-        $excluded = self::OPT_IN_GENERAL_FIELDS;
-
-        $includeFieldsAttr = $tabsTag?->getAttribute('include_fields');
-        if (\is_string($includeFieldsAttr) && '' !== \trim($includeFieldsAttr)) {
-            foreach (\array_map('trim', \explode(',', $includeFieldsAttr)) as $fieldName) {
-                if ('' !== $fieldName) {
-                    unset($excluded[$fieldName]);
-                }
-            }
-        }
-
-        $excludeFieldsAttr = $tabsTag?->getAttribute('exclude_fields');
-        if (\is_string($excludeFieldsAttr) && '' !== \trim($excludeFieldsAttr)) {
-            foreach (\array_map('trim', \explode(',', $excludeFieldsAttr)) as $fieldName) {
-                if ('' !== $fieldName) {
-                    $excluded[$fieldName] = true;
-                }
-            }
-        }
-
-        return $excluded;
-    }
-
-    /**
-     * Strips the `justify` option from `text_align` and `text_align_fallback` when
-     * `<tag name="sulu_block_suite.tabs" text_align="standard"/>` is configured.
-     */
-    private function stripJustifyFromTextAlignFields(SectionMetadata $generalSection): void
-    {
-        $items = $generalSection->getItems();
-
-        foreach (['text_align', 'text_align_fallback'] as $fieldName) {
-            $field = $items[$fieldName] ?? null;
-            if (!$field instanceof FieldMetadata) {
-                continue;
-            }
-
-            $valuesOption = $field->findOption('values');
-            if (!$valuesOption instanceof OptionMetadata || !\is_array($valuesOption->getValue())) {
-                continue;
-            }
-
-            $filteredOptions = [];
-            foreach ($valuesOption->getValue() as $opt) {
-                $optVal = $opt->getName() ?? $opt->getValue();
-                if ('justify' === $optVal) {
-                    continue;
-                }
-                $filteredOptions[] = $opt;
-            }
-            $valuesOption->setValue($filteredOptions);
-        }
-
-        $breakpointField = $items['text_align_breakpoint'] ?? null;
-        if ($breakpointField instanceof FieldMetadata) {
-            $breakpointField->setVisibleCondition("text_align && text_align != 'none'");
-        }
-
-        $fallbackField = $items['text_align_fallback'] ?? null;
-        if ($fallbackField instanceof FieldMetadata) {
-            $fallbackField->setVisibleCondition("text_align && text_align != 'none' && text_align_breakpoint");
-        }
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function collectSectionFieldNames(SectionMetadata $section): array
-    {
-        $names = [];
-        foreach ($section->getItems() as $item) {
-            if ($item instanceof SectionMetadata) {
-                foreach ($this->collectSectionFieldNames($item) as $nestedName) {
-                    $names[] = $nestedName;
-                }
-            } elseif ($item instanceof FieldMetadata) {
-                $rawName = \str_starts_with($item->getName(), 'props/')
-                    ? \substr($item->getName(), 6)
-                    : $item->getName();
-                $names[] = $rawName;
-            }
-        }
-
-        return $names;
     }
 
     private function loadSharedSection(string $formKey, string $sectionName): ?SectionMetadata
@@ -940,18 +776,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $registry = $this->dynamicContentHydrator instanceof DynamicContentHydrator
             ? $this->dynamicContentHydrator->getRegistry()
             : new DynamicContentSourceRegistry();
-        $allLocales = \array_values(\array_unique(['en', 'tr', 'de', 'ru', 'es', 'fr', $locale]));
-
         // 1. Populate dynamic_source options
         $sourceField = $items['dynamic_source'] ?? null;
         if ($sourceField instanceof FieldMetadata) {
-            $sourceOptionsByLocale = [];
-            foreach ($allLocales as $loc) {
-                foreach ($registry->getSourceDescriptors($loc) as $desc) {
-                    $sourceOptionsByLocale[$desc['key']][$loc] = $desc['label'];
-                }
-            }
-
             $sourceOptions = $registry->getSourceDescriptors($locale);
             $values = [];
             foreach ($sourceOptions as $src) {
@@ -961,9 +788,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 $opt = new OptionMetadata();
                 $opt->setName($src['key']);
                 $opt->setValue($src['key']);
-                foreach ($allLocales as $loc) {
-                    $opt->setTitle($sourceOptionsByLocale[$src['key']][$loc] ?? $src['label'], $loc);
-                }
+                $opt->setTitle($src['label'], $locale);
                 $values[] = $opt;
             }
             $valuesCollection = new OptionMetadata();
@@ -990,9 +815,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                         $opt = new OptionMetadata();
                         $opt->setName($tf['name']);
                         $opt->setValue($tf['name']);
-                        foreach ($allLocales as $loc) {
-                            $opt->setTitle($tf['titles'][$loc] ?? $tf['label'], $loc);
-                        }
+                        $opt->setTitle($tf['label'], $locale);
                         $targetOpts[] = $opt;
                     }
                     $targetCollection = new OptionMetadata();
@@ -1016,9 +839,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                         $opt = new OptionMetadata();
                         $opt->setName($sf['name']);
                         $opt->setValue($sf['name']);
-                        foreach ($allLocales as $loc) {
-                            $opt->setTitle($sf['titles'][$loc] ?? $sf['label'], $loc);
-                        }
+                        $opt->setTitle($sf['label'], $locale);
                         $sourceOpts[] = $opt;
                     }
                     $sourceCollection = new OptionMetadata();
@@ -1045,9 +866,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 $opt = new OptionMetadata();
                 $opt->setName($sf['name']);
                 $opt->setValue($sf['name']);
-                foreach ($allLocales as $loc) {
-                    $opt->setTitle($sf['titles'][$loc] ?? $sf['label'], $loc);
-                }
+                $opt->setTitle($sf['label'], $locale);
                 $condOpts[] = $opt;
             }
             $condCollection = new OptionMetadata();
@@ -1191,12 +1010,11 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     }
 
     /**
-     * @return list<array{name: string, label: string, titles: array<string, string>}>
+     * @return list<array{name: string, label: string}>
      */
     private function discoverBlockTargetFields(SectionMetadata $contentSection, string $locale): array
     {
-        $allLocales = \array_values(\array_unique(['en', 'tr', 'de', 'ru', 'es', 'fr', $locale]));
-        /** @var array<string, array{name: string, label: string, titles: array<string, string>}> $fieldsByName */
+        /** @var array<string, array{name: string, label: string}> $fieldsByName */
         $fieldsByName = [];
 
         foreach ($this->collectContentFieldMetadata($contentSection->getItems()) as $field) {
@@ -1211,16 +1029,11 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                         if (isset(self::EXCLUDED_TARGET_FIELDS[$childName]) || 'block' === $childType || \str_starts_with($childName, 'props/')) {
                             continue;
                         }
-                        $titles = [];
-                        foreach ($allLocales as $loc) {
-                            $titles[$loc] = $childField->getLabel($loc)
-                                ?? \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($childName, $loc);
-                        }
-                        $label = $titles[$locale] ?? $titles['en'];
+                        $label = $childField->getLabel($locale)
+                            ?? \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($childName, $locale);
                         $fieldsByName[$childName] ??= [
                             'name' => $childName,
                             'label' => $label,
-                            'titles' => $titles,
                         ];
                     }
                 }
@@ -1232,16 +1045,11 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 continue;
             }
 
-            $titles = [];
-            foreach ($allLocales as $loc) {
-                $titles[$loc] = $field->getLabel($loc)
-                    ?? \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fieldName, $loc);
-            }
-            $label = $titles[$locale] ?? $titles['en'];
+            $label = $field->getLabel($locale)
+                ?? \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fieldName, $locale);
             $fieldsByName[$fieldName] = [
                 'name' => $fieldName,
                 'label' => $label,
-                'titles' => $titles,
             ];
         }
 
@@ -1249,14 +1057,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $fallbackKeys = ['title', 'subtitle', 'content', 'image', 'link', 'icon'];
             $fallback = [];
             foreach ($fallbackKeys as $fKey) {
-                $titles = [];
-                foreach ($allLocales as $loc) {
-                    $titles[$loc] = \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fKey, $loc);
-                }
                 $fallback[] = [
                     'name' => $fKey,
-                    'label' => $titles[$locale] ?? $titles['en'],
-                    'titles' => $titles,
+                    'label' => \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fKey, $locale),
                 ];
             }
 
@@ -1299,27 +1102,19 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     }
 
     /**
-     * @return list<array{name: string, label: string, titles: array<string, string>}>
+     * @return list<array{name: string, label: string}>
      */
     private function discoverAllSourceFields(DynamicContentSourceRegistry $registry, string $locale): array
     {
-        $allLocales = \array_values(\array_unique(['en', 'tr', 'de', 'ru', 'es', 'fr', $locale]));
-        /** @var array<string, array{name: string, label: string, titles: array<string, string>}> $fieldsByName */
+        /** @var array<string, array{name: string, label: string}> $fieldsByName */
         $fieldsByName = [];
 
         foreach ($registry->getProviders() as $provider) {
-            $byLoc = [];
-            foreach ($allLocales as $loc) {
-                foreach ($provider->getSourceFields($loc) as $field) {
-                    $byLoc[$field['name']][$loc] = $field['label'];
-                }
-            }
             foreach ($provider->getSourceFields($locale) as $field) {
                 $name = $field['name'];
                 $fieldsByName[$name] ??= [
                     'name' => $name,
                     'label' => $field['label'],
-                    'titles' => $byLoc[$name] ?? [$locale => $field['label']],
                 ];
             }
         }
@@ -1328,14 +1123,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $fallbackKeys = ['title', 'headline', 'subtitle', 'summary', 'description', 'image', 'url', 'link', 'badge', 'date'];
             $fallback = [];
             foreach ($fallbackKeys as $fKey) {
-                $titles = [];
-                foreach ($allLocales as $loc) {
-                    $titles[$loc] = \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fKey, $loc);
-                }
                 $fallback[] = [
                     'name' => $fKey,
-                    'label' => $titles[$locale] ?? $titles['en'],
-                    'titles' => $titles,
+                    'label' => \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fKey, $locale),
                 ];
             }
 
