@@ -11,7 +11,7 @@
         <title lang="es">Bloque Reutilizable</title>
         <title lang="fr">Bloc Réutilisable</title>
     </meta>
-    <tag name="sulu_block_suite.tabs" exclude="dynamic_content"/>
+    <tag name="sulu_block_suite.tabs" enabled="false"/>
     <properties>
         <property name="snippet" type="single_reusable_block_selection" mandatory="true">
             <tag name="sulu.block_preview" priority="100"/>

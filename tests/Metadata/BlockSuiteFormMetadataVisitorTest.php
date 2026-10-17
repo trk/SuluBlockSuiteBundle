@@ -266,7 +266,6 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
     {
         $visitor = new BlockSuiteFormMetadataVisitor();
         $blockTagConfigs = [
-            'reusable' => ['exclude' => 'dynamic_content'],
             'fixture_spacer' => ['exclude' => 'dynamic_content'],
             'fixture_section' => ['exclude' => 'dynamic_content'],
             'fixture_divider' => ['exclude' => 'dynamic_content'],
@@ -307,6 +306,46 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
             );
             $this->assertSame(['content', 'advanced'], $tabKeys);
         }
+    }
+
+    public function testReusableBlockHasTabsDisabledAndKeepsDirectSnippetField(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor();
+
+        $xmlPath = \dirname(__DIR__, 2) . '/config/templates/blocks/reusable.xml';
+        $dom = new \DOMDocument();
+        self::assertTrue($dom->load($xmlPath));
+        $xml = \simplexml_import_dom($dom);
+        self::assertNotNull($xml);
+
+        $reusableForm = new FormMetadata();
+        $reusableForm->setKey((string) $xml->key);
+
+        foreach ($xml->tag as $tagNode) {
+            $tag = new TagMetadata();
+            $tag->setName((string) ($tagNode['name'] ?? ''));
+            $attrs = [];
+            foreach ($tagNode->attributes() as $attrName => $attrVal) {
+                if ('name' !== $attrName) {
+                    $attrs[$attrName] = (string) $attrVal;
+                }
+            }
+            $tag->setAttributes($attrs);
+            $reusableForm->addTag($tag);
+        }
+
+        $snippetField = new FieldMetadata('snippet');
+        $snippetField->setType('single_reusable_block_selection');
+        $reusableForm->addItem($snippetField);
+
+        $typedForm = new TypedFormMetadata();
+        $typedForm->addForm('reusable', $reusableForm);
+
+        $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
+
+        $items = $reusableForm->getItems();
+        self::assertArrayNotHasKey('__tabs', $items);
+        self::assertSame(['snippet'], \array_keys($items));
     }
 
     public function testDynamicMappingFieldMapOptionsAreIsolatedPerBlockAndSingleLocale(): void

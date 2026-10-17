@@ -339,7 +339,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             ++$tabCount;
         }
 
-        if (0 === $tabCount) {
+        if ($tabCount <= 1) {
             return;
         }
 
