@@ -44,10 +44,15 @@ final class HotspotPickerPropertyResolverTest extends TestCase
         ], $result->getContent());
     }
 
-    public function testResolveWithJsonString(): void
+    public function testResolveWithJsonStringAndSchemaParams(): void
     {
         $json = '{"x": 20.5, "y": 80.2, "marker_type": "number"}';
-        $result = $this->resolver->resolve($json, 'en');
+        $params = [
+            'types' => ['pulse' => 'pulse', 'number' => 'number'],
+            'colors' => ['primary' => 'primary', 'dark' => 'dark'],
+            'triggers' => ['click' => 'click', 'hover' => 'hover'],
+        ];
+        $result = $this->resolver->resolve($json, 'en', $params);
 
         /** @var array<string, mixed> $content */
         $content = $result->getContent();
@@ -59,27 +64,33 @@ final class HotspotPickerPropertyResolverTest extends TestCase
         self::assertSame('click', $content['trigger']);
     }
 
-    public function testResolveClampingAndDefaults(): void
+    public function testResolveClampingAndSchemaDefaults(): void
     {
         $data = [
             'x' => 150.0,
             'y' => -20.0,
+            'marker_type' => 'unknown',
+        ];
+        $params = [
+            'types' => ['dot', 'pin'],
+            'colors' => 'accent,success',
+            'triggers' => ['hover', 'click'],
         ];
 
-        $result = $this->resolver->resolve($data, 'en');
+        $result = $this->resolver->resolve($data, 'en', $params);
 
         /** @var array<string, mixed> $content */
         $content = $result->getContent();
 
         self::assertSame(100.0, $content['x']);
         self::assertSame(0.0, $content['y']);
-        self::assertSame('pulse', $content['marker_type']);
-        self::assertSame('primary', $content['marker_color']);
+        self::assertSame('dot', $content['marker_type']);
+        self::assertSame('accent', $content['marker_color']);
         self::assertNull($content['marker_icon']);
-        self::assertSame('click', $content['trigger']);
+        self::assertSame('hover', $content['trigger']);
     }
 
-    public function testResolveWithEmptyData(): void
+    public function testResolveWithEmptyDataAndNoParams(): void
     {
         $result = $this->resolver->resolve(null, 'en');
 
@@ -88,8 +99,9 @@ final class HotspotPickerPropertyResolverTest extends TestCase
 
         self::assertSame(50.0, $content['x']);
         self::assertSame(50.0, $content['y']);
-        self::assertSame('pulse', $content['marker_type']);
-        self::assertSame('primary', $content['marker_color']);
-        self::assertSame('click', $content['trigger']);
+        self::assertNull($content['marker_type']);
+        self::assertNull($content['marker_color']);
+        self::assertNull($content['marker_icon']);
+        self::assertNull($content['trigger']);
     }
 }

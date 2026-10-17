@@ -13,6 +13,7 @@ import SingleReusableBlockSelection, {
     SingleReusableBlockSelectionBlockPreviewTransformer,
 } from './components/SingleReusableBlockSelection';
 import blockConditionDataProvider from './conditionDataProviders/blockConditionDataProvider';
+import presetWireframeRegistry from './registries/presetWireframeRegistry';
 
 // 1. Enable inline horizontal `<TabSection>` for `<section name="__tabs">`
 Form.Section = TabSection;
@@ -63,5 +64,6 @@ export {
     SingleReusableBlockSelection,
     SingleReusableBlockSelectionBlockPreviewTransformer,
     blockConditionDataProvider,
+    presetWireframeRegistry,
 };
 export default PresetSelection;

@@ -38,21 +38,14 @@ final class HotspotPickerPropertyResolver implements PropertyResolverInterface
         $x = \round(\max(0.0, \min(100.0, $x)), 2);
         $y = \round(\max(0.0, \min(100.0, $y)), 2);
 
-        $markerType = isset($val['marker_type']) && \is_string($val['marker_type']) && '' !== \trim($val['marker_type'])
-            ? \trim($val['marker_type'])
-            : 'pulse';
-
-        $markerColor = isset($val['marker_color']) && \is_string($val['marker_color']) && '' !== \trim($val['marker_color'])
-            ? \trim($val['marker_color'])
-            : 'primary';
+        $markerType = $this->resolveOption($val, 'marker_type', $params, 'types');
+        $markerColor = $this->resolveOption($val, 'marker_color', $params, 'colors');
 
         $markerIcon = isset($val['marker_icon']) && \is_string($val['marker_icon']) && '' !== \trim($val['marker_icon'])
             ? \trim($val['marker_icon'])
             : null;
 
-        $trigger = isset($val['trigger']) && \is_string($val['trigger']) && '' !== \trim($val['trigger'])
-            ? \trim($val['trigger'])
-            : 'click';
+        $trigger = $this->resolveOption($val, 'trigger', $params, 'triggers');
 
         $normalized = [
             'x' => $x,
@@ -69,5 +62,51 @@ final class HotspotPickerPropertyResolver implements PropertyResolverInterface
     public static function getType(): string
     {
         return 'hotspot_picker';
+    }
+
+    /**
+     * @param array<string, mixed> $val
+     * @param array<string, mixed> $params
+     */
+    private function resolveOption(array $val, string $valKey, array $params, string $paramKey): ?string
+    {
+        $allowed = $this->extractAllowedOptions($params[$paramKey] ?? null);
+        $raw = $val[$valKey] ?? null;
+
+        if (\is_string($raw) && '' !== \trim($raw)) {
+            $trimmed = \trim($raw);
+            if ([] === $allowed || \in_array($trimmed, $allowed, true)) {
+                return $trimmed;
+            }
+        }
+
+        return $allowed[0] ?? null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extractAllowedOptions(mixed $rawParam): array
+    {
+        if (\is_string($rawParam) && '' !== \trim($rawParam)) {
+            $parts = \array_map('trim', \explode(',', $rawParam));
+
+            return \array_values(\array_filter($parts, static fn (string $part): bool => '' !== $part));
+        }
+
+        if (!\is_array($rawParam)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($rawParam as $key => $item) {
+            if (\is_string($item) && '' !== \trim($item)) {
+                $result[] = \trim($item);
+            } elseif (\is_string($key) && '' !== \trim($key)) {
+                $result[] = \trim($key);
+            }
+        }
+
+        return $result;
     }
 }

@@ -21,11 +21,6 @@ type HotspotData = {
 
 type Props = FieldTypeProps<?(HotspotData | string)>;
 
-function capitalize(s: ?string): string {
-    if (!s) return 'Primary';
-    return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 @observer
 export default class HotspotPicker extends React.Component<Props> {
     @observable imageUrl: ?string = null;
@@ -183,6 +178,43 @@ export default class HotspotPicker extends React.Component<Props> {
             }));
     };
 
+    getSchemaOptionList(optionName: string): Array<{label: string, value: string}> {
+        const {schemaOptions} = this.props;
+        if (!schemaOptions || !schemaOptions[optionName]) {
+            return [];
+        }
+
+        const opt = schemaOptions[optionName];
+        const rawVal = opt.value !== undefined ? opt.value : opt;
+
+        if (Array.isArray(rawVal)) {
+            return rawVal
+                .map((item) => {
+                    if (typeof item === 'string') {
+                        return {label: item, value: item};
+                    }
+                    if (item && typeof item === 'object') {
+                        const val = item.value !== undefined && item.value !== null && item.value !== ''
+                            ? String(item.value)
+                            : (item.name !== undefined && item.name !== null ? String(item.name) : '');
+                        const label = item.title ? String(item.title) : val;
+                        return val ? {label, value: val} : null;
+                    }
+                    return null;
+                })
+                .filter(Boolean);
+        }
+
+        if (typeof rawVal === 'string' && rawVal.trim() !== '') {
+            return rawVal.split(',').map((s) => {
+                const trimmed = s.trim();
+                return {label: trimmed, value: trimmed};
+            }).filter((item) => item.value !== '');
+        }
+
+        return [];
+    }
+
     get currentValue(): HotspotData {
         const {value} = this.props;
         let data: Object = {};
@@ -203,11 +235,27 @@ export default class HotspotPicker extends React.Component<Props> {
         const x = isNaN(rawX) ? 50.0 : Math.round(Math.max(0.0, Math.min(100.0, rawX)) * 10) / 10;
         const y = isNaN(rawY) ? 50.0 : Math.round(Math.max(0.0, Math.min(100.0, rawY)) * 10) / 10;
 
-        return {
+        const types = this.getSchemaOptionList('types');
+        const colors = this.getSchemaOptionList('colors');
+        const triggers = this.getSchemaOptionList('triggers');
+
+        const result: HotspotData = {
             ...data,
             x,
             y,
         };
+
+        if (!result.marker_type && types.length > 0) {
+            result.marker_type = types[0].value;
+        }
+        if (!result.marker_color && colors.length > 0) {
+            result.marker_color = colors[0].value;
+        }
+        if (!result.trigger && triggers.length > 0) {
+            result.trigger = triggers[0].value;
+        }
+
+        return result;
     }
 
     emitChange = (updates: $Shape<HotspotData>, finish: boolean = false) => {
@@ -319,9 +367,7 @@ export default class HotspotPicker extends React.Component<Props> {
     };
 
     render() {
-        const {x, y, marker_color} = this.currentValue;
-        const activeMarkerColor = marker_color || 'primary';
-        const colorClass = styles['color' + capitalize(activeMarkerColor)] || styles.colorPrimary;
+        const {x, y} = this.currentValue;
 
         return (
             <div className={styles.container}>
@@ -379,12 +425,12 @@ export default class HotspotPicker extends React.Component<Props> {
 
                             {/* Marker Pin with Radar Pulse */}
                             <div
-                                className={`${styles.marker} ${colorClass} ${this.isDragging ? styles.markerActive : ''}`}
+                                className={`${styles.marker} ${this.isDragging ? styles.markerActive : ''}`}
                                 style={{left: `${x}%`, top: `${y}%`}}
                             >
                                 <div className={styles.pulseRing} />
                                 <div className={styles.markerInner}>
-                                    <span style={{display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffffff'}} />
+                                    <span className={styles.markerDot} />
                                 </div>
                                 <div className={styles.markerTooltip}>
                                     {x.toFixed(1)}%, {y.toFixed(1)}%
@@ -402,12 +448,12 @@ export default class HotspotPicker extends React.Component<Props> {
                             </div>
 
                             <div
-                                className={`${styles.marker} ${colorClass}`}
+                                className={styles.marker}
                                 style={{left: `${x}%`, top: `${y}%`}}
                             >
                                 <div className={styles.pulseRing} />
                                 <div className={styles.markerInner}>
-                                    <span style={{display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffffff'}} />
+                                    <span className={styles.markerDot} />
                                 </div>
                                 <div className={styles.markerTooltip}>
                                     {x.toFixed(1)}%, {y.toFixed(1)}%

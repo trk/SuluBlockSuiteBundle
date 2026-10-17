@@ -4,6 +4,7 @@ import {action, computed, observable} from 'mobx';
 import {observer} from 'mobx-react';
 import {Button, Icon, Input, Overlay} from 'sulu-admin-bundle/components';
 import {translate} from 'sulu-admin-bundle/utils';
+import presetWireframeRegistry from '../../registries/presetWireframeRegistry';
 import styles from './presetGallery.scss';
 
 type PresetItem = {
@@ -24,100 +25,22 @@ type Props = {
     presets: Array<PresetItem>,
 };
 
-const HeadlineWireframe = ({align, size, tag}: {align: string, size: string, tag: string}) => {
-    const isCenter = align === 'center' || align === 'centered';
-    const isRight = align === 'right';
-    const isHero = size === '2xl' || size === 'xl' || tag === 'h1';
-
-    const barWidth = isHero ? 160 : 120;
-    const barHeight = isHero ? 16 : 12;
-    const barX = isCenter ? (240 - barWidth) / 2 : (isRight ? 240 - barWidth - 20 : 20);
-
-    const subWidth = isHero ? 110 : 80;
-    const subX = isCenter ? (240 - subWidth) / 2 : (isRight ? 240 - subWidth - 20 : 20);
-
-    return (
-        <svg className={styles.wireframeSvg} viewBox="0 0 240 85">
-            <rect fill="#e0e7ff" height={barHeight} rx="3" width={barWidth} x={barX} y="22" />
-            <rect fill="#4f46e5" height={barHeight} rx="3" width={barWidth * 0.75} x={barX} y="22" />
-            <rect fill="#94a3b8" height="7" rx="2" width={subWidth} x={subX} y="46" />
-            <rect fill="#cbd5e1" height="5" rx="2" width={subWidth * 0.6} x={subX} y="58" />
-        </svg>
-    );
-};
-
-const CardWireframe = ({variant}: {variant?: string}) => {
-    return (
-        <svg className={styles.wireframeSvg} viewBox="0 0 240 85">
-            <rect fill="#ffffff" height="72" rx="5" stroke="#cbd5e1" strokeWidth="1.5" width="200" x="20" y="6" />
-            <rect fill="#e0e7ff" height="30" rx="3" width="184" x="28" y="12" />
-            <rect fill="#334155" height="8" rx="2" width="90" x="28" y="48" />
-            <rect fill="#94a3b8" height="5" rx="1.5" width="140" x="28" y="60" />
-            <rect fill="#3b82f6" height="8" rx="2" width="36" x="176" y="66" />
-        </svg>
-    );
-};
-
-const ButtonWireframe = ({variant}: {variant?: string}) => {
-    const isOutline = variant === 'outline';
-    const isGhost = variant === 'ghost';
-
-    return (
-        <svg className={styles.wireframeSvg} viewBox="0 0 240 85">
-            <rect
-                fill={isGhost ? 'none' : (isOutline ? '#ffffff' : '#3b82f6')}
-                height="34"
-                rx="6"
-                stroke={isOutline ? '#3b82f6' : (isGhost ? '#94a3b8' : 'none')}
-                strokeDasharray={isGhost ? '3 3' : 'none'}
-                strokeWidth={isOutline || isGhost ? '2' : '0'}
-                width="140"
-                x="50"
-                y="26"
-            />
-            <circle cx="72" cy="43" fill={isOutline || isGhost ? '#3b82f6' : '#ffffff'} r="5" />
-            <rect
-                fill={isOutline || isGhost ? '#3b82f6' : '#ffffff'}
-                height="6"
-                rx="2"
-                width="64"
-                x="84"
-                y="40"
-            />
-        </svg>
-    );
-};
-
 const GenericWireframe = () => {
     return (
         <svg className={styles.wireframeSvg} viewBox="0 0 240 85">
-            <rect fill="#f1f5f9" height="66" rx="4" stroke="#e2e8f0" strokeWidth="1" width="200" x="20" y="10" />
-            <rect fill="#6366f1" height="8" rx="2" width="70" x="32" y="22" />
-            <rect fill="#94a3b8" height="5" rx="1.5" width="140" x="32" y="36" />
-            <rect fill="#cbd5e1" height="5" rx="1.5" width="110" x="32" y="46" />
-            <circle cx="196" cy="26" fill="#3b82f6" r="6" />
+            <rect className={styles.wireframeBg} height="66" rx="4" strokeWidth="1" width="200" x="20" y="10" />
+            <rect className={styles.wireframeTitle} height="8" rx="2" width="70" x="32" y="22" />
+            <rect className={styles.wireframeLinePrimary} height="5" rx="1.5" width="140" x="32" y="36" />
+            <rect className={styles.wireframeLineSecondary} height="5" rx="1.5" width="110" x="32" y="46" />
+            <circle className={styles.wireframeAccent} cx="196" cy="26" r="6" />
         </svg>
     );
 };
 
 const PresetWireframe = ({componentType, preset}: {componentType: string, preset: PresetItem}) => {
-    const props = preset.props || {};
-
-    if (componentType === 'headline') {
-        const align = String(props.text_align || '').toLowerCase();
-        const size = String(props.size || '').toLowerCase();
-        const tag = String(props.tag || '').toLowerCase();
-        return <HeadlineWireframe align={align} size={size} tag={tag} />;
-    }
-
-    if (componentType === 'card' || componentType === 'panel') {
-        const variant = String(props.variant || '').toLowerCase();
-        return <CardWireframe variant={variant} />;
-    }
-
-    if (componentType === 'button') {
-        const variant = String(props.variant || '').toLowerCase();
-        return <ButtonWireframe variant={variant} />;
+    if (presetWireframeRegistry.has(componentType)) {
+        const RegisteredWireframe = presetWireframeRegistry.get(componentType);
+        return <RegisteredWireframe componentType={componentType} preset={preset} />;
     }
 
     return <GenericWireframe />;

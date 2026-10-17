@@ -79,33 +79,25 @@ export default class PresetSelection extends React.Component<Props> {
 
     get componentType(): string {
         const {data, formInspector, schemaOptions, schemaPath} = this.props;
-        const normalizeType = (t: string): string => {
-            if (t === 'row_item') {
-                return 'row';
-            }
-            if (t === 'column_item') {
-                return 'column';
-            }
-            return t;
-        };
 
         if (formInspector) {
             try {
                 const targetBlock = formInspector.getValueByPath('/target_block');
                 if (targetBlock && typeof targetBlock === 'string') {
-                    return normalizeType(targetBlock);
+                    return targetBlock;
                 }
             } catch (e) {
                 // ignore
             }
         }
 
-        if (schemaOptions && schemaOptions.component_type) {
-            if (typeof schemaOptions.component_type === 'string') {
-                return normalizeType(schemaOptions.component_type);
+        if (schemaOptions) {
+            const option = schemaOptions.component_type || schemaOptions.block_type || schemaOptions.target_block;
+            if (typeof option === 'string' && option !== '') {
+                return option;
             }
-            if (schemaOptions.component_type.value) {
-                return normalizeType(String(schemaOptions.component_type.value));
+            if (option && typeof option === 'object' && option.value) {
+                return String(option.value);
             }
         }
 
@@ -114,18 +106,18 @@ export default class PresetSelection extends React.Component<Props> {
             if (matches.length > 0) {
                 const lastMatch = matches[matches.length - 1];
                 if (lastMatch && lastMatch[1]) {
-                    return normalizeType(lastMatch[1]);
+                    return lastMatch[1];
                 }
             }
         }
 
         const blockObj = this.blockData;
         if (blockObj && typeof blockObj.type === 'string') {
-            return normalizeType(blockObj.type);
+            return blockObj.type;
         }
 
         if (data && typeof data === 'object' && typeof data.type === 'string') {
-            return normalizeType(data.type);
+            return data.type;
         }
 
         return 'general';
