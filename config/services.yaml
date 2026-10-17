@@ -209,6 +209,9 @@ services:
         tags: ['sulu_block_suite.block_transformer']
 
     Totoglu\SuluBlockSuiteBundle\Transformer\DefaultAttributesTransformer:
+        arguments:
+            $fieldMetadataResolver: '@?Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver'
+            $srcSetFormats: '%sulu_block_suite.media.srcset_formats%'
         tags: ['sulu_block_suite.block_transformer']
 
     Totoglu\SuluBlockSuiteBundle\Renderer\BlockRenderer:

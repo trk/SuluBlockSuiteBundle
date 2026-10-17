@@ -304,6 +304,11 @@ final class AbstractBlockComponentTest extends TestCase
 
 final class DummyHeadlineComponent extends AbstractBlockComponent
 {
+    protected function dataKeys(): array
+    {
+        return ['link_title'];
+    }
+
     protected function defaults(): array
     {
         return [
@@ -347,7 +352,7 @@ final class DummyCardComponent extends AbstractBlockComponent
 {
     public function shouldRender(): bool
     {
-        return $this->hasAny('title', 'content', 'image', 'video', 'icon', 'buttons');
+        return $this->hasAny('title', 'content', 'image', 'video', 'icon');
     }
 }
 
@@ -376,6 +381,19 @@ final class DummyGridComponent extends AbstractBlockComponent
 
 final class DummySectionComponent extends AbstractBlockComponent
 {
+    protected function dataKeys(): array
+    {
+        return ['rows'];
+    }
+
+    protected function capabilityMap(): array
+    {
+        return [
+            ...parent::capabilityMap(),
+            'container' => fn (): bool => $this->hasNonEmptyCollection(['rows', 'blocks']),
+        ];
+    }
+
     public function shouldRender(): bool
     {
         return $this->is('container');

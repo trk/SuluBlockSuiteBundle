@@ -71,6 +71,17 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                     ->end()
                 ->end()
+                ->arrayNode('media')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->arrayNode('srcset_formats')
+                            ->useAttributeAsKey('format')
+                            ->normalizeKeys(false)
+                            ->integerPrototype()->min(1)->end()
+                            ->defaultValue([])
+                        ->end()
+                    ->end()
+                ->end()
             ->end();
 
         return $treeBuilder;

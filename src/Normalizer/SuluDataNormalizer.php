@@ -176,20 +176,39 @@ final class SuluDataNormalizer
     }
 
     /**
+     * @var array<string, int>
+     */
+    private static array $defaultSrcSetFormats = [];
+
+    /**
+     * Configures default format key => pixel width mappings for `resolveSrcSet()`.
+     *
+     * @param array<string, int> $formats
+     */
+    public static function setDefaultSrcSetFormats(array $formats): void
+    {
+        self::$defaultSrcSetFormats = $formats;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public static function getDefaultSrcSetFormats(): array
+    {
+        return self::$defaultSrcSetFormats;
+    }
+
+    /**
      * Resolves responsive `srcset` string from a Sulu Media structure or object.
      *
-     * @param array<string, int> $standardWidths
+     * @param array<string, int>|null $standardWidths
      */
     public static function resolveSrcSet(
         mixed $media,
-        array $standardWidths = [
-            'col-sm' => 400,
-            'col-md' => 640,
-            'col-lg' => 960,
-            'col-xl' => 1280,
-            'col-2xl' => 1600,
-        ],
+        ?array $standardWidths = null,
     ): ?string {
+        $standardWidths ??= self::$defaultSrcSetFormats;
+
         if (null === $media || (!\is_array($media) && !\is_object($media))) {
             return null;
         }

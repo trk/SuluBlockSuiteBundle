@@ -27,68 +27,17 @@ abstract class AbstractBlockComponent
     private const UNIVERSAL_DATA_KEYS = [
         'title',
         'subtitle',
-        'subheading',
-        'eyebrow',
-        'meta',
-        'badge',
-        'badges',
         'content',
         'summary',
         'description',
         'text',
-        'code',
-        'quote',
-        'author',
-        'author_name',
-        'author_title',
-        'author_role',
-        'author_avatar',
-        'avatar',
-        'source',
-        'source_title',
-        'source_url',
         'image',
-        'hover_image',
-        'before_image',
-        'after_image',
-        'before_label',
-        'after_label',
         'video',
-        'hover_video',
-        'poster',
-        'embed_url',
-        'html',
         'icon',
         'link',
-        'card_link',
         'url',
-        'link_title',
-        'button_text',
-        'buttons',
         'items',
-        'elements',
-        'rows',
-        'columns',
         'blocks',
-        'headers',
-        'footnotes',
-        'hotspots',
-        'target_date',
-        'expired_text',
-        'label_days',
-        'label_hours',
-        'label_minutes',
-        'label_seconds',
-        'target_selector',
-        'trigger_text',
-        'label',
-        'caption',
-        'alt',
-        'address',
-        'latitude',
-        'longitude',
-        'marker_title',
-        'marker_description',
     ];
 
     /**
@@ -981,12 +930,39 @@ abstract class AbstractBlockComponent
     // =========================================================================
 
     /**
+     * Built-in capability definitions for `$this->is($capability)`.
+     *
+     * Framework base classes (e.g. `PrelineComponent`) may override this map to
+     * register framework-wide capability rules, while concrete components override
+     * `capabilities()` for block-specific rules.
+     *
+     * @return array<string, bool|\Closure(): bool>
+     */
+    protected function capabilityMap(): array
+    {
+        return [
+            'empty' => fn (): bool => !$this->shouldRender(),
+            'multiple' => fn (): bool => $this->hasNonEmptyCollection(['items']) || $this->boolProp('multiple', false),
+            'container' => fn (): bool => $this->hasNonEmptyCollection(['blocks']),
+            'media' => fn (): bool => null !== SuluDataNormalizer::resolveImageUrl($this->get('image'))
+                || null !== SuluDataNormalizer::resolveImageUrl($this->get('video')),
+            'image' => fn (): bool => null !== SuluDataNormalizer::resolveImageUrl($this->get('image')),
+            'video' => fn (): bool => null !== SuluDataNormalizer::resolveImageUrl($this->get('video')),
+            'linked' => fn (): bool => '' !== SuluDataNormalizer::resolveUrl($this->get('link') ?? $this->get('url'), ''),
+            'clickable' => fn (): bool => '' !== SuluDataNormalizer::resolveUrl($this->get('link') ?? $this->get('url'), ''),
+        ];
+    }
+
+    /**
      * Evaluates a structural capability, custom component capability, or boolean prop.
      */
     public function is(string $capability): bool
     {
         $normalized = self::toSnakeCase($capability);
-        $custom = $this->capabilities();
+        $custom = [
+            ...$this->capabilityMap(),
+            ...$this->capabilities(),
+        ];
 
         if (\array_key_exists($capability, $custom)) {
             $entry = $custom[$capability];
@@ -1000,23 +976,7 @@ abstract class AbstractBlockComponent
             return \is_bool($entry) ? $entry : (bool) $entry();
         }
 
-        return match ($normalized) {
-            'empty' => !$this->shouldRender(),
-            'multiple' => $this->hasNonEmptyCollection(['items', 'elements', 'headers']) || $this->boolProp('multiple', false),
-            'container' => $this->hasNonEmptyCollection(['rows', 'columns', 'blocks']),
-            'media' => null !== SuluDataNormalizer::resolveImageUrl($this->get('image'))
-                || null !== SuluDataNormalizer::resolveImageUrl($this->get('video'))
-                || null !== SuluDataNormalizer::resolveImageUrl($this->get('hover_image'))
-                || null !== SuluDataNormalizer::resolveImageUrl($this->get('hover_video')),
-            'image' => null !== SuluDataNormalizer::resolveImageUrl($this->get('image')),
-            'video' => null !== SuluDataNormalizer::resolveImageUrl($this->get('video')) || $this->has('embed_url'),
-            'linked', 'clickable' => '' !== SuluDataNormalizer::resolveUrl($this->get('link') ?? $this->get('card_link') ?? $this->get('url')),
-            'interactive' => $this->boolProp('collapsible', false)
-                || $this->boolProp('dismissible', false)
-                || $this->boolProp('filter', false)
-                || $this->boolProp('lightbox', false),
-            default => $this->boolProp($normalized, false),
-        };
+        return $this->boolProp($normalized, false);
     }
 
     /**
@@ -1195,11 +1155,31 @@ abstract class AbstractBlockComponent
         foreach (self::UNIVERSAL_DATA_KEYS as $key) {
             $map[$key] = true;
         }
-        foreach ($this->dataKeys() as $key) {
+        foreach ($this->collectDataKeys() as $key) {
             $map[self::toSnakeCase($key)] = true;
         }
 
         return $map;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectDataKeys(): array
+    {
+        $keys = $this->dataKeys();
+        $parent = \get_parent_class($this);
+        while (false !== $parent && $parent !== self::class && \is_subclass_of($parent, self::class)) {
+            $rm = new \ReflectionMethod($parent, 'dataKeys');
+            if ($rm->getDeclaringClass()->getName() === $parent) {
+                /** @var list<string> $parentKeys */
+                $parentKeys = $rm->invoke($this);
+                $keys = [...$parentKeys, ...$keys];
+            }
+            $parent = \get_parent_class($parent);
+        }
+
+        return $keys;
     }
 
     private function isPassThroughHtmlAttribute(string $key, mixed $value): bool
@@ -1218,7 +1198,7 @@ abstract class AbstractBlockComponent
     /**
      * @param list<string> $keys
      */
-    private function hasNonEmptyCollection(array $keys): bool
+    protected function hasNonEmptyCollection(array $keys): bool
     {
         foreach ($keys as $key) {
             if ([] !== $this->items($key)) {

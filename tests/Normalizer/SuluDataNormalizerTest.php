@@ -97,6 +97,8 @@ final class SuluDataNormalizerTest extends TestCase
 
     public function testResolveSrcSetBuildsSortedResponsiveSources(): void
     {
+        SuluDataNormalizer::setDefaultSrcSetFormats([]);
+
         $this->assertNull(SuluDataNormalizer::resolveSrcSet(null));
         $this->assertNull(SuluDataNormalizer::resolveSrcSet(['formats' => []]));
 
@@ -109,10 +111,32 @@ final class SuluDataNormalizerTest extends TestCase
             ],
         ];
 
+        // With empty default formats, only keys containing numeric widths are resolved
+        $this->assertSame(
+            '/media/400.webp 400w',
+            SuluDataNormalizer::resolveSrcSet($media),
+        );
+
+        // With configured format widths (passed explicitly or via default config), named keys are resolved
+        $formats = [
+            'col-sm' => 400,
+            'col-md' => 640,
+            'col-lg' => 960,
+            'col-xl' => 1280,
+            'col-2xl' => 1600,
+        ];
+        $this->assertSame(
+            '/media/400.webp 400w, /media/640.webp 640w, /media/960.webp 960w',
+            SuluDataNormalizer::resolveSrcSet($media, $formats),
+        );
+
+        SuluDataNormalizer::setDefaultSrcSetFormats($formats);
+        $this->assertSame($formats, SuluDataNormalizer::getDefaultSrcSetFormats());
         $this->assertSame(
             '/media/400.webp 400w, /media/640.webp 640w, /media/960.webp 960w',
             SuluDataNormalizer::resolveSrcSet($media),
         );
+        SuluDataNormalizer::setDefaultSrcSetFormats([]);
     }
 
     public function testResolveFocusPointStyleExtractsCoordinates(): void

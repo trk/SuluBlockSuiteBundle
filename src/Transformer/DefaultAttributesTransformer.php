@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Transformer;
 
+use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 use Totoglu\SuluBlockSuiteBundle\Security\AttributeSanitizer;
 use Totoglu\SuluBlockSuiteBundle\Security\CssScoper;
@@ -17,6 +18,37 @@ use Totoglu\SuluBlockSuiteBundle\Util\ClassList;
  */
 final class DefaultAttributesTransformer implements BlockTransformerInterface
 {
+    private const RESERVED_KEYS = [
+        'type',
+        'settings',
+        'props',
+        'id',
+        'class',
+        'custom_class',
+        'attributes',
+        'css',
+        'custom_css',
+        'status',
+        'name',
+    ];
+
+    /**
+     * @var array<string, array<string, string>>
+     */
+    private array $metadataFieldTypesCache = [];
+
+    /**
+     * @param array<string, int>|null $srcSetFormats
+     */
+    public function __construct(
+        private readonly ?BlockTargetFieldMetadataResolver $fieldMetadataResolver = null,
+        private readonly ?array $srcSetFormats = null,
+    ) {
+        if (null !== $this->srcSetFormats && [] !== $this->srcSetFormats) {
+            SuluDataNormalizer::setDefaultSrcSetFormats($this->srcSetFormats);
+        }
+    }
+
     public static function getDefaultPriority(): int
     {
         return 90;
@@ -66,12 +98,12 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
         $attributes = \is_string($rawAttrs) ? AttributeSanitizer::parse($rawAttrs) : [];
 
         // 6. Custom Scoped CSS
+        $blockType = isset($block['type']) && \is_scalar($block['type']) ? (string) $block['type'] : '';
         $rawCss = $props['css'] ?? ($block['css'] ?? null);
         $scopedCss = null;
         if (\is_string($rawCss) && '' !== \trim($rawCss)) {
             if (null === $elementId) {
                 // Generate a stable unique element ID for CSS scoping without PHP object serialization
-                $blockType = isset($block['type']) && \is_scalar($block['type']) ? (string) $block['type'] : '';
                 $elementId = CssScoper::generateElementId($block, $blockType);
             }
 
@@ -97,22 +129,144 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
             $block['_scoped_css'] = $scopedCss;
         }
 
-        // 7. Sulu CMS Data Normalization (Media & Links)
-        if (isset($block['image']) && !isset($block['image_url'])) {
-            $block['image_url'] = SuluDataNormalizer::resolveImageUrl($block['image']);
-            $block['image_srcset'] = SuluDataNormalizer::resolveSrcSet($block['image']);
-            $block['image_focus_style'] = SuluDataNormalizer::resolveFocusPointStyle($block['image']);
-        }
+        // 7. Generic Sulu CMS Data Normalization (Media & Links)
+        return $this->normalizeMediaAndLinkFields($block, $blockType);
+    }
 
-        if (isset($block['hover_image']) && !isset($block['hover_image_url'])) {
-            $block['hover_image_url'] = SuluDataNormalizer::resolveImageUrl($block['hover_image']);
-        }
+    /**
+     * @param array<string, mixed> $block
+     *
+     * @return array<string, mixed>
+     */
+    private function normalizeMediaAndLinkFields(array $block, string $blockType): array
+    {
+        $metadataFieldTypes = $this->getMetadataFieldTypes($blockType);
 
-        $link = $block['link'] ?? ($block['card_link'] ?? null);
-        if (null !== $link && !isset($block['link_url'])) {
-            $block['link_url'] = SuluDataNormalizer::resolveUrl($link);
+        foreach ($block as $field => $value) {
+            if (!$this->isCandidateFieldKey($field) || null === $value || '' === $value || [] === $value) {
+                continue;
+            }
+
+            $fieldType = $metadataFieldTypes[$field] ?? $this->detectValueFieldType($value);
+
+            if ('media' === $fieldType) {
+                if (!isset($block[$field . '_url']) || '' === $block[$field . '_url']) {
+                    $block[$field . '_url'] = SuluDataNormalizer::resolveImageUrl($value);
+                }
+                if (!isset($block[$field . '_srcset'])) {
+                    $block[$field . '_srcset'] = SuluDataNormalizer::resolveSrcSet($value, $this->srcSetFormats);
+                }
+                if (!isset($block[$field . '_focus_style'])) {
+                    $block[$field . '_focus_style'] = SuluDataNormalizer::resolveFocusPointStyle($value);
+                }
+            } elseif ('link' === $fieldType) {
+                if (!isset($block[$field . '_url']) || '' === $block[$field . '_url']) {
+                    $block[$field . '_url'] = SuluDataNormalizer::resolveUrl($value);
+                }
+            }
         }
 
         return $block;
+    }
+
+    private function isCandidateFieldKey(string $field): bool
+    {
+        if ('' === $field || \str_starts_with($field, '_') || \str_starts_with($field, 'props/')) {
+            return false;
+        }
+
+        if (\in_array($field, self::RESERVED_KEYS, true)) {
+            return false;
+        }
+
+        return !\str_ends_with($field, '_url')
+            && !\str_ends_with($field, '_srcset')
+            && !\str_ends_with($field, '_focus_style');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function getMetadataFieldTypes(string $blockType): array
+    {
+        $cleanType = \strtolower(\trim($blockType));
+        if ('' === $cleanType || null === $this->fieldMetadataResolver) {
+            return [];
+        }
+
+        if (isset($this->metadataFieldTypesCache[$cleanType])) {
+            return $this->metadataFieldTypesCache[$cleanType];
+        }
+
+        $types = [];
+        foreach ($this->fieldMetadataResolver->resolveTargetFields($cleanType) as $fieldMeta) {
+            $types[$fieldMeta['name']] = $fieldMeta['type'];
+        }
+
+        return $this->metadataFieldTypesCache[$cleanType] = $types;
+    }
+
+    private function detectValueFieldType(mixed $value): ?string
+    {
+        if (\is_object($value)) {
+            if (
+                \method_exists($value, 'getFormats')
+                || \method_exists($value, 'getFocusPoint')
+                || \method_exists($value, 'getThumbnails')
+                || \method_exists($value, 'getMimeType')
+            ) {
+                return 'media';
+            }
+
+            if (\method_exists($value, 'getUrl')) {
+                /** @var mixed $url */
+                $url = $value->getUrl();
+                if (\is_string($url) && 1 === \preg_match('/\.(?:jpe?g|png|webp|gif|avif|svg|bmp|ico|mp4|webm|ogg|mov|m4v|mp3|wav|pdf)(?:[?#].*)?$/i', $url)) {
+                    return 'media';
+                }
+
+                return 'link';
+            }
+
+            return null;
+        }
+
+        if (!\is_array($value) || [] === $value || \array_is_list($value)) {
+            return null;
+        }
+
+        if (
+            \array_key_exists('formats', $value)
+            || \array_key_exists('thumbnails', $value)
+            || \array_key_exists('focusPoint', $value)
+            || \array_key_exists('focalPoint', $value)
+            || \array_key_exists('mimeType', $value)
+            || \array_key_exists('fileVersion', $value)
+        ) {
+            return 'media';
+        }
+
+        if (
+            \array_key_exists('href', $value)
+            || \array_key_exists('provider', $value)
+            || \array_key_exists('anchor', $value)
+            || \array_key_exists('target', $value)
+            || \array_key_exists('query', $value)
+        ) {
+            return 'link';
+        }
+
+        if (\is_string($value['url'] ?? null) && '' !== \trim($value['url'])) {
+            if (
+                \array_key_exists('id', $value)
+                || 1 === \preg_match('/\.(?:jpe?g|png|webp|gif|avif|svg|bmp|ico|mp4|webm|ogg|mov|m4v|mp3|wav|pdf)(?:[?#].*)?$/i', $value['url'])
+            ) {
+                return 'media';
+            }
+
+            return 'link';
+        }
+
+        return null;
     }
 }

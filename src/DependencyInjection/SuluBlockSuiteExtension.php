@@ -10,6 +10,7 @@ use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformerInterface;
 
 final class SuluBlockSuiteExtension extends Extension implements PrependExtensionInterface
@@ -86,5 +87,10 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
             ? \array_values($renderingConfig['template_namespaces'])
             : [$renderingConfig['template_namespaces']];
         $container->setParameter('sulu_block_suite.rendering.template_namespaces', $namespaces);
+
+        /** @var array{srcset_formats: array<string, int>} $mediaConfig */
+        $mediaConfig = $config['media'];
+        $container->setParameter('sulu_block_suite.media.srcset_formats', $mediaConfig['srcset_formats']);
+        SuluDataNormalizer::setDefaultSrcSetFormats($mediaConfig['srcset_formats']);
     }
 }

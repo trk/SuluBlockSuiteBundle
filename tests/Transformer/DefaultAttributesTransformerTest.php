@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Totoglu\SuluBlockSuiteBundle\Tests\Transformer;
 
 use PHPUnit\Framework\TestCase;
+use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 use Totoglu\SuluBlockSuiteBundle\Security\CssScoper;
 use Totoglu\SuluBlockSuiteBundle\Transformer\DefaultAttributesTransformer;
 
@@ -125,5 +126,49 @@ final class DefaultAttributesTransformerTest extends TestCase
         $this->assertMatchesRegularExpression('/^' . CssScoper::GENERATED_ID_PREFIX . '[0-9a-f]{8}$/', $first['_id']);
         $this->assertSame($first['_id'], $second['_id']);
         $this->assertSame('#' . $first['_id'] . ' { color: red; }', $first['_scoped_css']);
+    }
+
+    public function testDerivesMediaAndLinkFieldsGenerically(): void
+    {
+        $transformer = new DefaultAttributesTransformer(null, ['col-sm' => 400]);
+
+        $block = [
+            'type' => 'custom_banner',
+            'hero_banner' => [
+                'url' => 'https://example.com/banner.jpg',
+                'formats' => ['col-sm' => 'https://example.com/banner-400.webp'],
+                'focusPoint' => ['x' => 25, 'y' => 75],
+            ],
+            'author_avatar' => [
+                'url' => 'https://example.com/avatar.png',
+                'formats' => ['sulu-200x200' => 'https://example.com/avatar-200.webp'],
+            ],
+            'primary_cta' => [
+                'url' => 'https://example.com/signup',
+                'target' => '_blank',
+            ],
+            'link' => [
+                'href' => '/contact',
+                'provider' => 'page',
+            ],
+        ];
+
+        $transformed = $transformer->transform($block, []);
+
+        $this->assertSame('https://example.com/banner.jpg', $transformed['hero_banner_url']);
+        $this->assertSame('https://example.com/banner-400.webp 400w', $transformed['hero_banner_srcset']);
+        $this->assertSame('object-position: 25% 75%;', $transformed['hero_banner_focus_style']);
+
+        $this->assertSame('https://example.com/avatar.png', $transformed['author_avatar_url']);
+        $this->assertSame('https://example.com/avatar-200.webp 200w', $transformed['author_avatar_srcset']);
+        $this->assertNull($transformed['author_avatar_focus_style']);
+
+        $this->assertSame('https://example.com/signup', $transformed['primary_cta_url']);
+        $this->assertArrayNotHasKey('primary_cta_srcset', $transformed);
+
+        $this->assertSame('/contact', $transformed['link_url']);
+        $this->assertArrayNotHasKey('link_srcset', $transformed);
+
+        SuluDataNormalizer::setDefaultSrcSetFormats([]);
     }
 }
