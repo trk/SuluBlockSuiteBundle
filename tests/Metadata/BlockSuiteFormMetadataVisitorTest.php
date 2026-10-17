@@ -11,6 +11,7 @@ use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\OptionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TagMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor;
 use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
 
@@ -310,7 +311,18 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
 
     public function testDynamicMappingFieldMapOptionsAreIsolatedPerBlockAndSingleLocale(): void
     {
-        $visitor = new BlockSuiteFormMetadataVisitor();
+        $translator = $this->createStub(TranslatorInterface::class);
+        $translator->method('trans')->willReturnCallback(
+            static fn (string $id, array $parameters = [], ?string $domain = null, ?string $locale = null): string => match ([$id, $domain, $locale]) {
+                ['sulu_block_suite.dynamic_field_title', 'admin', 'tr'] => 'Başlık',
+                ['sulu_block_suite.dynamic_field_title', 'admin', 'en'] => 'Title',
+                ['sulu_block_suite.tab_content', 'admin', 'tr'] => 'İçerik',
+                ['sulu_block_suite.tab_content', 'admin', 'en'] => 'Content',
+                default => $id,
+            },
+        );
+
+        $visitor = new BlockSuiteFormMetadataVisitor(translator: $translator);
 
         $accordionForm = new FormMetadata();
         $accordionForm->setKey('fixture_accordion');
@@ -381,6 +393,9 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
 
         /** @var SectionMetadata $trTabs */
         $trTabs = $trHeadlineForm->getItems()['__tabs'];
+        /** @var SectionMetadata $trContentSection */
+        $trContentSection = $trTabs->getItems()['content'];
+        $this->assertSame('İçerik', $trContentSection->getLabel('tr'));
         /** @var SectionMetadata $trDyn */
         $trDyn = $trTabs->getItems()['dynamic_content'];
         /** @var FieldMetadata $trMapping */
@@ -390,6 +405,15 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         /** @var list<OptionMetadata> $trTargetValues */
         $trTargetValues = (array) $trTarget->findOption('values')?->getValue();
         $this->assertSame(['tr' => 'Başlık'], $trTargetValues[0]->getTitles());
+    }
+
+    public function testResolveBlockTitleDoesNotUseCatalogFallback(): void
+    {
+        $translator = $this->createMock(TranslatorInterface::class);
+        $translator->expects($this->never())->method('trans');
+
+        $visitor = new BlockSuiteFormMetadataVisitor(translator: $translator);
+        $this->assertSame('Custom widget', $visitor->resolveBlockTitle('custom_widget', 'tr'));
     }
 
     public function testBlockWithEmptyContentSectionExposesZeroTargetFieldOptionsWithoutHardcodedFallbacks(): void

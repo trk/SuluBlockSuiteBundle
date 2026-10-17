@@ -8,6 +8,7 @@ use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
 use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
 
@@ -27,6 +28,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         ?ContentAggregatorInterface $contentAggregator = null,
         ?RequestStack $requestStack = null,
         ?ReferenceStoreInterface $referenceStore = null,
+        ?TranslatorInterface $translator = null,
     ) {
         $this->registry = new DynamicContentSourceRegistry(
             $customProviders,
@@ -36,6 +38,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             $contentAggregator,
             $requestStack,
             $referenceStore,
+            $translator,
         );
     }
 

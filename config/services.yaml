@@ -146,6 +146,7 @@ services:
     Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluPageSourceProvider:
         arguments:
             $sourceResolver: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface'
+            $translator: '@?translator'
         tags: ['sulu_block_suite.dynamic_source_provider']
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluArticleSourceProvider:
@@ -156,6 +157,7 @@ services:
             $referenceStore: '@?sulu_http_cache.reference_store'
             $contentAggregator: '@?sulu_content.content_aggregator'
             $smartContentBridge: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge'
+            $translator: '@?translator'
         tags:
             - 'sulu_block_suite.dynamic_source_provider'
             - { name: 'kernel.reset', method: 'reset' }
@@ -165,6 +167,7 @@ services:
             $categoryManager: '@?sulu_category.category_manager'
             $requestStack: '@?request_stack'
             $referenceStore: '@?sulu_http_cache.reference_store'
+            $translator: '@?translator'
         tags: ['sulu_block_suite.dynamic_source_provider']
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluMediaCollectionSourceProvider:
@@ -173,6 +176,7 @@ services:
             $requestStack: '@?request_stack'
             $referenceStore: '@?sulu_http_cache.reference_store'
             $smartContentBridge: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge'
+            $translator: '@?translator'
         tags: ['sulu_block_suite.dynamic_source_provider']
 
     Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface:
@@ -188,6 +192,7 @@ services:
             $contentAggregator: '@?sulu_content.content_aggregator'
             $requestStack: '@?request_stack'
             $referenceStore: '@?sulu_http_cache.reference_store'
+            $translator: '@?translator'
 
     Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface:
         alias: Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipeline

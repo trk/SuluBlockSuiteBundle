@@ -8,6 +8,7 @@ use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
 use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SmartContentSourceProviderAdapter;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluArticleSourceProvider;
@@ -51,13 +52,14 @@ final class DynamicContentSourceRegistry
         ?ContentAggregatorInterface $contentAggregator = null,
         ?RequestStack $requestStack = null,
         ?ReferenceStoreInterface $referenceStore = null,
+        private readonly ?TranslatorInterface $translator = null,
     ) {
         foreach ($providers as $provider) {
             $this->registerProvider($provider);
         }
 
         if (!isset($this->providers['sulu_pages'])) {
-            $this->registerProvider(new SuluPageSourceProvider($pageSourceResolver));
+            $this->registerProvider(new SuluPageSourceProvider($pageSourceResolver, $this->translator));
         }
 
         if (!isset($this->providers['sulu_articles'])) {
@@ -67,6 +69,7 @@ final class DynamicContentSourceRegistry
                 referenceStore: $referenceStore,
                 contentAggregator: $contentAggregator,
                 smartContentBridge: $smartContentBridge,
+                translator: $this->translator,
             ));
         }
 
@@ -74,6 +77,7 @@ final class DynamicContentSourceRegistry
             $this->registerProvider(new SuluCategorySourceProvider(
                 requestStack: $requestStack,
                 referenceStore: $referenceStore,
+                translator: $this->translator,
             ));
         }
 
@@ -82,6 +86,7 @@ final class DynamicContentSourceRegistry
                 requestStack: $requestStack,
                 referenceStore: $referenceStore,
                 smartContentBridge: $smartContentBridge,
+                translator: $this->translator,
             ));
         }
 
@@ -98,6 +103,7 @@ final class DynamicContentSourceRegistry
                     contentAggregator: $contentAggregator,
                     requestStack: $requestStack,
                     referenceStore: $referenceStore,
+                    translator: $this->translator,
                 );
 
                 if (!isset($this->providers[$adapter->getKey()])) {
@@ -107,8 +113,21 @@ final class DynamicContentSourceRegistry
         }
     }
 
+    public function getTranslator(): ?TranslatorInterface
+    {
+        return $this->translator;
+    }
+
     public function registerProvider(DynamicContentSourceProviderInterface $provider): void
     {
+        if (
+            $provider instanceof AbstractDynamicContentSourceProvider
+            && null === $provider->getTranslator()
+            && null !== $this->translator
+        ) {
+            $provider->setTranslator($this->translator);
+        }
+
         $this->providers[$provider->getKey()] = $provider;
 
         if ($provider instanceof ConfigurableDynamicContentSourceProviderInterface) {
@@ -152,20 +171,16 @@ final class DynamicContentSourceRegistry
      */
     public function getSourceDescriptors(string $locale = 'en'): array
     {
-        $lang = \strtolower(\substr($locale, 0, 2));
-
         /** @var array<string, SourceDescriptor> $byKey */
         $byKey = [
             'none' => [
                 'key' => 'none',
-                'label' => match ($lang) {
-                    'tr' => 'Yok',
-                    'de' => 'Keine',
-                    'ru' => 'Нет',
-                    'es' => 'Ninguno',
-                    'fr' => 'Aucun',
-                    default => 'None',
-                },
+                'label' => AbstractDynamicContentSourceProvider::translateKey(
+                    'sulu_block_suite.dynamic_source_none',
+                    $locale,
+                    'None',
+                    $this->translator,
+                ),
                 'multi_item' => false,
                 'config_fields' => [],
             ],

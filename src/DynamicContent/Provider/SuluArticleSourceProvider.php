@@ -13,6 +13,7 @@ use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Contracts\Service\ResetInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator;
@@ -32,7 +33,9 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
         private readonly ?ReferenceStoreInterface $referenceStore = null,
         private readonly ?ContentAggregatorInterface $contentAggregator = null,
         private readonly ?SuluSmartContentQueryBridge $smartContentBridge = null,
+        ?TranslatorInterface $translator = null,
     ) {
+        $this->translator = $translator;
     }
 
     public function reset(): void
@@ -47,14 +50,7 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
 
     public function getLabel(string $locale = 'en'): string
     {
-        return match (\strtolower(\substr($locale, 0, 2))) {
-            'tr' => 'Makaleler',
-            'de' => 'Artikel',
-            'ru' => 'Статьи',
-            'es' => 'Artículos',
-            'fr' => 'Articles',
-            default => 'Articles',
-        };
+        return $this->translate('sulu_block_suite.dynamic_source_sulu_articles', $locale, 'Articles');
     }
 
     public function getSingleKey(): string
@@ -64,14 +60,7 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
 
     public function getSingleLabel(string $locale = 'en'): string
     {
-        return match (\strtolower(\substr($locale, 0, 2))) {
-            'tr' => 'Tekil Makale Seçimi',
-            'de' => 'Einzelne Artikelauswahl',
-            'ru' => 'Выбор одной статьи',
-            'es' => 'Selección de artículo único',
-            'fr' => 'Sélection d’article unique',
-            default => 'Single Article Selection',
-        };
+        return $this->translate('sulu_block_suite.dynamic_source_single_article', $locale, 'Single Article Selection');
     }
 
     public function getSingleConfigFields(string $locale = 'en'): array

@@ -17,6 +17,7 @@ use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadataVisitorInterface;
 use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
 use Symfony\Contracts\Translation\TranslatorInterface;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceRegistry;
@@ -311,14 +312,12 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
     private function resolveContentSectionLabel(string $locale): string
     {
-        return match ($locale) {
-            'tr' => 'İçerik',
-            'de' => 'Inhalt',
-            'ru' => 'Контент',
-            'es' => 'Contenido',
-            'fr' => 'Contenu',
-            default => 'Content',
-        };
+        return $this->translate('sulu_block_suite.tab_content', $locale, 'Content');
+    }
+
+    private function translate(string $key, string $locale, string $fallback): string
+    {
+        return AbstractDynamicContentSourceProvider::translateKey($key, $locale, $fallback, $this->translator);
     }
 
     /**
@@ -771,7 +770,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $isMultipleBlock = $this->isMultipleBlock($contentSection);
         $registry = $this->dynamicContentHydrator instanceof DynamicContentHydrator
             ? $this->dynamicContentHydrator->getRegistry()
-            : new DynamicContentSourceRegistry();
+            : new DynamicContentSourceRegistry(translator: $this->translator);
         // 1. Populate dynamic_source options
         $sourceField = $items['dynamic_source'] ?? null;
         if ($sourceField instanceof FieldMetadata) {
@@ -1026,7 +1025,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                             continue;
                         }
                         $label = $childField->getLabel($locale)
-                            ?? \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($childName, $locale);
+                            ?? AbstractDynamicContentSourceProvider::translateSourceFieldLabel($childName, $locale, $this->translator);
                         $fieldsByName[$childName] ??= [
                             'name' => $childName,
                             'label' => $label,
@@ -1042,7 +1041,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             }
 
             $label = $field->getLabel($locale)
-                ?? \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fieldName, $locale);
+                ?? AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fieldName, $locale, $this->translator);
             $fieldsByName[$fieldName] = [
                 'name' => $fieldName,
                 'label' => $label,
@@ -1410,19 +1409,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $firstTitle = \reset($titles);
             if (\is_string($firstTitle) && '' !== $firstTitle) {
                 return $firstTitle;
-            }
-        }
-
-        if (null !== $this->translator) {
-            $key = 'sulu_block_suite.block_' . $blockType;
-            $translated = $this->translator->trans($key, [], 'admin', $locale);
-            if ($translated !== $key) {
-                return $translated;
-            }
-
-            $translatedDefault = $this->translator->trans($key, [], null, $locale);
-            if ($translatedDefault !== $key) {
-                return $translatedDefault;
             }
         }
 

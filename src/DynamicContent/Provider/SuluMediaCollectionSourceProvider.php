@@ -9,6 +9,7 @@ use Sulu\Bundle\MediaBundle\Api\Media;
 use Sulu\Bundle\MediaBundle\Entity\MediaInterface;
 use Sulu\Bundle\MediaBundle\Media\Manager\MediaManagerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 
@@ -22,7 +23,9 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
         private readonly ?RequestStack $requestStack = null,
         private readonly ?ReferenceStoreInterface $referenceStore = null,
         private readonly ?SuluSmartContentQueryBridge $smartContentBridge = null,
+        ?TranslatorInterface $translator = null,
     ) {
+        $this->translator = $translator;
     }
 
     public function getKey(): string
@@ -32,14 +35,7 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
 
     public function getLabel(string $locale = 'en'): string
     {
-        return match (\strtolower(\substr($locale, 0, 2))) {
-            'tr' => 'Medya Koleksiyonu',
-            'de' => 'Mediensammlung',
-            'ru' => 'Медиаколлекция',
-            'es' => 'Colección multimedia',
-            'fr' => 'Collection média',
-            default => 'Media Collection',
-        };
+        return $this->translate('sulu_block_suite.dynamic_source_sulu_media_collection', $locale, 'Media Collection');
     }
 
     public function getSingleKey(): string
@@ -49,14 +45,7 @@ final class SuluMediaCollectionSourceProvider extends AbstractDynamicContentSour
 
     public function getSingleLabel(string $locale = 'en'): string
     {
-        return match (\strtolower(\substr($locale, 0, 2))) {
-            'tr' => 'Tekil Medya Seçimi',
-            'de' => 'Einzelne Medienauswahl',
-            'ru' => 'Выбор одного медиафайла',
-            'es' => 'Selección de medio único',
-            'fr' => 'Sélection d’un média unique',
-            default => 'Single Media Selection',
-        };
+        return $this->translate('sulu_block_suite.dynamic_source_single_media', $locale, 'Single Media Selection');
     }
 
     public function getSingleConfigFields(string $locale = 'en'): array

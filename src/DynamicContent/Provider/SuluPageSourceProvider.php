@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider;
 
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface;
 
@@ -16,7 +17,9 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
 {
     public function __construct(
         private readonly ?PageSourceResolverInterface $sourceResolver = null,
+        ?TranslatorInterface $translator = null,
     ) {
+        $this->translator = $translator;
     }
 
     public function getKey(): string
@@ -26,57 +29,27 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
 
     public function getLabel(string $locale = 'en'): string
     {
-        return match (\strtolower(\substr($locale, 0, 2))) {
-            'tr' => 'Sayfalar',
-            'de' => 'Seiten',
-            'ru' => 'Страницы',
-            'es' => 'Páginas',
-            'fr' => 'Pages',
-            default => 'Pages',
-        };
+        return $this->translate('sulu_block_suite.dynamic_source_sulu_pages', $locale, 'Pages');
     }
 
     public function getSourceDescriptors(string $locale = 'en'): array
     {
-        $lang = \strtolower(\substr($locale, 0, 2));
-
         return [
             [
                 'key' => 'current_page',
-                'label' => match ($lang) {
-                    'tr' => 'Mevcut Sayfa',
-                    'de' => 'Aktuelle Seite',
-                    'ru' => 'Текущая страница',
-                    'es' => 'Página actual',
-                    'fr' => 'Page actuelle',
-                    default => 'Current Page',
-                },
+                'label' => $this->translate('sulu_block_suite.dynamic_source_current_page', $locale, 'Current Page'),
                 'multi_item' => false,
                 'config_fields' => [],
             ],
             [
                 'key' => 'parent_page',
-                'label' => match ($lang) {
-                    'tr' => 'Üst Sayfa',
-                    'de' => 'Übergeordnete Seite',
-                    'ru' => 'Родительская страница',
-                    'es' => 'Página superior',
-                    'fr' => 'Page parente',
-                    default => 'Parent Page',
-                },
+                'label' => $this->translate('sulu_block_suite.dynamic_source_parent_page', $locale, 'Parent Page'),
                 'multi_item' => false,
                 'config_fields' => [],
             ],
             [
                 'key' => 'specific_page',
-                'label' => match ($lang) {
-                    'tr' => 'Tekil Sayfa Seçimi',
-                    'de' => 'Einzelne Seitenauswahl',
-                    'ru' => 'Выбор одной страницы',
-                    'es' => 'Selección de página única',
-                    'fr' => 'Sélection de page unique',
-                    default => 'Single Page Selection',
-                },
+                'label' => $this->translate('sulu_block_suite.dynamic_source_specific_page', $locale, 'Single Page Selection'),
                 'multi_item' => false,
                 'config_fields' => [
                     $this->createSelectionField(
@@ -92,14 +65,7 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
             ],
             [
                 'key' => 'page_selection',
-                'label' => match ($lang) {
-                    'tr' => 'Çoklu Sayfa Seçimi',
-                    'de' => 'Mehrfache Seitenauswahl',
-                    'ru' => 'Выбор нескольких страниц',
-                    'es' => 'Selección de múltiples páginas',
-                    'fr' => 'Sélection de pages multiples',
-                    default => 'Page Selection',
-                },
+                'label' => $this->translate('sulu_block_suite.dynamic_source_page_selection', $locale, 'Page Selection'),
                 'multi_item' => true,
                 'config_fields' => [
                     $this->createSelectionField(
@@ -115,14 +81,7 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
             ],
             [
                 'key' => 'page_children',
-                'label' => match ($lang) {
-                    'tr' => 'Alt Sayfalar',
-                    'de' => 'Unterseiten',
-                    'ru' => 'Дочерние страницы',
-                    'es' => 'Subpáginas',
-                    'fr' => 'Sous-pages',
-                    default => 'Child Pages',
-                },
+                'label' => $this->translate('sulu_block_suite.dynamic_source_page_children', $locale, 'Child Pages'),
                 'multi_item' => true,
                 'config_fields' => [
                     $this->createSelectionField(
@@ -140,14 +99,7 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
             ],
             [
                 'key' => 'sibling_pages',
-                'label' => match ($lang) {
-                    'tr' => 'Kardeş Sayfalar',
-                    'de' => 'Geschwisterseiten',
-                    'ru' => 'Соседние страницы',
-                    'es' => 'Páginas hermanas',
-                    'fr' => 'Pages sœurs',
-                    default => 'Sibling Pages',
-                },
+                'label' => $this->translate('sulu_block_suite.dynamic_source_sibling_pages', $locale, 'Sibling Pages'),
                 'multi_item' => true,
                 'config_fields' => [
                     ...$this->createPaginationAndSortFields(10),
@@ -163,14 +115,7 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
             ],
             [
                 'key' => 'custom_query',
-                'label' => match ($lang) {
-                    'tr' => 'Akıllı Sayfa Sorgusu',
-                    'de' => 'Smart-Content-Seitenabfrage',
-                    'ru' => 'Умный запрос страниц',
-                    'es' => 'Consulta inteligente de páginas',
-                    'fr' => 'Requête intelligente de pages',
-                    default => 'Smart Content Pages',
-                },
+                'label' => $this->translate('sulu_block_suite.dynamic_source_custom_query', $locale, 'Smart Content Pages'),
                 'multi_item' => true,
                 'config_fields' => [
                     ...$this->createPaginationAndSortFields(10),

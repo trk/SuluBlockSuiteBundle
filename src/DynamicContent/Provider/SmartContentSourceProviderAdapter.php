@@ -12,6 +12,7 @@ use Sulu\Content\Domain\Model\ContentRichEntityInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Content\Domain\Model\TemplateInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 
@@ -31,7 +32,9 @@ final class SmartContentSourceProviderAdapter extends AbstractDynamicContentSour
         private readonly ?RequestStack $requestStack = null,
         private readonly ?string $sourceKeyOverride = null,
         private readonly ?ReferenceStoreInterface $referenceStore = null,
+        ?TranslatorInterface $translator = null,
     ) {
+        $this->translator = $translator;
     }
 
     public function getProviderType(): string
@@ -52,34 +55,12 @@ final class SmartContentSourceProviderAdapter extends AbstractDynamicContentSour
 
     public function getLabel(string $locale = 'en'): string
     {
-        $lang = \strtolower(\substr($locale, 0, 2));
         $type = $this->smartContentProvider->getType();
 
         return match ($type) {
-            'snippets' => match ($lang) {
-                'tr' => 'Snippet Koleksiyonu (Smart Content)',
-                'de' => 'Snippets (Smart Content)',
-                'ru' => 'Сниппеты (Smart Content)',
-                'es' => 'Fragmentos (Smart Content)',
-                'fr' => 'Extraits (Smart Content)',
-                default => 'Snippets (Smart Content)',
-            },
-            'contacts' => match ($lang) {
-                'tr' => 'Kişiler (Smart Content)',
-                'de' => 'Kontakte (Smart Content)',
-                'ru' => 'Контакты (Smart Content)',
-                'es' => 'Contactos (Smart Content)',
-                'fr' => 'Contacts (Smart Content)',
-                default => 'Contacts (Smart Content)',
-            },
-            'accounts' => match ($lang) {
-                'tr' => 'Kurumlar / Hesaplar (Smart Content)',
-                'de' => 'Organisationen (Smart Content)',
-                'ru' => 'Организации (Smart Content)',
-                'es' => 'Cuentas (Smart Content)',
-                'fr' => 'Comptes (Smart Content)',
-                default => 'Accounts (Smart Content)',
-            },
+            'snippets' => $this->translate('sulu_block_suite.dynamic_source_smart_snippets', $locale, 'Snippets (Smart Content)'),
+            'contacts' => $this->translate('sulu_block_suite.dynamic_source_smart_contacts', $locale, 'Contacts (Smart Content)'),
+            'accounts' => $this->translate('sulu_block_suite.dynamic_source_smart_accounts', $locale, 'Accounts (Smart Content)'),
             default => \ucwords(\str_replace(['_', '-'], ' ', $type)) . ' (Smart Content)',
         };
     }

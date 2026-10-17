@@ -10,6 +10,7 @@ use Sulu\Bundle\CategoryBundle\Entity\CategoryInterface;
 use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Bundle\MediaBundle\Entity\MediaInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 
 /**
@@ -21,7 +22,9 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
         private readonly ?CategoryManagerInterface $categoryManager = null,
         private readonly ?RequestStack $requestStack = null,
         private readonly ?ReferenceStoreInterface $referenceStore = null,
+        ?TranslatorInterface $translator = null,
     ) {
+        $this->translator = $translator;
     }
 
     public function getKey(): string
@@ -31,14 +34,7 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
 
     public function getLabel(string $locale = 'en'): string
     {
-        return match (\strtolower(\substr($locale, 0, 2))) {
-            'tr' => 'Kategoriler',
-            'de' => 'Kategorien',
-            'ru' => 'Категории',
-            'es' => 'Categorías',
-            'fr' => 'Catégories',
-            default => 'Categories',
-        };
+        return $this->translate('sulu_block_suite.dynamic_source_sulu_categories', $locale, 'Categories');
     }
 
     public function getSingleKey(): string
@@ -48,14 +44,7 @@ final class SuluCategorySourceProvider extends AbstractDynamicContentSourceProvi
 
     public function getSingleLabel(string $locale = 'en'): string
     {
-        return match (\strtolower(\substr($locale, 0, 2))) {
-            'tr' => 'Tekil Kategori Seçimi',
-            'de' => 'Einzelne Kategorieauswahl',
-            'ru' => 'Выбор одной категории',
-            'es' => 'Selección de categoría única',
-            'fr' => 'Sélection de catégorie unique',
-            default => 'Single Category Selection',
-        };
+        return $this->translate('sulu_block_suite.dynamic_source_single_category', $locale, 'Single Category Selection');
     }
 
     public function getSingleConfigFields(string $locale = 'en'): array

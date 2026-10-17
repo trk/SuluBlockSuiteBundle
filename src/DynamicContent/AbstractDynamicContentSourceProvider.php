@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Totoglu\SuluBlockSuiteBundle\DynamicContent;
 
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Base class for Dynamic Content source providers.
@@ -19,6 +20,54 @@ use Symfony\Component\HttpFoundation\RequestStack;
  */
 abstract class AbstractDynamicContentSourceProvider implements ConfigurableDynamicContentSourceProviderInterface
 {
+    /**
+     * @var array<string, array{key: string, fallback: string}>
+     */
+    private const FIELD_TRANSLATION_KEYS = [
+        'title' => ['key' => 'sulu_block_suite.dynamic_field_title', 'fallback' => 'Title'],
+        'headline' => ['key' => 'sulu_block_suite.dynamic_field_headline', 'fallback' => 'Headline'],
+        'subtitle' => ['key' => 'sulu_block_suite.dynamic_field_subtitle', 'fallback' => 'Subtitle'],
+        'summary' => ['key' => 'sulu_block_suite.dynamic_field_summary', 'fallback' => 'Summary'],
+        'description' => ['key' => 'sulu_block_suite.dynamic_field_description', 'fallback' => 'Description'],
+        'content' => ['key' => 'sulu_block_suite.dynamic_field_content', 'fallback' => 'Content'],
+        'image' => ['key' => 'sulu_block_suite.dynamic_field_image', 'fallback' => 'Image'],
+        'icon' => ['key' => 'sulu_block_suite.dynamic_field_icon', 'fallback' => 'Icon'],
+        'url' => ['key' => 'sulu_block_suite.dynamic_field_url', 'fallback' => 'URL'],
+        'page_url' => ['key' => 'sulu_block_suite.dynamic_field_page_url', 'fallback' => 'Page URL'],
+        'link' => ['key' => 'sulu_block_suite.dynamic_field_link', 'fallback' => 'Link'],
+        'page_link' => ['key' => 'sulu_block_suite.dynamic_field_page_link', 'fallback' => 'Page Link'],
+        'badge' => ['key' => 'sulu_block_suite.dynamic_field_badge', 'fallback' => 'Badge'],
+        'tags' => ['key' => 'sulu_block_suite.dynamic_field_tags', 'fallback' => 'Tags'],
+        'template' => ['key' => 'sulu_block_suite.dynamic_field_template', 'fallback' => 'Template Key'],
+        'date' => ['key' => 'sulu_block_suite.dynamic_field_date', 'fallback' => 'Publish Date'],
+        'authored' => ['key' => 'sulu_block_suite.dynamic_field_authored', 'fallback' => 'Authored Date'],
+        'author' => ['key' => 'sulu_block_suite.dynamic_field_author', 'fallback' => 'Author'],
+        'category_title' => ['key' => 'sulu_block_suite.dynamic_field_category_title', 'fallback' => 'Category Name'],
+        'category_description' => ['key' => 'sulu_block_suite.dynamic_field_category_description', 'fallback' => 'Category Description'],
+        'category_key' => ['key' => 'sulu_block_suite.dynamic_field_category_key', 'fallback' => 'Category Key'],
+        'category_image' => ['key' => 'sulu_block_suite.dynamic_field_category_image', 'fallback' => 'Category Media'],
+        'media_image' => ['key' => 'sulu_block_suite.dynamic_field_media_image', 'fallback' => 'Media Image'],
+        'media_title' => ['key' => 'sulu_block_suite.dynamic_field_media_title', 'fallback' => 'Media Title'],
+        'media_description' => ['key' => 'sulu_block_suite.dynamic_field_media_description', 'fallback' => 'Media Description'],
+        'media_caption' => ['key' => 'sulu_block_suite.dynamic_field_media_caption', 'fallback' => 'Media Caption'],
+        'media_url' => ['key' => 'sulu_block_suite.dynamic_field_media_url', 'fallback' => 'Media Direct URL'],
+        'media_link' => ['key' => 'sulu_block_suite.dynamic_field_media_link', 'fallback' => 'Media Link'],
+        'copyright' => ['key' => 'sulu_block_suite.dynamic_field_copyright', 'fallback' => 'Copyright'],
+        'credits' => ['key' => 'sulu_block_suite.dynamic_field_credits', 'fallback' => 'Credits'],
+    ];
+
+    protected ?TranslatorInterface $translator = null;
+
+    public function setTranslator(?TranslatorInterface $translator): void
+    {
+        $this->translator = $translator;
+    }
+
+    public function getTranslator(): ?TranslatorInterface
+    {
+        return $this->translator;
+    }
+
     public function isMultiItem(): bool
     {
         return true;
@@ -319,260 +368,42 @@ abstract class AbstractDynamicContentSourceProvider implements ConfigurableDynam
         return 'en';
     }
 
-    protected function translateFieldLabel(string $fieldKey, string $locale = 'en'): string
+    protected function translate(string $key, string $locale, string $fallback): string
     {
-        return self::translateSourceFieldLabel($fieldKey, $locale);
+        return self::translateKey($key, $locale, $fallback, $this->translator);
     }
 
-    public static function translateSourceFieldLabel(string $fieldKey, string $locale = 'en'): string
+    public static function translateKey(
+        string $key,
+        string $locale,
+        string $fallback,
+        ?TranslatorInterface $translator = null,
+    ): string {
+        if (null === $translator) {
+            return $fallback;
+        }
+
+        $translated = $translator->trans($key, [], 'admin', $locale);
+
+        return ('' !== \trim($translated) && $translated !== $key)
+            ? $translated
+            : $fallback;
+    }
+
+    protected function translateFieldLabel(string $fieldKey, string $locale = 'en'): string
     {
-        $lang = \strtolower(\substr(\trim($locale), 0, 2));
+        return self::translateSourceFieldLabel($fieldKey, $locale, $this->translator);
+    }
 
-        $labels = [
-            'title' => [
-                'en' => 'Title',
-                'tr' => 'Başlık',
-                'de' => 'Titel',
-                'ru' => 'Заголовок',
-                'es' => 'Título',
-                'fr' => 'Titre',
-            ],
-            'headline' => [
-                'en' => 'Headline',
-                'tr' => 'Ana Başlık',
-                'de' => 'Überschrift',
-                'ru' => 'Основной заголовок',
-                'es' => 'Titular',
-                'fr' => 'Titre Principal',
-            ],
-            'subtitle' => [
-                'en' => 'Subtitle',
-                'tr' => 'Alt Başlık',
-                'de' => 'Untertitel',
-                'ru' => 'Подзаголовок',
-                'es' => 'Subtítulo',
-                'fr' => 'Sous-titre',
-            ],
-            'summary' => [
-                'en' => 'Summary',
-                'tr' => 'Özet',
-                'de' => 'Zusammenfassung',
-                'ru' => 'Краткое описание',
-                'es' => 'Resumen',
-                'fr' => 'Résumé',
-            ],
-            'description' => [
-                'en' => 'Description',
-                'tr' => 'Açıklama',
-                'de' => 'Beschreibung',
-                'ru' => 'Описание',
-                'es' => 'Descripción',
-                'fr' => 'Description',
-            ],
-            'content' => [
-                'en' => 'Content',
-                'tr' => 'İçerik',
-                'de' => 'Inhalt',
-                'ru' => 'Контент',
-                'es' => 'Contenido',
-                'fr' => 'Contenu',
-            ],
-            'image' => [
-                'en' => 'Image',
-                'tr' => 'Görsel',
-                'de' => 'Bild',
-                'ru' => 'Изображение',
-                'es' => 'Imagen',
-                'fr' => 'Image',
-            ],
-            'icon' => [
-                'en' => 'Icon',
-                'tr' => 'İkon',
-                'de' => 'Symbol',
-                'ru' => 'Иконка',
-                'es' => 'Icono',
-                'fr' => 'Icône',
-            ],
-            'url' => [
-                'en' => 'URL',
-                'tr' => 'URL Adresi',
-                'de' => 'URL',
-                'ru' => 'URL-адрес',
-                'es' => 'Dirección URL',
-                'fr' => 'Adresse URL',
-            ],
-            'page_url' => [
-                'en' => 'Page URL',
-                'tr' => 'Sayfa URL Adresi',
-                'de' => 'Seiten-URL',
-                'ru' => 'URL страницы',
-                'es' => 'URL de la Página',
-                'fr' => 'URL de la Page',
-            ],
-            'link' => [
-                'en' => 'Link',
-                'tr' => 'Bağlantı',
-                'de' => 'Link',
-                'ru' => 'Ссылка',
-                'es' => 'Enlace',
-                'fr' => 'Lien',
-            ],
-            'page_link' => [
-                'en' => 'Page Link',
-                'tr' => 'Sayfa Bağlantısı',
-                'de' => 'Seitenlink',
-                'ru' => 'Ссылка на страницу',
-                'es' => 'Enlace de la Página',
-                'fr' => 'Lien de la Page',
-            ],
-            'badge' => [
-                'en' => 'Badge',
-                'tr' => 'Rozet',
-                'de' => 'Abzeichen',
-                'ru' => 'Значок',
-                'es' => 'Insignia',
-                'fr' => 'Badge',
-            ],
-            'tags' => [
-                'en' => 'Tags',
-                'tr' => 'Etiketler',
-                'de' => 'Schlagwörter',
-                'ru' => 'Теги',
-                'es' => 'Etiquetas',
-                'fr' => 'Étiquettes',
-            ],
-            'template' => [
-                'en' => 'Template Key',
-                'tr' => 'Şablon Anahtarı',
-                'de' => 'Vorlagenschlüssel',
-                'ru' => 'Ключ шаблона',
-                'es' => 'Clave de Plantilla',
-                'fr' => 'Clé de Modèle',
-            ],
-            'date' => [
-                'en' => 'Publish Date',
-                'tr' => 'Yayın Tarihi',
-                'de' => 'Veröffentlichungsdatum',
-                'ru' => 'Дата публикации',
-                'es' => 'Fecha de Publicación',
-                'fr' => 'Date de Publication',
-            ],
-            'authored' => [
-                'en' => 'Authored Date',
-                'tr' => 'Yazım Tarihi',
-                'de' => 'Autorendatum',
-                'ru' => 'Дата написания',
-                'es' => 'Fecha de Autoría',
-                'fr' => 'Date de Rédaction',
-            ],
-            'author' => [
-                'en' => 'Author',
-                'tr' => 'Yazar',
-                'de' => 'Autor',
-                'ru' => 'Автор',
-                'es' => 'Autor',
-                'fr' => 'Auteur',
-            ],
-            'category_title' => [
-                'en' => 'Category Name',
-                'tr' => 'Kategori Adı',
-                'de' => 'Kategoriename',
-                'ru' => 'Название категории',
-                'es' => 'Nombre de Categoría',
-                'fr' => 'Nom de la Catégorie',
-            ],
-            'category_description' => [
-                'en' => 'Category Description',
-                'tr' => 'Kategori Açıklaması',
-                'de' => 'Kategoriebeschreibung',
-                'ru' => 'Описание категории',
-                'es' => 'Descripción de Categoría',
-                'fr' => 'Description de la Catégorie',
-            ],
-            'category_key' => [
-                'en' => 'Category Key',
-                'tr' => 'Kategori Anahtarı',
-                'de' => 'Kategorieschlüssel',
-                'ru' => 'Ключ категории',
-                'es' => 'Clave de Categoría',
-                'fr' => 'Clé de la Catégorie',
-            ],
-            'category_image' => [
-                'en' => 'Category Media',
-                'tr' => 'Kategori Görseli',
-                'de' => 'Kategoriemedium',
-                'ru' => 'Медиа категории',
-                'es' => 'Imagen de Categoría',
-                'fr' => 'Média de la Catégorie',
-            ],
-            'media_image' => [
-                'en' => 'Media Image',
-                'tr' => 'Medya Görseli',
-                'de' => 'Medienbild',
-                'ru' => 'Изображение медиа',
-                'es' => 'Imagen Multimedia',
-                'fr' => 'Image Média',
-            ],
-            'media_title' => [
-                'en' => 'Media Title',
-                'tr' => 'Medya Başlığı',
-                'de' => 'Medientitel',
-                'ru' => 'Заголовок медиа',
-                'es' => 'Título Multimedia',
-                'fr' => 'Titre Média',
-            ],
-            'media_description' => [
-                'en' => 'Media Description',
-                'tr' => 'Medya Açıklaması',
-                'de' => 'Medienbeschreibung',
-                'ru' => 'Описание медиа',
-                'es' => 'Descripción Multimedia',
-                'fr' => 'Description Média',
-            ],
-            'media_caption' => [
-                'en' => 'Media Caption',
-                'tr' => 'Medya Altyazısı',
-                'de' => 'Bildunterschrift',
-                'ru' => 'Подпись медиа',
-                'es' => 'Pie de Foto',
-                'fr' => 'Légende Média',
-            ],
-            'media_url' => [
-                'en' => 'Media Direct URL',
-                'tr' => 'Medya Doğrudan URL',
-                'de' => 'Direkte Medien-URL',
-                'ru' => 'Прямой URL медиа',
-                'es' => 'URL Directa del Medio',
-                'fr' => 'URL Directe du Média',
-            ],
-            'media_link' => [
-                'en' => 'Media Link',
-                'tr' => 'Medya Bağlantısı',
-                'de' => 'Medienlink',
-                'ru' => 'Ссылка на медиа',
-                'es' => 'Enlace Multimedia',
-                'fr' => 'Lien Média',
-            ],
-            'copyright' => [
-                'en' => 'Copyright',
-                'tr' => 'Telif Hakkı',
-                'de' => 'Urheberrecht',
-                'ru' => 'Авторское право',
-                'es' => 'Derechos de Autor',
-                'fr' => 'Droits d’Auteur',
-            ],
-            'credits' => [
-                'en' => 'Credits',
-                'tr' => 'Kaynak Bilgisi',
-                'de' => 'Bildnachweis',
-                'ru' => 'Авторы',
-                'es' => 'Créditos',
-                'fr' => 'Crédits',
-            ],
-        ];
+    public static function translateSourceFieldLabel(
+        string $fieldKey,
+        string $locale = 'en',
+        ?TranslatorInterface $translator = null,
+    ): string {
+        if (isset(self::FIELD_TRANSLATION_KEYS[$fieldKey])) {
+            $entry = self::FIELD_TRANSLATION_KEYS[$fieldKey];
 
-        if (isset($labels[$fieldKey])) {
-            return $labels[$fieldKey][$lang] ?? $labels[$fieldKey]['en'];
+            return self::translateKey($entry['key'], $locale, $entry['fallback'], $translator);
         }
 
         return \ucwords(\str_replace(['_', '-'], ' ', $fieldKey));
