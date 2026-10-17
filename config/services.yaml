@@ -247,4 +247,5 @@ services:
     Totoglu\SuluBlockSuiteBundle\Search\BlockSuitePageReindexEnhancer:
         arguments:
             $snippetRepository: '@?sulu_snippet.snippet_repository'
+            $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
         tags: ['sulu_page.website_page_reindex_provider_enhancer']

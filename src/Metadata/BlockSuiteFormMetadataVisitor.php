@@ -41,10 +41,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         'target_block' => true,
         'reusable_snippet' => true,
         'snippet' => true,
-        'rows' => true,
-        'items' => true,
-        'columns' => true,
-        'blocks' => true,
     ];
 
     /**
@@ -1053,19 +1049,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             ];
         }
 
-        if ([] === $fieldsByName) {
-            $fallbackKeys = ['title', 'subtitle', 'content', 'image', 'link', 'icon'];
-            $fallback = [];
-            foreach ($fallbackKeys as $fKey) {
-                $fallback[] = [
-                    'name' => $fKey,
-                    'label' => \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fKey, $locale),
-                ];
-            }
-
-            return $fallback;
-        }
-
         return \array_values($fieldsByName);
     }
 
@@ -1117,19 +1100,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                     'label' => $field['label'],
                 ];
             }
-        }
-
-        if ([] === $fieldsByName) {
-            $fallbackKeys = ['title', 'headline', 'subtitle', 'summary', 'description', 'image', 'url', 'link', 'badge', 'date'];
-            $fallback = [];
-            foreach ($fallbackKeys as $fKey) {
-                $fallback[] = [
-                    'name' => $fKey,
-                    'label' => \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fKey, $locale),
-                ];
-            }
-
-            return $fallback;
         }
 
         return \array_values($fieldsByName);
@@ -1382,7 +1352,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     {
         $resolvedLocale = $locale ?? 'en';
         $types = [];
-        $excluded = ['reusable', 'default', 'common', ''];
+        $excluded = ['reusable', 'default', ''];
 
         $blockForms = $this->getRegisteredBlockForms($resolvedLocale);
         foreach (\array_keys($blockForms) as $blockKey) {

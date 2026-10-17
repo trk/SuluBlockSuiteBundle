@@ -16,7 +16,7 @@ final class DynamicContentHydratorTest extends TestCase
         $hydrator = new DynamicContentHydrator();
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'title' => 'Static Title',
             'summary' => 'Static Summary',
             'props' => [
@@ -35,7 +35,7 @@ final class DynamicContentHydratorTest extends TestCase
         $hydrator = new DynamicContentHydrator();
 
         $block = [
-            'type' => 'headline',
+            'type' => 'fixture_headline',
             'headline' => 'Static Headline',
             'props' => [
                 '_dynamic' => [
@@ -74,7 +74,7 @@ final class DynamicContentHydratorTest extends TestCase
             ->willReturn($pageData);
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'title' => 'Old Title',
             'summary' => 'Old Summary',
             'props' => [
@@ -124,7 +124,7 @@ final class DynamicContentHydratorTest extends TestCase
             ->willReturn($pageData);
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'title' => 'Static Title',
             'summary' => 'Static Manual Summary Fallback',
             'props' => [
@@ -167,7 +167,7 @@ final class DynamicContentHydratorTest extends TestCase
             ->willReturn($pageData);
 
         $block = [
-            'type' => 'image',
+            'type' => 'fixture_image',
             'image' => null,
             'props' => [
                 '_dynamic' => [
@@ -209,7 +209,7 @@ final class DynamicContentHydratorTest extends TestCase
             ->willReturn($pageData);
 
         $block = [
-            'type' => 'image',
+            'type' => 'fixture_image',
             'image' => null,
             'props' => [
                 '_dynamic' => [
@@ -244,7 +244,7 @@ final class DynamicContentHydratorTest extends TestCase
             ->willReturn(null);
 
         $block = [
-            'type' => 'headline',
+            'type' => 'fixture_headline',
             'headline' => 'Fallback Headline',
             'props' => [
                 '_dynamic' => [
@@ -294,7 +294,7 @@ final class DynamicContentHydratorTest extends TestCase
             ->willReturn($children);
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'title' => 'Template Card',
             'props' => [
                 'variant' => 'elevated',
@@ -346,7 +346,7 @@ final class DynamicContentHydratorTest extends TestCase
             ->willReturn($items);
 
         $block = [
-            'type' => 'headline',
+            'type' => 'fixture_headline',
             'headline' => 'Default',
             'props' => [
                 '_dynamic' => [
@@ -385,7 +385,7 @@ final class DynamicContentHydratorTest extends TestCase
             ->willReturn($children);
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'props' => [
                 '_dynamic' => [
                     'enabled' => true,
@@ -425,9 +425,9 @@ final class DynamicContentHydratorTest extends TestCase
             ]);
 
         $blocks = [
-            ['type' => 'headline', 'title' => 'Top Static'],
+            ['type' => 'fixture_headline', 'title' => 'Top Static'],
             [
-                'type' => 'card',
+                'type' => 'fixture_card',
                 'props' => [
                     '_dynamic' => [
                         'enabled' => true,
@@ -437,19 +437,19 @@ final class DynamicContentHydratorTest extends TestCase
                     ],
                 ],
             ],
-            ['type' => 'divider'],
+            ['type' => 'fixture_divider'],
         ];
 
         $flattened = $hydrator->hydrateBlocks($blocks);
 
         self::assertCount(4, $flattened);
-        self::assertSame('headline', $flattened[0]['type']);
+        self::assertSame('fixture_headline', $flattened[0]['type']);
         self::assertSame('Top Static', $flattened[0]['title']);
-        self::assertSame('card', $flattened[1]['type']);
+        self::assertSame('fixture_card', $flattened[1]['type']);
         self::assertSame('Child 1', $flattened[1]['title']);
-        self::assertSame('card', $flattened[2]['type']);
+        self::assertSame('fixture_card', $flattened[2]['type']);
         self::assertSame('Child 2', $flattened[2]['title']);
-        self::assertSame('divider', $flattened[3]['type']);
+        self::assertSame('fixture_divider', $flattened[3]['type']);
     }
 
     public function testExtractsDynamicConfigFromContentViewObject(): void
@@ -479,7 +479,7 @@ final class DynamicContentHydratorTest extends TestCase
         };
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'title' => 'Original',
             'props' => $propsObject,
         ];
@@ -500,7 +500,7 @@ final class DynamicContentHydratorTest extends TestCase
             ->willReturn(['title' => 'Current Page Mapped Title']);
 
         $block = [
-            'type' => 'headline',
+            'type' => 'fixture_headline',
             'title' => 'Static Headline',
             'props' => [
                 '_dynamic' => [
@@ -535,7 +535,7 @@ final class DynamicContentHydratorTest extends TestCase
             ]);
 
         $parentBlock = [
-            'type' => 'headline',
+            'type' => 'fixture_headline',
             'title' => 'Fallback',
             'props' => [
                 '_dynamic' => [
@@ -552,7 +552,7 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertSame('/parent', $parentResult[0]['link']);
 
         $siblingBlock = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'props' => [
                 '_dynamic' => [
                     'enabled' => true,
@@ -583,9 +583,9 @@ final class DynamicContentHydratorTest extends TestCase
             ]);
 
         $gridBlock = [
-            'type' => 'grid',
+            'type' => 'fixture_grid',
             'items' => [
-                ['type' => 'grid_item', 'title' => 'Placeholder', 'button_text' => 'Read More'],
+                ['type' => 'fixture_grid_item', 'title' => 'Placeholder', 'button_text' => 'Read More'],
             ],
             'props' => [
                 'columns' => '3',
@@ -607,13 +607,13 @@ final class DynamicContentHydratorTest extends TestCase
 
         // Must return 1 grid block with 2 inner items, NOT 2 grid blocks!
         self::assertCount(1, $result);
-        self::assertSame('grid', $result[0]['type']);
+        self::assertSame('fixture_grid', $result[0]['type']);
         self::assertIsArray($result[0]['items']);
         /** @var list<array<string, mixed>> $items */
         $items = $result[0]['items'];
         self::assertCount(2, $items);
 
-        self::assertSame('grid_item', $items[0]['type']);
+        self::assertSame('fixture_grid_item', $items[0]['type']);
         self::assertSame('Cloud Architecture', $items[0]['title']);
         self::assertSame('Scalable cloud infra', $items[0]['summary']);
         self::assertSame('/services/cloud', $items[0]['link']);
@@ -636,7 +636,7 @@ final class DynamicContentHydratorTest extends TestCase
             ]);
 
         $accordionBlock = [
-            'type' => 'accordion',
+            'type' => 'fixture_accordion',
             'items' => [],
             'props' => [
                 '_dynamic' => [
@@ -654,17 +654,17 @@ final class DynamicContentHydratorTest extends TestCase
         $result = $hydrator->hydrateBlock($accordionBlock);
 
         self::assertCount(1, $result);
-        self::assertSame('accordion', $result[0]['type']);
+        self::assertSame('fixture_accordion', $result[0]['type']);
         self::assertIsArray($result[0]['items']);
         /** @var list<array<string, mixed>> $items */
         $items = $result[0]['items'];
         self::assertCount(2, $items);
 
-        self::assertSame('accordion_item', $items[0]['type']);
+        self::assertSame('fixture_accordion_item', $items[0]['type']);
         self::assertSame('What is Sulu 3?', $items[0]['title']);
         self::assertSame('Modern Symfony CMS', $items[0]['content']);
 
-        self::assertSame('accordion_item', $items[1]['type']);
+        self::assertSame('fixture_accordion_item', $items[1]['type']);
         self::assertSame('How do presets work?', $items[1]['title']);
         self::assertSame('Reusable prop sets', $items[1]['content']);
     }
@@ -711,7 +711,7 @@ final class DynamicContentHydratorTest extends TestCase
         $hydrator = new DynamicContentHydrator(null, [$customProvider]);
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'props' => [
                 '_dynamic' => [
                     'enabled' => true,
@@ -745,7 +745,7 @@ final class DynamicContentHydratorTest extends TestCase
 
         // Test 'contains' on array
         $blockContains = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'props' => [
                 '_dynamic' => [
                     'enabled' => true,
@@ -760,7 +760,7 @@ final class DynamicContentHydratorTest extends TestCase
 
         // Test 'in' comma-separated list
         $blockIn = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'props' => [
                 '_dynamic' => [
                     'enabled' => true,
@@ -775,7 +775,7 @@ final class DynamicContentHydratorTest extends TestCase
 
         // Test 'starts_with' failing
         $blockStartsWith = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'props' => [
                 '_dynamic' => [
                     'enabled' => true,
@@ -803,20 +803,20 @@ final class DynamicContentHydratorTest extends TestCase
                 ['title' => 'About', 'url' => '/about'],
             ]);
 
-        $breadcrumbsForm = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata();
-        $breadcrumbsForm->setKey('breadcrumbs');
+        $trailForm = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata();
+        $trailForm->setKey('fixture_trail');
 
         $childItemForm = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata();
-        $childItemForm->setKey('breadcrumb_item');
+        $childItemForm->setKey('fixture_trail_item');
 
         $itemsBlockField = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata('items');
         $itemsBlockField->setType('block');
-        $itemsBlockField->setDefaultType('breadcrumb_item');
+        $itemsBlockField->setDefaultType('fixture_trail_item');
         $itemsBlockField->addType($childItemForm);
-        $breadcrumbsForm->addItem($itemsBlockField);
+        $trailForm->addItem($itemsBlockField);
 
         $typedFormMetadata = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata();
-        $typedFormMetadata->addForm('breadcrumbs', $breadcrumbsForm);
+        $typedFormMetadata->addForm('fixture_trail', $trailForm);
 
         $provider = $this->createStub(\Sulu\Bundle\AdminBundle\Metadata\MetadataProviderInterface::class);
         $provider->method('getMetadata')->willReturn($typedFormMetadata);
@@ -830,8 +830,8 @@ final class DynamicContentHydratorTest extends TestCase
         $targetFieldResolver = new \Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver($registry);
         $hydrator = new DynamicContentHydrator($sourceResolver, [], $targetFieldResolver);
 
-        $breadcrumbsBlock = [
-            'type' => 'breadcrumbs',
+        $trailBlock = [
+            'type' => 'fixture_trail',
             'props' => [
                 '_dynamic' => [
                     'enabled' => true,
@@ -846,15 +846,15 @@ final class DynamicContentHydratorTest extends TestCase
             ],
         ];
 
-        $result = $hydrator->hydrateBlock($breadcrumbsBlock);
+        $result = $hydrator->hydrateBlock($trailBlock);
 
         self::assertCount(1, $result);
-        self::assertSame('breadcrumbs', $result[0]['type']);
+        self::assertSame('fixture_trail', $result[0]['type']);
         self::assertIsArray($result[0]['items']);
         /** @var list<array<string, mixed>> $items */
         $items = $result[0]['items'];
         self::assertCount(2, $items);
-        self::assertSame('breadcrumb_item', $items[0]['type']);
+        self::assertSame('fixture_trail_item', $items[0]['type']);
         self::assertSame('Home', $items[0]['title']);
         self::assertSame('/about', $items[1]['url']);
     }
@@ -916,9 +916,9 @@ final class DynamicContentHydratorTest extends TestCase
 
         $hydrator = new DynamicContentHydrator(null, [$productProvider]);
 
-        // 1. Single product mode on a single block (card)
+        // 1. Single product mode on a single block (fixture_card)
         $singleCard = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'title' => 'Static Product',
             'badge' => 'STATIC',
             'props' => [
@@ -941,9 +941,9 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertSame('CNC-X500', $singleResult[0]['badge']);
         self::assertSame('$14,500', $singleResult[0]['subtitle']);
 
-        // 2. Product collection mode on a multiple block (grid)
+        // 2. Product collection mode on a multiple block (fixture_grid)
         $gridBlock = [
-            'type' => 'grid',
+            'type' => 'fixture_grid',
             'items' => [],
             'props' => [
                 '_dynamic' => [
@@ -997,7 +997,7 @@ final class DynamicContentHydratorTest extends TestCase
         };
 
         $headlineWithWrappedMapping = [
-            'type' => 'headline',
+            'type' => 'fixture_headline',
             'title' => '',
             'subtitle' => '',
             'props' => [
@@ -1012,7 +1012,7 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertSame('Dynamic Current Page Headline', $result[0]['title']);
 
         $headlineWithoutExplicitMapping = [
-            'type' => 'headline',
+            'type' => 'fixture_headline',
             'title' => '',
             'subtitle' => '',
             'props' => [
@@ -1038,7 +1038,7 @@ final class DynamicContentHydratorTest extends TestCase
         $hydrator = new DynamicContentHydrator($sourceResolver);
 
         $block = [
-            'type' => 'text',
+            'type' => 'fixture_rich_text',
             'content' => '<p>Static placeholder</p>',
             'props' => [
                 'dynamic_source' => 'current_page',
@@ -1069,7 +1069,7 @@ final class DynamicContentHydratorTest extends TestCase
         $hydrator = new DynamicContentHydrator($sourceResolver);
 
         $block = [
-            'type' => 'text',
+            'type' => 'fixture_rich_text',
             'content' => '',
             'props' => [
                 'dynamic_source' => 'current_page',
@@ -1093,7 +1093,7 @@ final class DynamicContentHydratorTest extends TestCase
         $hydrator = new DynamicContentHydrator($sourceResolver);
 
         $block = [
-            'type' => 'headline',
+            'type' => 'fixture_headline',
             'title' => 'Fallback',
             'props' => [
                 '_dynamic' => [
@@ -1119,7 +1119,7 @@ final class DynamicContentHydratorTest extends TestCase
         $hydrator = new DynamicContentHydrator($sourceResolver);
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'content' => '',
             'props' => [
                 '_dynamic' => [
@@ -1189,48 +1189,75 @@ final class DynamicContentHydratorTest extends TestCase
         );
     }
 
-    public function testAutoMappingHydratesCardOverlayAndSlideshowContentFromSummaryOrTruncatedBody(): void
+    public function testAutoMappingMatchesByEqualNameAndFieldTypeCompatibility(): void
     {
-        $longBody = '<p>' . \str_repeat('Modern Sulu 3 architecture with single source of truth content fields. ', 4) . '</p>';
+        $richBody = '<p>Modern Sulu 3 architecture with metadata-driven field mapping.</p>';
 
         $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
         $sourceResolver->method('resolvePage')->willReturn([
             'title' => 'Card Page Title',
-            'headline' => 'Card Display Headline',
-            'summary' => '',
-            'content' => $longBody,
+            'content' => $richBody,
             'image' => ['id' => 99, 'url' => '/uploads/card.jpg'],
             'url' => '/solutions/card-page',
         ]);
 
-        $hydrator = new DynamicContentHydrator($sourceResolver);
+        $fixtureTeaserForm = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata();
+        $fixtureTeaserForm->setKey('fixture_teaser');
 
-        foreach (['card', 'overlay', 'slideshow_item'] as $teaserBlockType) {
-            $block = [
-                'type' => $teaserBlockType,
-                'title' => '',
-                'content' => '',
-                'image' => null,
-                'link' => '',
-                'props' => [
-                    'dynamic_source' => 'specific_page',
-                    'dynamic_page_id' => 'page-123',
-                    'dynamic_mapping' => [],
-                ],
-            ];
+        $titleField = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata('title');
+        $titleField->setType('text_line');
+        $fixtureTeaserForm->addItem($titleField);
 
-            $hydratedList = $hydrator->hydrateBlock($block);
-            self::assertCount(1, $hydratedList);
-            $hydrated = $hydratedList[0];
+        $bodyField = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata('body');
+        $bodyField->setType('text_editor');
+        $fixtureTeaserForm->addItem($bodyField);
 
-            self::assertSame('Card Page Title', $hydrated['title']);
-            self::assertIsString($hydrated['content']);
-            self::assertLessThanOrEqual(160, \mb_strlen($hydrated['content'], 'UTF-8'));
-            self::assertStringNotContainsString('<p>', $hydrated['content']);
-            self::assertStringEndsWith('...', $hydrated['content']);
-            self::assertSame(['id' => 99, 'url' => '/uploads/card.jpg'], $hydrated['image']);
-            self::assertSame('/solutions/card-page', $hydrated['link']);
-        }
+        $photoField = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata('photo');
+        $photoField->setType('single_media_selection');
+        $fixtureTeaserForm->addItem($photoField);
+
+        $ctaLinkField = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata('cta_link');
+        $ctaLinkField->setType('link');
+        $fixtureTeaserForm->addItem($ctaLinkField);
+
+        $typedFormMetadata = new \Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata();
+        $typedFormMetadata->addForm('fixture_teaser', $fixtureTeaserForm);
+
+        $provider = $this->createStub(\Sulu\Bundle\AdminBundle\Metadata\MetadataProviderInterface::class);
+        $provider->method('getMetadata')->willReturn($typedFormMetadata);
+
+        $registry = new \Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry(
+            new \Symfony\Component\DependencyInjection\ServiceLocator([
+                'form' => static fn () => $provider,
+            ]),
+        );
+
+        $targetFieldResolver = new \Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver($registry);
+        $hydrator = new DynamicContentHydrator($sourceResolver, [], $targetFieldResolver);
+
+        $block = [
+            'type' => 'fixture_teaser',
+            'title' => '',
+            'body' => '',
+            'photo' => null,
+            'cta_link' => '',
+            'props' => [
+                'dynamic_source' => 'specific_page',
+                'dynamic_page_id' => 'page-123',
+                'dynamic_mapping' => [],
+            ],
+        ];
+
+        $hydratedList = $hydrator->hydrateBlock($block);
+        self::assertCount(1, $hydratedList);
+        $hydrated = $hydratedList[0];
+
+        // 1. Equal field name match
+        self::assertSame('Card Page Title', $hydrated['title']);
+        // 2. Type compatibility matches via BlockTargetFieldMetadataResolver
+        self::assertSame($richBody, $hydrated['body']);
+        self::assertSame(['id' => 99, 'url' => '/uploads/card.jpg'], $hydrated['photo']);
+        self::assertSame('/solutions/card-page', $hydrated['cta_link']);
     }
 
     public function testExtractValueWithStripHtmlIgnoresNonScalarValueAndUsesFallback(): void
@@ -1262,7 +1289,7 @@ final class DynamicContentHydratorTest extends TestCase
         $hydrator = new DynamicContentHydrator($sourceResolver, [$pageProvider]);
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'title' => '',
             'props' => [
                 'dynamic_source' => 'page_children',
@@ -1291,7 +1318,7 @@ final class DynamicContentHydratorTest extends TestCase
         $hydrator = new DynamicContentHydrator($sourceResolver);
 
         $block = [
-            'type' => 'card',
+            'type' => 'fixture_card',
             'id' => 'root-card',
             'title' => 'Template Card',
             'props' => [

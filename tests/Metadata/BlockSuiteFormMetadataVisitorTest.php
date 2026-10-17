@@ -21,7 +21,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $presetProvider = $this->createMock(BlockPresetProviderInterface::class);
         $presetProvider->expects($this->once())
             ->method('getPresets')
-            ->with('headline', 'tr')
+            ->with('fixture_headline', 'tr')
             ->willReturn([
                 [
                     'id' => 'hero_center_title',
@@ -34,7 +34,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $visitor = new BlockSuiteFormMetadataVisitor(presetProvider: $presetProvider);
 
         $headlineForm = new FormMetadata();
-        $headlineForm->setKey('headline');
+        $headlineForm->setKey('fixture_headline');
 
         $contentSection = new SectionMetadata('content');
         $contentSection->setLabel('İçerik', 'tr');
@@ -44,7 +44,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $headlineForm->addItem($contentSection);
 
         $typedForm = new TypedFormMetadata();
-        $typedForm->addForm('headline', $headlineForm);
+        $typedForm->addForm('fixture_headline', $headlineForm);
 
         $visitor->visitTypedFormMetadata($typedForm, 'block', 'tr');
 
@@ -73,7 +73,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $visitor = new BlockSuiteFormMetadataVisitor();
 
         $headlineForm = new FormMetadata();
-        $headlineForm->setKey('headline');
+        $headlineForm->setKey('fixture_headline');
 
         $contentSection = new SectionMetadata('content');
         $contentSection->setLabel('Content', 'en');
@@ -101,7 +101,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $headlineForm->addItem($generalSection);
 
         $typedForm = new TypedFormMetadata();
-        $typedForm->addForm('headline', $headlineForm);
+        $typedForm->addForm('fixture_headline', $headlineForm);
 
         $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
 
@@ -214,7 +214,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $visitor = new BlockSuiteFormMetadataVisitor();
 
         $buttonSubItem = new FormMetadata();
-        $buttonSubItem->setKey('button');
+        $buttonSubItem->setKey('fixture_button');
 
         $subContent = new SectionMetadata('content');
         $subContent->setLabel('Content', 'en');
@@ -235,11 +235,11 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $itemsBlockField->addType($buttonSubItem);
 
         $parentBlock = new FormMetadata();
-        $parentBlock->setKey('button');
+        $parentBlock->setKey('fixture_button');
         $parentBlock->addItem($itemsBlockField);
 
         $typedForm = new TypedFormMetadata();
-        $typedForm->addForm('button', $parentBlock);
+        $typedForm->addForm('fixture_button', $parentBlock);
 
         $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
 
@@ -266,17 +266,9 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $visitor = new BlockSuiteFormMetadataVisitor();
         $blockTagConfigs = [
             'reusable' => ['exclude' => 'dynamic_content'],
-            'spacer' => ['exclude' => 'dynamic_content'],
-            'section' => ['exclude' => 'dynamic_content'],
-            'divider' => ['exclude' => 'dynamic_content'],
-            'icon' => ['exclude' => 'dynamic_content'],
-            'html' => ['exclude' => 'dynamic_content'],
-            'code' => ['exclude' => 'dynamic_content'],
-            'breadcrumbs' => ['exclude' => 'dynamic_content'],
-            'scroll_to' => ['exclude' => 'dynamic_content'],
-            'countdown' => ['exclude' => 'dynamic_content'],
-            'popover' => ['exclude' => 'dynamic_content'],
-            'map' => ['exclude' => 'dynamic_content'],
+            'fixture_spacer' => ['exclude' => 'dynamic_content'],
+            'fixture_section' => ['exclude' => 'dynamic_content'],
+            'fixture_divider' => ['exclude' => 'dynamic_content'],
         ];
 
         $typedForm = new TypedFormMetadata();
@@ -321,12 +313,12 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $visitor = new BlockSuiteFormMetadataVisitor();
 
         $accordionForm = new FormMetadata();
-        $accordionForm->setKey('accordion');
+        $accordionForm->setKey('fixture_accordion');
         $accContent = new SectionMetadata('content');
         $accItems = new FieldMetadata('items');
         $accItems->setType('block');
         $accItemType = new FormMetadata();
-        $accItemType->setKey('accordion_item');
+        $accItemType->setKey('fixture_accordion_item');
         $accItemHeading = new FieldMetadata('accordion_heading');
         $accItemHeading->setType('text_line');
         $accItemType->addItem($accItemHeading);
@@ -335,7 +327,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $accordionForm->addItem($accContent);
 
         $headlineForm = new FormMetadata();
-        $headlineForm->setKey('headline');
+        $headlineForm->setKey('fixture_headline');
         $hlContent = new SectionMetadata('content');
         $hlTitle = new FieldMetadata('title');
         $hlTitle->setType('text_line');
@@ -343,8 +335,8 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $headlineForm->addItem($hlContent);
 
         $typedForm = new TypedFormMetadata();
-        $typedForm->addForm('accordion', $accordionForm);
-        $typedForm->addForm('headline', $headlineForm);
+        $typedForm->addForm('fixture_accordion', $accordionForm);
+        $typedForm->addForm('fixture_headline', $headlineForm);
 
         $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
 
@@ -376,7 +368,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $this->assertSame(['en' => 'Title'], $firstTargetOption->getTitles());
 
         $trHeadlineForm = new FormMetadata();
-        $trHeadlineForm->setKey('headline');
+        $trHeadlineForm->setKey('fixture_headline');
         $trHlContent = new SectionMetadata('content');
         $trHlTitle = new FieldMetadata('title');
         $trHlTitle->setType('text_line');
@@ -384,7 +376,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $trHeadlineForm->addItem($trHlContent);
 
         $trTypedForm = new TypedFormMetadata();
-        $trTypedForm->addForm('headline', $trHeadlineForm);
+        $trTypedForm->addForm('fixture_headline', $trHeadlineForm);
         $visitor->visitTypedFormMetadata($trTypedForm, 'block', 'tr');
 
         /** @var SectionMetadata $trTabs */
@@ -400,12 +392,38 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $this->assertSame(['tr' => 'Başlık'], $trTargetValues[0]->getTitles());
     }
 
+    public function testBlockWithEmptyContentSectionExposesZeroTargetFieldOptionsWithoutHardcodedFallbacks(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor();
+
+        $emptyContentBlock = new FormMetadata();
+        $emptyContentBlock->setKey('fixture_empty');
+        $emptyContentBlock->addItem(new SectionMetadata('content'));
+
+        $typedForm = new TypedFormMetadata();
+        $typedForm->addForm('fixture_empty', $emptyContentBlock);
+
+        $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
+
+        /** @var SectionMetadata $tabs */
+        $tabs = $emptyContentBlock->getItems()['__tabs'];
+        /** @var SectionMetadata $dyn */
+        $dyn = $tabs->getItems()['dynamic_content'];
+        /** @var FieldMetadata $mapping */
+        $mapping = $dyn->getItems()['props/dynamic_mapping'];
+        /** @var FieldMetadata $targetField */
+        $targetField = $mapping->getTypes()['field_map']->getItems()['target_field'];
+
+        $this->assertNull($targetField->findOption('default_value')?->getValue());
+        $this->assertSame([], $targetField->findOption('values')?->getValue());
+    }
+
     public function testBlocksAreSortedAlphabeticallyByTitle(): void
     {
         $visitor = new BlockSuiteFormMetadataVisitor();
 
         $typedBlockForms = new TypedFormMetadata();
-        foreach (['video' => 'Video', 'accordion' => 'Accordion', 'headline' => 'Headline', 'button' => 'Button'] as $key => $title) {
+        foreach (['fixture_video' => 'Video', 'fixture_accordion' => 'Accordion', 'fixture_headline' => 'Headline', 'fixture_button' => 'Button'] as $key => $title) {
             $blockForm = new FormMetadata();
             $blockForm->setKey($key);
             $blockForm->setTitle($title, 'en');
@@ -419,7 +437,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
 
         $visitor->visitTypedFormMetadata($typedBlockForms, 'block', 'en');
 
-        $this->assertSame(['accordion', 'button', 'headline', 'video'], \array_keys($typedBlockForms->getForms()));
+        $this->assertSame(['fixture_accordion', 'fixture_button', 'fixture_headline', 'fixture_video'], \array_keys($typedBlockForms->getForms()));
     }
 
     public function testBlockPresetTargetBlockOptionsAreDerivedFromBlockFieldTypes(): void
@@ -436,7 +454,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $blockField = new FieldMetadata('block');
         $blockField->setType('block');
 
-        foreach (['headline' => 'Headline', 'text' => 'Text', 'button' => 'Button'] as $key => $title) {
+        foreach (['fixture_headline' => 'Headline', 'fixture_text' => 'Text', 'fixture_button' => 'Button'] as $key => $title) {
             $typeForm = new FormMetadata();
             $typeForm->setKey($key);
             $typeForm->setTitle($title, 'en');
@@ -446,18 +464,18 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
 
         $visitor->visitFormMetadata($presetForm, 'en');
 
-        $this->assertSame('headline', $targetBlockField->findOption('default_value')?->getValue());
+        $this->assertSame('fixture_headline', $targetBlockField->findOption('default_value')?->getValue());
 
         $valuesOption = $targetBlockField->findOption('values');
         $this->assertNotNull($valuesOption);
         $values = $valuesOption->getValue();
         $this->assertIsArray($values);
         $this->assertCount(3, $values);
-        $this->assertSame('button', $values[0]->getName());
+        $this->assertSame('fixture_button', $values[0]->getName());
         $this->assertSame(['en' => 'Button'], $values[0]->getTitles());
-        $this->assertSame('headline', $values[1]->getName());
+        $this->assertSame('fixture_headline', $values[1]->getName());
         $this->assertSame(['en' => 'Headline'], $values[1]->getTitles());
-        $this->assertSame('text', $values[2]->getName());
+        $this->assertSame('fixture_text', $values[2]->getName());
         $this->assertSame(['en' => 'Text'], $values[2]->getTitles());
     }
 

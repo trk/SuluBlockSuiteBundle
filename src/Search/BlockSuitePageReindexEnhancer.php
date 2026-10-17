@@ -6,54 +6,42 @@ namespace Totoglu\SuluBlockSuiteBundle\Search;
 
 use CmsIg\Seal\Converter\HtmlToTextConverter;
 use Doctrine\ORM\QueryBuilder;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\ItemMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Page\Infrastructure\Sulu\Search\Visitor\WebsitePageReindexProviderEnhancerInterface;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 
 /**
  * Enhances Sulu 3 Website Page search documents (CMS-IG Seal) by recursively extracting
- * searchable text from nested container blocks (`section` -> `rows` -> `columns` -> `blocks`),
- * collection sub-items (`items`), and embedded `reusable_block` snippets.
+ * searchable text from fields of type `text_line`, `text_area`, and `text_editor`,
+ * nested `block`-type fields, and embedded `reusable` block snippets.
  */
 final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderEnhancerInterface
 {
-    private const TEXT_FIELDS = [
-        'title',
-        'subtitle',
-        'headline',
-        'meta',
-        'text',
-        'content',
-        'description',
-        'summary',
-        'caption',
-        'quote',
-        'author',
-        'author_role',
-        'label',
-        'badge',
-        'term',
-        'details',
-        'button_text',
-        'link_text',
-        'col_1',
-        'col_2',
-        'col_3',
-        'col_4',
-        'col_5',
+    private const TEXT_FIELD_TYPES = [
+        'text_line' => true,
+        'text_area' => true,
+        'text_editor' => true,
     ];
 
-    private const CHILD_COLLECTION_KEYS = [
-        'blocks',
-        'rows',
-        'columns',
-        'items',
-        'buttons',
-        'badges',
+    private const MEDIA_FIELD_TYPES = [
+        'single_media_selection' => true,
+        'media_selection' => true,
     ];
+
+    /**
+     * @var array<string, array<string, FormMetadata>>
+     */
+    private array $typedFormsCache = [];
 
     public function __construct(
         private readonly ?SnippetRepositoryInterface $snippetRepository = null,
+        private readonly ?MetadataProviderRegistry $metadataProviderRegistry = null,
     ) {
     }
 
@@ -61,16 +49,22 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
     {
         $selectParts = $queryBuilder->getDQLPart('select');
         $hasTemplateData = false;
+        $hasTemplateKey = false;
         if (\is_array($selectParts)) {
             foreach ($selectParts as $part) {
                 $partString = (\is_string($part) || $part instanceof \Stringable) ? (string) $part : '';
                 if (\str_contains($partString, 'dimensionContent.templateData')) {
                     $hasTemplateData = true;
-                    break;
+                }
+                if (\str_contains($partString, 'dimensionContent.templateKey')) {
+                    $hasTemplateKey = true;
                 }
             }
         }
 
+        if (!$hasTemplateKey) {
+            $queryBuilder->addSelect('dimensionContent.templateKey');
+        }
         if (!$hasTemplateData) {
             $queryBuilder->addSelect('dimensionContent.templateData');
         }
@@ -79,6 +73,7 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
     public function enhanceDocument(array $queryResult, array $document): array
     {
         $locale = isset($queryResult['locale']) && \is_string($queryResult['locale']) ? $queryResult['locale'] : 'en';
+        $templateKey = isset($queryResult['templateKey']) && \is_string($queryResult['templateKey']) ? $queryResult['templateKey'] : null;
         $templateData = $queryResult['templateData'] ?? null;
 
         if (!\is_array($templateData) || [] === $templateData) {
@@ -89,28 +84,19 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
         $extractedTexts = [];
         $visitedSnippets = [];
 
-        foreach (['headline', 'subtitle', 'summary', 'description', 'content', 'article'] as $topLevelField) {
-            if (isset($templateData[$topLevelField]) && \is_string($templateData[$topLevelField])) {
-                $plain = $this->normalizePlainText($templateData[$topLevelField]);
-                if ('' !== $plain) {
-                    $extractedTexts[] = $plain;
-                }
-            }
-        }
-
-        if ((!isset($document['mediaId']) || '' === $document['mediaId'])
-            && isset($templateData['image'])
-            && \is_array($templateData['image'])
-            && isset($templateData['image']['id'])
-            && (\is_int($templateData['image']['id']) || \is_numeric($templateData['image']['id']))
-        ) {
-            $document['mediaId'] = (string) $templateData['image']['id'];
-        }
-
-        foreach (self::CHILD_COLLECTION_KEYS as $collectionKey) {
-            if (isset($templateData[$collectionKey]) && \is_array($templateData[$collectionKey])) {
-                $this->extractFromBlockList($templateData[$collectionKey], $locale, $extractedTexts, $visitedSnippets);
-            }
+        $pageForm = $this->resolveTemplateForm('page', $templateKey, $locale);
+        if (null !== $pageForm) {
+            $this->extractFromTemplateDataWithMetadata(
+                $templateData,
+                $pageForm,
+                $locale,
+                $extractedTexts,
+                $visitedSnippets,
+                $document,
+                isRootPage: true,
+            );
+        } else {
+            $this->extractFromRootDataFallback($templateData, $locale, $extractedTexts, $visitedSnippets, $document);
         }
 
         if ([] === $extractedTexts) {
@@ -134,16 +120,124 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
     }
 
     /**
+     * @param array<string, mixed> $data
+     * @param list<string> $extractedTexts
+     * @param array<string, bool> $visitedSnippets
+     * @param array<string, mixed> $document
+     */
+    private function extractFromTemplateDataWithMetadata(
+        array $data,
+        FormMetadata $formMetadata,
+        string $locale,
+        array &$extractedTexts,
+        array &$visitedSnippets,
+        array &$document,
+        bool $isRootPage = false,
+    ): void {
+        $fields = $this->collectContentFields($formMetadata->getItems());
+
+        foreach ($fields as $field) {
+            $fieldName = $field->getName();
+            if (\str_starts_with($fieldName, 'props/')) {
+                continue;
+            }
+
+            $fieldType = $this->getFieldType($field);
+            $value = $data[$fieldName] ?? null;
+
+            if ($isRootPage && isset(self::MEDIA_FIELD_TYPES[$fieldType])) {
+                if ((!isset($document['mediaId']) || '' === $document['mediaId'])
+                    && \is_array($value)
+                    && isset($value['id'])
+                    && (\is_int($value['id']) || \is_numeric($value['id']))
+                ) {
+                    $document['mediaId'] = (string) $value['id'];
+                }
+
+                continue;
+            }
+
+            if ($isRootPage && 'title' === $fieldName && 'text_line' === $fieldType) {
+                continue;
+            }
+
+            if (isset(self::TEXT_FIELD_TYPES[$fieldType])) {
+                if (\is_string($value)) {
+                    $plain = $this->normalizePlainText($value, 'text_editor' === $fieldType);
+                    if ('' !== $plain) {
+                        $extractedTexts[] = $plain;
+                    }
+                }
+
+                continue;
+            }
+
+            if ('block' === $fieldType && \is_array($value)) {
+                $this->extractFromBlockList($value, $field, $locale, $extractedTexts, $visitedSnippets);
+            }
+        }
+    }
+
+    /**
+     * Structural fallback when Sulu FormMetadata is not available (e.g. standalone unit tests without metadata registry).
+     *
+     * @param array<string, mixed> $templateData
+     * @param list<string> $extractedTexts
+     * @param array<string, bool> $visitedSnippets
+     * @param array<string, mixed> $document
+     */
+    private function extractFromRootDataFallback(
+        array $templateData,
+        string $locale,
+        array &$extractedTexts,
+        array &$visitedSnippets,
+        array &$document,
+    ): void {
+        foreach ($templateData as $key => $value) {
+            if ('props' === $key || 'url' === $key || 'layout' === $key || \str_starts_with($key, '_')) {
+                continue;
+            }
+
+            if (\is_string($value)) {
+                $plain = $this->normalizePlainText($value, \str_contains($value, '<'));
+                if ('' !== $plain) {
+                    $extractedTexts[] = $plain;
+                }
+
+                continue;
+            }
+
+            if (\is_array($value)) {
+                if ((!isset($document['mediaId']) || '' === $document['mediaId'])
+                    && isset($value['id'])
+                    && (\is_int($value['id']) || \is_numeric($value['id']))
+                ) {
+                    $document['mediaId'] = (string) $value['id'];
+
+                    continue;
+                }
+
+                if (\array_is_list($value)) {
+                    $this->extractFromBlockList($value, null, $locale, $extractedTexts, $visitedSnippets);
+                }
+            }
+        }
+    }
+
+    /**
      * @param array<mixed> $blocks
      * @param list<string> $extractedTexts
      * @param array<string, bool> $visitedSnippets
      */
     private function extractFromBlockList(
         array $blocks,
+        ?FieldMetadata $blockFieldMetadata,
         string $locale,
         array &$extractedTexts,
         array &$visitedSnippets,
     ): void {
+        $typeForms = null !== $blockFieldMetadata ? $blockFieldMetadata->getTypes() : [];
+
         foreach ($blocks as $block) {
             if (!\is_array($block)) {
                 continue;
@@ -163,26 +257,176 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
                     $visitedSnippets[$snippetUuid] = true;
                     $this->extractFromReusableSnippet($snippetUuid, $locale, $extractedTexts, $visitedSnippets);
                 }
+
+                continue;
             }
 
-            // Extract text fields on this block
-            foreach (self::TEXT_FIELDS as $fieldName) {
-                if (!isset($block[$fieldName]) || !\is_string($block[$fieldName])) {
-                    continue;
-                }
+            $blockForm = $this->resolveBlockTypeForm($type, $typeForms, $locale);
+            if (null !== $blockForm) {
+                $dummyDoc = [];
+                $this->extractFromTemplateDataWithMetadata(
+                    $block,
+                    $blockForm,
+                    $locale,
+                    $extractedTexts,
+                    $visitedSnippets,
+                    $dummyDoc,
+                    isRootPage: false,
+                );
+            } else {
+                $this->extractFromBlockFallback($block, $locale, $extractedTexts, $visitedSnippets);
+            }
+        }
+    }
 
-                $plain = $this->normalizePlainText($block[$fieldName]);
+    /**
+     * @param array<string, mixed> $block
+     * @param list<string> $extractedTexts
+     * @param array<string, bool> $visitedSnippets
+     */
+    private function extractFromBlockFallback(
+        array $block,
+        string $locale,
+        array &$extractedTexts,
+        array &$visitedSnippets,
+    ): void {
+        foreach ($block as $key => $value) {
+            if ('type' === $key || 'props' === $key || 'settings' === $key || \str_starts_with($key, '_')) {
+                continue;
+            }
+
+            if (\is_string($value)) {
+                $plain = $this->normalizePlainText($value, \str_contains($value, '<'));
                 if ('' !== $plain) {
                     $extractedTexts[] = $plain;
                 }
+
+                continue;
             }
 
-            // Recurse into nested containers (`rows`, `columns`, `blocks`, `items`, etc.)
-            foreach (self::CHILD_COLLECTION_KEYS as $childKey) {
-                if (isset($block[$childKey]) && \is_array($block[$childKey])) {
-                    $this->extractFromBlockList($block[$childKey], $locale, $extractedTexts, $visitedSnippets);
+            if (\is_array($value) && \array_is_list($value)) {
+                $this->extractFromBlockList($value, null, $locale, $extractedTexts, $visitedSnippets);
+            }
+        }
+    }
+
+    /**
+     * @param array<array-key, FormMetadata> $inlineTypeForms
+     */
+    private function resolveBlockTypeForm(string $type, array $inlineTypeForms, string $locale): ?FormMetadata
+    {
+        if ('' === $type) {
+            return null;
+        }
+
+        $inlineForm = $inlineTypeForms[$type] ?? null;
+        if ($inlineForm instanceof FormMetadata) {
+            $globalBlockTag = $inlineForm->getTagsByName('sulu.global_block')[0] ?? null;
+            if (null !== $globalBlockTag) {
+                $globalName = $globalBlockTag->getAttribute('global_block');
+                if (\is_string($globalName) && '' !== $globalName) {
+                    $globalForm = $this->resolveTemplateForm('block', $globalName, $locale);
+                    if (null !== $globalForm) {
+                        return $globalForm;
+                    }
                 }
             }
+
+            if ([] !== $inlineForm->getItems()) {
+                return $inlineForm;
+            }
+        }
+
+        return $this->resolveTemplateForm('block', $type, $locale);
+    }
+
+    private function resolveTemplateForm(string $metadataKey, ?string $templateKey, string $locale): ?FormMetadata
+    {
+        $forms = $this->getTypedForms($metadataKey, $locale);
+        if ([] === $forms) {
+            return null;
+        }
+
+        if (null !== $templateKey && '' !== $templateKey && isset($forms[$templateKey])) {
+            return $forms[$templateKey];
+        }
+
+        if ('page' === $metadataKey) {
+            return $forms['default'] ?? \reset($forms);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, FormMetadata>
+     */
+    private function getTypedForms(string $metadataKey, string $locale): array
+    {
+        $cacheKey = $metadataKey . '__' . $locale;
+        if (isset($this->typedFormsCache[$cacheKey])) {
+            return $this->typedFormsCache[$cacheKey];
+        }
+
+        if (null === $this->metadataProviderRegistry) {
+            return $this->typedFormsCache[$cacheKey] = [];
+        }
+
+        try {
+            $provider = $this->metadataProviderRegistry->getMetadataProvider('form');
+            $options = 'block' === $metadataKey ? ['ignore_global_blocks' => true] : [];
+            $metadata = $provider->getMetadata($metadataKey, $locale, $options);
+            if ($metadata instanceof TypedFormMetadata) {
+                /** @var array<string, FormMetadata> $forms */
+                $forms = $metadata->getForms();
+
+                return $this->typedFormsCache[$cacheKey] = $forms;
+            }
+        } catch (\Throwable) {
+            // Gracefully fallback when metadata cannot be loaded
+        }
+
+        return $this->typedFormsCache[$cacheKey] = [];
+    }
+
+    /**
+     * Collects content FieldMetadata items from a form, skipping non-content sections
+     * (`settings`, `style`, `layout`, `general`, `dynamic_content`, `advanced`).
+     *
+     * @param array<array-key, ItemMetadata> $items
+     *
+     * @return list<FieldMetadata>
+     */
+    private function collectContentFields(array $items): array
+    {
+        if (isset($items['__tabs']) && $items['__tabs'] instanceof SectionMetadata) {
+            $contentTab = $items['__tabs']->getItems()['content'] ?? null;
+
+            return $contentTab instanceof SectionMetadata
+                ? $this->collectContentFields($contentTab->getItems())
+                : [];
+        }
+
+        $fields = [];
+        foreach ($items as $item) {
+            if ($item instanceof FieldMetadata) {
+                $fields[] = $item;
+            } elseif ($item instanceof SectionMetadata && \in_array($item->getName(), ['content', 'media'], true)) {
+                foreach ($this->collectContentFields($item->getItems()) as $subField) {
+                    $fields[] = $subField;
+                }
+            }
+        }
+
+        return $fields;
+    }
+
+    private function getFieldType(FieldMetadata $field): string
+    {
+        try {
+            return $field->getType();
+        } catch (\TypeError) {
+            return '';
         }
     }
 
@@ -241,14 +485,27 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
 
             if (null !== $matchedContent) {
                 $templateData = $matchedContent->getTemplateData();
-                if (isset($templateData['title']) && \is_string($templateData['title'])) {
-                    $plainTitle = $this->normalizePlainText($templateData['title']);
-                    if ('' !== $plainTitle) {
-                        $extractedTexts[] = $plainTitle;
-                    }
-                }
-                if (isset($templateData['blocks']) && \is_array($templateData['blocks'])) {
-                    $this->extractFromBlockList($templateData['blocks'], $locale, $extractedTexts, $visitedSnippets);
+                $snippetForm = $this->resolveTemplateForm('snippet', $matchedContent->getTemplateKey(), $locale);
+                if (null !== $snippetForm) {
+                    $dummyDoc = [];
+                    $this->extractFromTemplateDataWithMetadata(
+                        $templateData,
+                        $snippetForm,
+                        $locale,
+                        $extractedTexts,
+                        $visitedSnippets,
+                        $dummyDoc,
+                        isRootPage: false,
+                    );
+                } else {
+                    $dummyDoc = [];
+                    $this->extractFromRootDataFallback(
+                        $templateData,
+                        $locale,
+                        $extractedTexts,
+                        $visitedSnippets,
+                        $dummyDoc,
+                    );
                 }
             }
         } catch (\Throwable) {
@@ -308,14 +565,14 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
         return false;
     }
 
-    private function normalizePlainText(string $value): string
+    private function normalizePlainText(string $value, bool $isRichText = false): string
     {
         $trimmed = \trim($value);
         if ('' === $trimmed) {
             return '';
         }
 
-        if (\str_contains($trimmed, '<')) {
+        if ($isRichText || \str_contains($trimmed, '<')) {
             if (\class_exists(HtmlToTextConverter::class)) {
                 return \trim(HtmlToTextConverter::convert($trimmed));
             }

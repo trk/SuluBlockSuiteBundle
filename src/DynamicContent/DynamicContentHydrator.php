@@ -454,42 +454,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         $hydrated = $block;
 
         if ([] === $mapping) {
-            $blockType = isset($block['type']) && \is_string($block['type']) ? $block['type'] : '';
-            $isFullBodyBlock = \in_array($blockType, ['text', 'html', 'code'], true);
-
-            if (\array_key_exists('title', $block)) {
-                $mapping['title'] = 'title|headline';
-            }
-            if (\array_key_exists('headline', $block)) {
-                $mapping['headline'] = 'headline|title';
-            }
-            if (\array_key_exists('summary', $block)) {
-                $mapping['summary'] = 'summary|description|content:length=160';
-            }
-            if (\array_key_exists('description', $block)) {
-                $mapping['description'] = 'description|summary|content:length=160';
-            }
-            if (\array_key_exists('content', $block)) {
-                $mapping['content'] = (!$isFullBodyBlock && !\array_key_exists('summary', $block))
-                    ? 'summary|description|content:length=160'
-                    : 'content';
-            }
-            if (\array_key_exists('link', $block)) {
-                $mapping['link'] = 'link|url';
-            }
-            if (\array_key_exists('url', $block)) {
-                $mapping['url'] = 'url|link';
-            }
-
-            $autoCandidates = ['subtitle', 'image', 'badge', 'date', 'author'];
-            foreach ($autoCandidates as $candidate) {
-                if (\array_key_exists($candidate, $block) && isset($pageData[$candidate]) && $this->isValuePresent($pageData[$candidate])) {
-                    $mapping[$candidate] = $candidate;
-                }
-            }
-            if ([] === $mapping && (isset($pageData['title']) || isset($pageData['headline']))) {
-                $mapping['title'] = 'title|headline';
-            }
+            $mapping = $this->buildAutoMapping($block, $pageData);
         }
 
         foreach ($mapping as $targetField => $sourcePath) {
@@ -507,6 +472,140 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         }
 
         return $hydrated;
+    }
+
+    /**
+     * Builds an automatic target-to-source field mapping using:
+     * 1. Equal field name matching against non-empty source data keys.
+     * 2. Field type compatibility when block field metadata (`BlockTargetFieldMetadataResolver`) is available.
+     *
+     * @param array<string, mixed> $block
+     * @param array<string, mixed> $pageData
+     *
+     * @return array<string, string>
+     */
+    private function buildAutoMapping(array $block, array $pageData): array
+    {
+        /** @var array<string, string|null> $targetFields */
+        $targetFields = [];
+        $blockType = isset($block['type']) && \is_string($block['type']) ? $block['type'] : '';
+
+        if (null !== $this->targetFieldResolver && '' !== $blockType) {
+            foreach ($this->targetFieldResolver->resolveTargetFields($blockType) as $fieldMeta) {
+                $targetFields[$fieldMeta['name']] = $fieldMeta['type'];
+            }
+        }
+
+        foreach (\array_keys($block) as $key) {
+            if (\in_array($key, ['type', 'props', 'id', 'items', 'settings'], true) || \str_starts_with($key, '_')) {
+                continue;
+            }
+            if (!\array_key_exists($key, $targetFields)) {
+                $targetFields[$key] = null;
+            }
+        }
+
+        /** @var array<string, string> $declaredSourceTypes */
+        $declaredSourceTypes = [];
+        foreach ($this->registry->getProviders() as $provider) {
+            foreach ($provider->getSourceFields() as $sourceField) {
+                $declaredSourceTypes[$sourceField['name']] ??= $sourceField['type'];
+            }
+        }
+
+        /** @var array<string, string> $availableSourceTypes */
+        $availableSourceTypes = [];
+        foreach ($pageData as $sourceKey => $sourceValue) {
+            if (\str_starts_with($sourceKey, '_') || \in_array($sourceKey, ['id', 'uuid', 'template'], true)) {
+                continue;
+            }
+            if (!$this->isValuePresent($sourceValue)) {
+                continue;
+            }
+            $availableSourceTypes[$sourceKey] = $this->inferSourceValueType(
+                $sourceValue,
+                $declaredSourceTypes[$sourceKey] ?? null,
+            );
+        }
+
+        /** @var array<string, string> $mapping */
+        $mapping = [];
+        /** @var array<string, true> $usedSources */
+        $usedSources = [];
+
+        // 1. Equal field name match
+        foreach ($targetFields as $targetField => $targetType) {
+            if (\array_key_exists($targetField, $pageData) && $this->isValuePresent($pageData[$targetField])) {
+                $mapping[$targetField] = $targetField;
+                $usedSources[$targetField] = true;
+            }
+        }
+
+        // 2. Field type compatibility match via resolved block field metadata
+        foreach ($targetFields as $targetField => $targetType) {
+            if (isset($mapping[$targetField]) || null === $targetType) {
+                continue;
+            }
+
+            $matchedSource = null;
+            foreach ($availableSourceTypes as $sourceKey => $sourceType) {
+                if ($sourceType === $targetType && !isset($usedSources[$sourceKey])) {
+                    $matchedSource = $sourceKey;
+                    break;
+                }
+            }
+
+            if (null === $matchedSource) {
+                foreach ($availableSourceTypes as $sourceKey => $sourceType) {
+                    if ($sourceType === $targetType) {
+                        $matchedSource = $sourceKey;
+                        break;
+                    }
+                }
+            }
+
+            if (null !== $matchedSource) {
+                $mapping[$targetField] = $matchedSource;
+                $usedSources[$matchedSource] = true;
+            }
+        }
+
+        return $mapping;
+    }
+
+    private function inferSourceValueType(mixed $value, ?string $declaredType): string
+    {
+        if (\is_array($value)) {
+            if (isset($value['id']) || isset($value['url']) || isset($value['thumbnails'])) {
+                return 'media';
+            }
+
+            return 'array';
+        }
+
+        if (\is_bool($value)) {
+            return 'boolean';
+        }
+
+        if (\is_int($value) || \is_float($value)) {
+            return 'number';
+        }
+
+        if (null !== $declaredType && '' !== $declaredType) {
+            return $declaredType;
+        }
+
+        if (\is_string($value)) {
+            if (\str_starts_with($value, '/') || \str_starts_with($value, 'http://') || \str_starts_with($value, 'https://')) {
+                return 'link';
+            }
+
+            if ($value !== \strip_tags($value) || \mb_strlen($value, 'UTF-8') > 120) {
+                return 'text';
+            }
+        }
+
+        return 'string';
     }
 
     /**

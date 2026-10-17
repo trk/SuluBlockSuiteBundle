@@ -15,10 +15,10 @@ use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
 
 final class BlockTargetFieldMetadataResolverTest extends TestCase
 {
-    public function testResolveTargetFieldsExtractsFieldsFromSuluFormMetadataAndSkipsPropsFields(): void
+    public function testResolveTargetFieldsExtractsFieldsFromSuluFormMetadataAndSkipsPropsAndBlockFields(): void
     {
         $cardForm = new FormMetadata();
-        $cardForm->setKey('card');
+        $cardForm->setKey('fixture_card');
 
         $tabsSection = new SectionMetadata('__tabs');
         $contentSection = new SectionMetadata('content');
@@ -38,7 +38,7 @@ final class BlockTargetFieldMetadataResolverTest extends TestCase
         $variantField->setType('single_select');
         $settingsSection->addItem($variantField);
 
-        $nestedBlocksField = new FieldMetadata('blocks');
+        $nestedBlocksField = new FieldMetadata('custom_children');
         $nestedBlocksField->setType('block');
         $contentSection->addItem($nestedBlocksField);
 
@@ -47,7 +47,7 @@ final class BlockTargetFieldMetadataResolverTest extends TestCase
         $cardForm->addItem($tabsSection);
 
         $typedFormMetadata = new TypedFormMetadata();
-        $typedFormMetadata->addForm('card', $cardForm);
+        $typedFormMetadata->addForm('fixture_card', $cardForm);
 
         $provider = $this->createStub(MetadataProviderInterface::class);
         $provider->method('getMetadata')->willReturn($typedFormMetadata);
@@ -57,7 +57,7 @@ final class BlockTargetFieldMetadataResolverTest extends TestCase
 
         $resolver = new BlockTargetFieldMetadataResolver($registry);
 
-        $fields = $resolver->resolveTargetFields('card', 'en');
+        $fields = $resolver->resolveTargetFields('fixture_card', 'en');
 
         $this->assertSame([
             ['name' => 'title', 'label' => 'Card Title', 'type' => 'string'],
@@ -68,10 +68,10 @@ final class BlockTargetFieldMetadataResolverTest extends TestCase
     public function testResolveTargetFieldsExtractsInnerItemsBlockFields(): void
     {
         $accordionForm = new FormMetadata();
-        $accordionForm->setKey('accordion');
+        $accordionForm->setKey('fixture_accordion');
 
         $childItemForm = new FormMetadata();
-        $childItemForm->setKey('accordion_item');
+        $childItemForm->setKey('fixture_accordion_item');
 
         $childContentSection = new SectionMetadata('content');
         $itemTitleField = new FieldMetadata('title');
@@ -101,7 +101,7 @@ final class BlockTargetFieldMetadataResolverTest extends TestCase
         $accordionForm->addItem($itemsBlockField);
 
         $typedFormMetadata = new TypedFormMetadata();
-        $typedFormMetadata->addForm('accordion', $accordionForm);
+        $typedFormMetadata->addForm('fixture_accordion', $accordionForm);
 
         $provider = $this->createStub(MetadataProviderInterface::class);
         $provider->method('getMetadata')->willReturn($typedFormMetadata);
@@ -111,13 +111,30 @@ final class BlockTargetFieldMetadataResolverTest extends TestCase
 
         $resolver = new BlockTargetFieldMetadataResolver($registry);
 
-        $metadata = $resolver->resolveBlockMetadata('accordion', 'en');
+        $metadata = $resolver->resolveBlockMetadata('fixture_accordion', 'en');
 
         $this->assertTrue($metadata['multiple']);
-        $this->assertSame('accordion_item', $metadata['default_item_type']);
+        $this->assertSame('fixture_accordion_item', $metadata['default_item_type']);
         $this->assertSame([
             ['name' => 'title', 'label' => 'Question Title', 'type' => 'string'],
             ['name' => 'content', 'label' => 'Answer Body', 'type' => 'text'],
         ], $metadata['fields']);
+    }
+
+    public function testResolveBlockMetadataReturnsEmptyFieldsWhenMetadataIsUnavailable(): void
+    {
+        $resolver = new BlockTargetFieldMetadataResolver();
+
+        $this->assertSame([
+            'multiple' => false,
+            'default_item_type' => null,
+            'fields' => [],
+        ], $resolver->resolveBlockMetadata('unknown_fixture_block', 'en'));
+
+        $this->assertSame([
+            'multiple' => false,
+            'default_item_type' => null,
+            'fields' => [],
+        ], $resolver->resolveBlockMetadata('', 'en'));
     }
 }
