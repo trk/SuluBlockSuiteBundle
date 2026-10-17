@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Transformer;
 
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+
 /**
  * Unwraps nested container blocks into flat leaf blocks when a reusable block
  * is expanded inside an already active nested container or column.
  */
+#[AutoconfigureTag('sulu_block_suite.nested_block_flattener')]
 interface NestedBlockFlattenerInterface
 {
     /**

@@ -18,25 +18,33 @@ final class BlockRendererTest extends TestCase
     public function testResolveBlockTemplateFollowsNamespacePriority(): void
     {
         $loader = new ArrayLoader([
-            'blocks/headline.html.twig' => 'APP:{{ block.title }}',
-            '@SuluPrelineBlocks/blocks/headline.html.twig' => 'PRELINE:{{ block.title }}',
-            '@SuluPrelineBlocks/blocks/card.html.twig' => 'PRELINE_CARD:{{ block.title }}',
+            'blocks/fixture_hero.html.twig' => 'APP:{{ block.title }}',
+            '@ThemeChildBlocks/blocks/fixture_hero.html.twig' => 'CHILD:{{ block.title }}',
+            '@ThemeChildBlocks/blocks/fixture_card.html.twig' => 'CHILD_CARD:{{ block.title }}',
+            '@ThemeBaseBlocks/blocks/fixture_card.html.twig' => 'BASE_CARD:{{ block.title }}',
+            '@ThemeBaseBlocks/blocks/fixture_quote.html.twig' => 'BASE_QUOTE:{{ block.title }}',
             '@SuluBlockSuite/blocks/reusable.html.twig' => 'ENGINE_REUSABLE',
         ]);
         $twig = new Environment($loader);
         $pipeline = new BlockTransformPipeline([new DefaultAttributesTransformer()]);
 
+        // Pass unordered priority map: BlockRenderer sorts descending (1000 -> 200 -> 100 -> 0)
         $renderer = new BlockRenderer(
             $twig,
             $pipeline,
-            ['blocks', '@SuluPrelineBlocks/blocks', '@SuluBlockSuite/blocks'],
+            [
+                '@ThemeBaseBlocks/blocks' => 100,
+                '@ThemeChildBlocks/blocks' => 200,
+            ],
         );
 
-        // App override wins over bundle namespace
-        $this->assertSame('blocks/headline.html.twig', $renderer->resolveBlockTemplate('headline'));
-        // UI framework namespace wins when app override does not exist
-        $this->assertSame('@SuluPrelineBlocks/blocks/card.html.twig', $renderer->resolveBlockTemplate('card'));
-        // Engine fallback wins when neither app nor UI framework defines it
+        // App override (1000) wins over child (200) and base (100)
+        $this->assertSame('blocks/fixture_hero.html.twig', $renderer->resolveBlockTemplate('fixture_hero'));
+        // Child theme (200) wins over base theme (100) when app override does not exist
+        $this->assertSame('@ThemeChildBlocks/blocks/fixture_card.html.twig', $renderer->resolveBlockTemplate('fixture_card'));
+        // Base theme (100) wins when neither app nor child theme defines it
+        $this->assertSame('@ThemeBaseBlocks/blocks/fixture_quote.html.twig', $renderer->resolveBlockTemplate('fixture_quote'));
+        // Engine fallback (0) wins when neither app nor UI framework defines it
         $this->assertSame('@SuluBlockSuite/blocks/reusable.html.twig', $renderer->resolveBlockTemplate('reusable'));
         // Missing template returns null gracefully
         $this->assertNull($renderer->resolveBlockTemplate('non_existent_block'));
@@ -45,7 +53,7 @@ final class BlockRendererTest extends TestCase
     public function testRenderBlockProcessesPipelineAndSkipsHiddenOrMissingBlocks(): void
     {
         $loader = new ArrayLoader([
-            '@SuluBlockSuite/blocks/text.html.twig' => '<div id="{{ block._id|default(\'\') }}">{{ block.text }}</div>',
+            '@SuluBlockSuite/blocks/fixture_text.html.twig' => '<div id="{{ block._id|default(\'\') }}">{{ block.text }}</div>',
         ]);
         $twig = new Environment($loader);
         $pipeline = new BlockTransformPipeline([new DefaultAttributesTransformer()]);
@@ -58,7 +66,7 @@ final class BlockRendererTest extends TestCase
 
         // Active block with props JSON
         $html = $renderer->renderBlock([
-            'type' => 'text',
+            'type' => 'fixture_text',
             'text' => 'Hello Engine',
             'props' => '{"id":"intro-text"}',
         ]);
@@ -66,7 +74,7 @@ final class BlockRendererTest extends TestCase
 
         // Disabled block is skipped
         $disabledHtml = $renderer->renderBlock([
-            'type' => 'text',
+            'type' => 'fixture_text',
             'text' => 'Hidden',
             'props' => '{"status":"disabled"}',
         ]);

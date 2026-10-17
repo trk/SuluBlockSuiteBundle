@@ -45,7 +45,7 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
     }
 
     /**
-     * @param array<string, mixed> $configs
+     * @param array<array-key, mixed> $configs
      */
     public function load(array $configs, ContainerBuilder $container): void
     {
@@ -81,11 +81,17 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
         $container->setParameter('sulu_block_suite.layout.defaults', $layoutConfig['defaults']);
         $container->setParameter('sulu_block_suite.layout.mappings', $layoutConfig['mappings']);
 
-        /** @var array{template_namespaces: string|array<array-key, string>} $renderingConfig */
+        /** @var array{template_namespaces: array<string, int>} $renderingConfig */
         $renderingConfig = $config['rendering'];
-        $namespaces = \is_array($renderingConfig['template_namespaces'])
-            ? \array_values($renderingConfig['template_namespaces'])
-            : [$renderingConfig['template_namespaces']];
+        /** @var array<string, int> $namespaces */
+        $namespaces = \array_replace(
+            [
+                'blocks' => 1000,
+                '@SuluBlockSuite/blocks' => 0,
+            ],
+            $renderingConfig['template_namespaces'],
+        );
+        \arsort($namespaces, \SORT_NUMERIC);
         $container->setParameter('sulu_block_suite.rendering.template_namespaces', $namespaces);
 
         /** @var array{srcset_formats: array<string, int>} $mediaConfig */

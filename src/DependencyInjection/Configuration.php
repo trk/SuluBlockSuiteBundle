@@ -68,12 +68,14 @@ final class Configuration implements ConfigurationInterface
                 ->arrayNode('rendering')
                     ->addDefaultsIfNotSet()
                     ->children()
-                        ->variableNode('template_namespaces')
-                            ->defaultValue(['blocks', '@SuluBlockSuite/blocks'])
-                            ->validate()
-                                ->ifTrue(static fn (mixed $v): bool => !\is_string($v) && !\is_array($v))
-                                ->thenInvalid('template_namespaces must be a string or array of strings.')
-                            ->end()
+                        ->arrayNode('template_namespaces')
+                            ->useAttributeAsKey('namespace')
+                            ->normalizeKeys(false)
+                            ->integerPrototype()->end()
+                            ->defaultValue([
+                                'blocks' => 1000,
+                                '@SuluBlockSuite/blocks' => 0,
+                            ])
                         ->end()
                     ->end()
                 ->end()

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Transformer;
 
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+
 /**
  * Contract for all block transformers in the BlockTransformPipeline.
  */
+#[AutoconfigureTag('sulu_block_suite.block_transformer')]
 interface BlockTransformerInterface
 {
     /**

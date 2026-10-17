@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\DynamicContent;
 
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+
 /**
  * Contract for registering custom dynamic content sources (e.g. Articles, Products, Events)
  * into the Sulu Block Suite dynamic content engine.
  */
+#[AutoconfigureTag('sulu_block_suite.dynamic_source_provider')]
 interface DynamicContentSourceProviderInterface
 {
     /**

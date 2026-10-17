@@ -37,4 +37,40 @@ final class SuluBlockSuiteExtensionTest extends TestCase
         self::assertArrayHasKey('block', $config['templates']);
         self::assertArrayNotHasKey('snippet', $config['templates']);
     }
+
+    public function testLoadMergesAndSortsTemplateNamespacesByPriorityDescending(): void
+    {
+        $container = new ContainerBuilder();
+        $extension = new SuluBlockSuiteExtension();
+
+        $extension->load([
+            [
+                'rendering' => [
+                    'template_namespaces' => [
+                        '@TailwindBaseBlocks/blocks' => 100,
+                    ],
+                ],
+            ],
+            [
+                'rendering' => [
+                    'template_namespaces' => [
+                        '@ThemeChildBlocks/blocks' => 200,
+                    ],
+                ],
+            ],
+        ], $container);
+
+        /** @var array<string, int> $resolvedNamespaces */
+        $resolvedNamespaces = $container->getParameter('sulu_block_suite.rendering.template_namespaces');
+
+        self::assertSame(
+            [
+                'blocks' => 1000,
+                '@ThemeChildBlocks/blocks' => 200,
+                '@TailwindBaseBlocks/blocks' => 100,
+                '@SuluBlockSuite/blocks' => 0,
+            ],
+            $resolvedNamespaces,
+        );
+    }
 }

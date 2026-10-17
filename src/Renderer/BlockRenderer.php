@@ -36,30 +36,65 @@ final class BlockRenderer implements ResetInterface
     private array $activeReusableSnippets = [];
 
     /**
-     * @param list<string> $templateNamespaces
+     * @param array<string, int>|list<string> $templateNamespaces
      */
     public function __construct(
         private readonly ?Environment $twig = null,
         private readonly ?BlockTransformPipelineInterface $pipeline = null,
-        array $templateNamespaces = ['blocks', '@SuluBlockSuite/blocks'],
+        array $templateNamespaces = ['blocks' => 1000, '@SuluBlockSuite/blocks' => 0],
         ?BlockCollectionRendererInterface $collectionRenderer = null,
     ) {
-        $normalized = [];
-        foreach ($templateNamespaces as $ns) {
-            $trimmed = \trim($ns, '/ ');
-            if ('' !== $trimmed && !\in_array($trimmed, $normalized, true)) {
-                $normalized[] = $trimmed;
+        $this->templateNamespaces = $this->normalizeTemplateNamespaces($templateNamespaces);
+        $this->collectionRenderer = $collectionRenderer;
+    }
+
+    /**
+     * @param array<string, int>|list<string> $templateNamespaces
+     *
+     * @return list<string>
+     */
+    private function normalizeTemplateNamespaces(array $templateNamespaces): array
+    {
+        /** @var array<string, int> $prioritized */
+        $prioritized = [];
+        /** @var list<string> $listed */
+        $listed = [];
+
+        foreach ($templateNamespaces as $key => $value) {
+            if (\is_string($key) && \is_int($value)) {
+                $trimmed = \trim($key, '/ ');
+                if ('' !== $trimmed) {
+                    $prioritized[$trimmed] = $value;
+                }
+            } elseif (\is_string($value)) {
+                $trimmed = \trim($value, '/ ');
+                if ('' !== $trimmed && !\in_array($trimmed, $listed, true)) {
+                    $listed[] = $trimmed;
+                }
             }
         }
-        if (!\in_array('blocks', $normalized, true)) {
-            \array_unshift($normalized, 'blocks');
-        }
-        if (!\in_array('@SuluBlockSuite/blocks', $normalized, true)) {
-            $normalized[] = '@SuluBlockSuite/blocks';
+
+        if ([] !== $prioritized) {
+            if (!\array_key_exists('blocks', $prioritized)) {
+                $prioritized['blocks'] = 1000;
+            }
+            if (!\array_key_exists('@SuluBlockSuite/blocks', $prioritized)) {
+                $prioritized['@SuluBlockSuite/blocks'] = 0;
+            }
+            \arsort($prioritized, \SORT_NUMERIC);
+
+            return \array_keys($prioritized);
         }
 
-        $this->templateNamespaces = $normalized;
-        $this->collectionRenderer = $collectionRenderer;
+        $ordered = $listed;
+        if (!\in_array('blocks', $ordered, true)) {
+            \array_unshift($ordered, 'blocks');
+        }
+        if (!\in_array('@SuluBlockSuite/blocks', $ordered, true)) {
+            $ordered[] = '@SuluBlockSuite/blocks';
+        }
+
+        return $ordered;
     }
 
     public function reset(): void
