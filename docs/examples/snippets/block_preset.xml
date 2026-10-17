@@ -85,6 +85,7 @@
                 <info_text lang="fr">Choisissez le type de bloc cible et configurez ses valeurs de contenu et de style prêtes à l'emploi.</info_text>
             </meta>
             <types>
+                <!-- Replace with your project's block <type ref="..."/> entries or an xi:include -->
                 <type name="default">
                     <meta>
                         <title lang="en">Block Content</title>

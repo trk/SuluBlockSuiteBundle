@@ -55,7 +55,7 @@
         <title lang="fr">Description / Notes</title>
       </meta>
     </property>
-    <property name="blocks" type="block" default-type="default">
+    <property name="blocks" type="block" default-type="reusable">
       <meta>
         <title lang="en">Layout Blocks</title>
         <title lang="tr">D&#xFC;zen Bloklar&#x131;</title>
@@ -65,17 +65,8 @@
         <title lang="fr">Blocs de la Mise en Page</title>
       </meta>
       <types>
-        <type name="default">
-          <meta>
-            <title lang="en">Default</title>
-            <title lang="tr">Varsay&#x131;lan</title>
-            <title lang="de">Standard</title>
-            <title lang="ru">&#x41F;&#x43E; &#x443;&#x43C;&#x43E;&#x43B;&#x447;&#x430;&#x43D;&#x438;&#x44E;</title>
-            <title lang="es">Predeterminado</title>
-            <title lang="fr">Par D&#xE9;faut</title>
-          </meta>
-          <properties/>
-        </type>
+        <!-- Add your project's block <type ref="..."/> entries or an xi:include here -->
+        <type ref="reusable"/>
       </types>
     </property>
   </properties>

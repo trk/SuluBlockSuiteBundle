@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use Symfony\Contracts\Service\ResetInterface;
+use Totoglu\SuluBlockSuiteBundle\Template\TemplateKeys;
 use Twig\Environment;
 
 final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInterface
@@ -118,7 +119,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
                     /** @var iterable<SnippetInterface> $fetched */
                     $fetched = $this->snippetRepository->findBy(
                         [
-                            'templateKeys' => ['page_layout'],
+                            'templateKeys' => [TemplateKeys::PAGE_LAYOUT],
                             'locale' => $resolvedLocale,
                             'stage' => DimensionContentInterface::STAGE_LIVE,
                         ],
@@ -142,7 +143,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
                         }
                     }
 
-                    $targetContent = $this->findLiveDimensionContent($snippet, 'page_layout', $resolvedLocale);
+                    $targetContent = $this->findLiveDimensionContent($snippet, TemplateKeys::PAGE_LAYOUT, $resolvedLocale);
 
                     if (null !== $targetContent) {
                         /** @var array<string, mixed> $templateData */
@@ -327,7 +328,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
                 [SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => []],
             );
 
-            $content = $this->findLiveDimensionContent($snippet, 'reusable_block', $resolvedLocale);
+            $content = $this->findLiveDimensionContent($snippet, TemplateKeys::REUSABLE_BLOCK, $resolvedLocale);
             if (null !== $content) {
                 $templateData = $this->resolveSnippetContentData($content, $cacheKey);
                 $title = $content->getTitle();
@@ -361,7 +362,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
         $resolvedLocale = $this->resolveLocale($locale);
         $targetContent = $dimensionContent ?? $this->findLiveDimensionContent(
             $snippet,
-            'page_layout',
+            TemplateKeys::PAGE_LAYOUT,
             $resolvedLocale,
         );
 

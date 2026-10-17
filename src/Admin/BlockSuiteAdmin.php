@@ -17,6 +17,7 @@ use Sulu\Component\Security\Authorization\PermissionTypes;
 use Sulu\Component\Security\Authorization\SecurityCheckerInterface;
 use Sulu\Snippet\Domain\Model\SnippetInterface;
 use Sulu\Snippet\Infrastructure\Sulu\Admin\SnippetAdmin;
+use Totoglu\SuluBlockSuiteBundle\Template\TemplateKeys;
 
 final class BlockSuiteAdmin extends Admin
 {
@@ -85,7 +86,7 @@ final class BlockSuiteAdmin extends Admin
         if ($this->reusableBlocksEnabled) {
             $this->configureSnippetGroupViews(
                 $viewCollection,
-                'reusable_block',
+                TemplateKeys::REUSABLE_BLOCK,
                 'sulu_block_suite.reusable_blocks',
                 '/block-suite/reusable',
                 'sulu_block_suite.reusable_blocks',
@@ -96,7 +97,7 @@ final class BlockSuiteAdmin extends Admin
         if ($this->presetsEnabled) {
             $this->configureSnippetGroupViews(
                 $viewCollection,
-                'block_preset',
+                TemplateKeys::BLOCK_PRESET,
                 'sulu_block_suite.presets',
                 '/block-suite/presets',
                 'sulu_block_suite.presets',
@@ -107,7 +108,7 @@ final class BlockSuiteAdmin extends Admin
         if ($this->layoutEnabled) {
             $this->configureSnippetGroupViews(
                 $viewCollection,
-                'page_layout',
+                TemplateKeys::PAGE_LAYOUT,
                 'sulu_block_suite.layouts',
                 '/block-suite/layouts',
                 'sulu_block_suite.layouts',

@@ -15,6 +15,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Yaml\Yaml;
+use Totoglu\SuluBlockSuiteBundle\Template\TemplateKeys;
 
 /**
  * Exports CMS-managed `block_preset` snippets from the database into project-level YAML preset files.
@@ -77,7 +78,7 @@ final class ExportBlockPresetsCommand extends Command
 
         $snippets = $this->snippetRepository->findBy(
             [
-                'templateKeys' => ['block_preset'],
+                'templateKeys' => [TemplateKeys::BLOCK_PRESET],
                 'locale' => $locale,
             ],
             ['title' => 'asc'],
@@ -229,7 +230,7 @@ final class ExportBlockPresetsCommand extends Command
     ): ?SnippetDimensionContentInterface {
         $bestMatch = null;
         foreach ($snippet->getDimensionContents() as $content) {
-            if ('block_preset' !== $content->getTemplateKey()) {
+            if (TemplateKeys::BLOCK_PRESET !== $content->getTemplateKey()) {
                 continue;
             }
             if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()) {

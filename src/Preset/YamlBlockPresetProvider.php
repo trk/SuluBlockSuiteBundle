@@ -14,6 +14,7 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use Symfony\Contracts\Service\ResetInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
+use Totoglu\SuluBlockSuiteBundle\Template\TemplateKeys;
 
 final class YamlBlockPresetProvider implements BlockPresetProviderInterface, ResetInterface
 {
@@ -177,7 +178,7 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface, Res
                     /** @var iterable<SnippetInterface> $fetched */
                     $fetched = $this->snippetRepository->findBy(
                         [
-                            'templateKeys' => ['block_preset'],
+                            'templateKeys' => [TemplateKeys::BLOCK_PRESET],
                             'locale' => $locale,
                             'stage' => DimensionContentInterface::STAGE_LIVE,
                         ],
@@ -280,7 +281,7 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface, Res
 
         foreach ($dimensionContents as $content) {
             if (
-                'block_preset' !== $content->getTemplateKey()
+                TemplateKeys::BLOCK_PRESET !== $content->getTemplateKey()
                 || DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()
                 || $content->getLocale() !== $locale
             ) {
@@ -294,7 +295,7 @@ final class YamlBlockPresetProvider implements BlockPresetProviderInterface, Res
 
         foreach ($dimensionContents as $content) {
             if (
-                'block_preset' !== $content->getTemplateKey()
+                TemplateKeys::BLOCK_PRESET !== $content->getTemplateKey()
                 || DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()
             ) {
                 continue;

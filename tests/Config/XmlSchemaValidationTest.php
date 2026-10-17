@@ -21,11 +21,13 @@ final class XmlSchemaValidationTest extends TestCase
 
         $bundleRoot = \dirname(__DIR__, 2);
 
+        $this->assertDirectoryDoesNotExist($bundleRoot . '/config/templates/snippets');
+
         $templateXmlFiles = \array_merge(
             \glob($bundleRoot . '/config/templates/blocks/*.xml') ?: [],
-            \glob($bundleRoot . '/config/templates/snippets/*.xml') ?: [],
+            \glob($bundleRoot . '/docs/examples/snippets/*.xml') ?: [],
         );
-        $this->assertNotEmpty($templateXmlFiles);
+        $this->assertCount(4, $templateXmlFiles);
 
         foreach ($templateXmlFiles as $xmlFile) {
             $dom = new \DOMDocument();

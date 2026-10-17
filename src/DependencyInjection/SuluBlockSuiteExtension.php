@@ -31,11 +31,6 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
                             'sulu_block_suite' => \dirname(__DIR__, 2) . '/config/templates/blocks',
                         ],
                     ],
-                    'snippet' => [
-                        'directories' => [
-                            'sulu_block_suite' => \dirname(__DIR__, 2) . '/config/templates/snippets',
-                        ],
-                    ],
                 ],
             ]);
         }

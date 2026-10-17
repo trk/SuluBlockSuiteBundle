@@ -28,6 +28,7 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor;
 use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
 use Totoglu\SuluBlockSuiteBundle\Preset\MediaPreviewUrlResolver;
+use Totoglu\SuluBlockSuiteBundle\Template\TemplateKeys;
 
 final class BlockPresetController extends AbstractController
 {
@@ -187,7 +188,7 @@ final class BlockPresetController extends AbstractController
 
         /** @var array<string, mixed> $snippetData */
         $snippetData = [
-            'template' => 'block_preset',
+            'template' => TemplateKeys::BLOCK_PRESET,
             'locale' => $locale,
             'title' => $title,
             'description' => $description,
@@ -294,7 +295,7 @@ final class BlockPresetController extends AbstractController
 
         /** @var array<string, mixed> $snippetData */
         $snippetData = [
-            'template' => 'reusable_block',
+            'template' => TemplateKeys::REUSABLE_BLOCK,
             'locale' => $locale,
             'title' => $title,
             'description' => $description,
@@ -372,7 +373,7 @@ final class BlockPresetController extends AbstractController
 
             $matchedContent = null;
             foreach ($snippet->getDimensionContents() as $content) {
-                if ('reusable_block' !== $content->getTemplateKey()) {
+                if (TemplateKeys::REUSABLE_BLOCK !== $content->getTemplateKey()) {
                     continue;
                 }
                 if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()) {

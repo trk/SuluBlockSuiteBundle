@@ -73,6 +73,7 @@
                 <title lang="fr">Blocs de Contenu de la Section</title>
             </meta>
             <types>
+                <!-- Replace with your project's block <type ref="..."/> entries or an xi:include -->
                 <type name="default">
                     <meta>
                         <title lang="en">Block Content</title>

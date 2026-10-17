@@ -103,6 +103,14 @@ return [
    npm --prefix assets/admin run build
    ```
 
+### 4. Copy Example Snippet Templates
+
+Copy the example snippet templates (`block_preset.xml`, `page_layout.xml`, `reusable_block.xml`) to your project's `config/templates/snippets/` directory and customize the `<types><type ref="..."/></types>` (or `xi:include`) list for your project's blocks:
+
+```bash
+cp vendor/trk/sulu-block-suite-bundle/docs/examples/snippets/*.xml config/templates/snippets/
+```
+
 ---
 
 ## Configuration Reference
