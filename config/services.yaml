@@ -256,6 +256,13 @@ services:
             $snippetRepository: '@?sulu_snippet.snippet_repository'
         tags: ['console.command']
 
+    Totoglu\SuluBlockSuiteBundle\Command\InitBlockSuiteCommand:
+        arguments:
+            $projectDirectory: '%kernel.project_dir%'
+            $presetsDirectory: '%sulu_block_suite.presets.yaml_dir%'
+            $bundlesMetadata: '%kernel.bundles_metadata%'
+        tags: ['console.command']
+
     Totoglu\SuluBlockSuiteBundle\Search\BlockSuitePageReindexEnhancer:
         arguments:
             $snippetRepository: '@?sulu_snippet.snippet_repository'

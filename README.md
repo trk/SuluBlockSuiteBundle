@@ -101,9 +101,21 @@ return [
    npm --prefix assets/admin run build
    ```
 
-### 4. Copy Example Snippet Templates to Your Project
+### 4. Initialize Project Snippet Templates (`sulu:block-suite:init`)
 
-Core does not auto-register snippet templates so that each project retains full Sulu-native control over which blocks are allowed in `page_layout`, `reusable_block`, and `block_preset`. Copy the starter templates from `docs/examples/snippets/` into your project:
+Core does not auto-register snippet templates so that each project retains full Sulu-native control over which blocks are allowed in `page_layout`, `reusable_block`, and `block_preset`. Run the initialization command to scaffold the starter templates (and any registered framework bundle's block type includes and presets) into your project without overwriting existing files:
+
+```bash
+php bin/console sulu:block-suite:init
+```
+
+Options:
+- `--dry-run`: Preview files to be created or skipped without writing to disk.
+- `--no-presets`: Skip copying example `config/blocks/presets/*.yaml` files.
+- `--force` (`-f`): Overwrite existing files in the project.
+- `--source=<path>` (`-s`): Initialize from a custom `docs/examples` directory.
+
+Or copy the starter snippet templates manually:
 
 ```bash
 cp vendor/trk/sulu-block-suite-bundle/docs/examples/snippets/*.xml config/templates/snippets/
