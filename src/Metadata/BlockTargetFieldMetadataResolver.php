@@ -196,6 +196,7 @@ final class BlockTargetFieldMetadataResolver
             'single_media_selection', 'media_selection' => 'media',
             'link' => 'link',
             'single_icon_selection', 'icon' => 'icon',
+            'single_form_selection' => 'form',
             'checkbox' => 'boolean',
             'single_select', 'select' => 'select',
             'date', 'datetime', 'time' => 'date',

@@ -38,6 +38,10 @@ abstract class AbstractBlockComponent
         'url',
         'items',
         'blocks',
+        'form',
+        'form_view',
+        'form_entity',
+        'form_submitted',
     ];
 
     /**
@@ -1262,7 +1266,11 @@ abstract class AbstractBlockComponent
         }
 
         if (\is_object($value)) {
-            return null !== SuluDataNormalizer::resolveImageUrl($value);
+            if (\method_exists($value, 'getFormats') || \method_exists($value, 'getThumbnails') || \method_exists($value, 'getUrl')) {
+                return null !== SuluDataNormalizer::resolveImageUrl($value);
+            }
+
+            return true;
         }
 
         return false;

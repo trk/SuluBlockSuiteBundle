@@ -6,9 +6,11 @@ namespace Totoglu\SuluBlockSuiteBundle\DependencyInjection;
 
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformerInterface;
@@ -16,6 +18,8 @@ use Totoglu\SuluBlockSuiteBundle\Transformer\NestedBlockFlattenerInterface;
 
 final class SuluBlockSuiteExtension extends Extension implements PrependExtensionInterface
 {
+    private const FORM_TITLE_PROVIDER_CLASS = 'Sulu\\Bundle\\FormBundle\\TitleProvider\\DimensionContentTitleProvider';
+
     public function prepend(ContainerBuilder $container): void
     {
         if ($container->hasExtension('sulu_admin')) {
@@ -63,6 +67,14 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
 
         $loader = new YamlFileLoader($container, new FileLocator(\dirname(__DIR__, 2) . '/config'));
         $loader->load('services.yaml');
+
+        if (\class_exists(self::FORM_TITLE_PROVIDER_CLASS)) {
+            $snippetTitleProvider = new Definition(self::FORM_TITLE_PROVIDER_CLASS, [
+                new Reference('request_stack'),
+            ]);
+            $snippetTitleProvider->addTag('sulu_form.title_provider', ['alias' => 'snippets']);
+            $container->setDefinition('sulu_block_suite.form.title_provider.snippet', $snippetTitleProvider);
+        }
 
         /** @var array{enabled: bool, yaml_dir: string|list<string>, enable_snippet_presets: bool} $presetsConfig */
         $presetsConfig = $config['presets'];

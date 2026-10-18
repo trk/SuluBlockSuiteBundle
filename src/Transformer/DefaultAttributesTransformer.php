@@ -181,7 +181,10 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
 
         return !\str_ends_with($field, '_url')
             && !\str_ends_with($field, '_srcset')
-            && !\str_ends_with($field, '_focus_style');
+            && !\str_ends_with($field, '_focus_style')
+            && !\str_ends_with($field, '_view')
+            && !\str_ends_with($field, '_entity')
+            && !\str_ends_with($field, '_submitted');
     }
 
     /**

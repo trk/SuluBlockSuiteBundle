@@ -223,6 +223,15 @@ services:
             $srcSetFormats: '%sulu_block_suite.media.srcset_formats%'
         tags: ['sulu_block_suite.block_transformer']
 
+    Totoglu\SuluBlockSuiteBundle\Transformer\FormBlockTransformer:
+        arguments:
+            $fieldMetadataResolver: '@?Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver'
+            $formBuilder: '@?sulu_form.builder'
+            $formRepository: '@?sulu_form.repository.form'
+            $requestStack: '@?request_stack'
+            $referenceStore: '@?sulu_http_cache.reference_store'
+        tags: ['sulu_block_suite.block_transformer']
+
     Totoglu\SuluBlockSuiteBundle\Renderer\BlockRenderer:
         arguments:
             $twig: '@?twig'
