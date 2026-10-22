@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-22
+
+### Added
+- **`FormBlockTransformer` & Snippet Title Bridge for `sulu/form-bundle`**: Added `FormBlockTransformer` and `FormTitleProvider` bridge to seamlessly resolve and hydrate Sulu dynamic forms within block suite pipelines.
+
+### Fixed
+- **Security Hardening**: Hardened URL protocol validation (`javascript:`, `vbscript:`, `data:`, `blob:`, `file:` rejection) in `SuluDataNormalizer` and `DefaultAttributesTransformer`, tightened path traversal validation regexes (`/^[a-zA-Z0-9_-]+$/`) in `YamlBlockPresetProvider`, `PageLayoutProvider`, and `ExportBlockPresetsCommand`, and added bounded recursion guards (`MAX_RECURSION_DEPTH = 10` and visited snippet tracking) in `LayoutTwigExtension`.
+
 ## [0.1.0] - 2026-10-18
 
 ### Added
