@@ -76,7 +76,9 @@ final class TranslationCatalogIntegrityTest extends TestCase
     {
         $prelineTranslationsDir = \dirname(__DIR__, 3) . '/sulu-preline-blocks-bundle/translations';
         if (!\is_dir($prelineTranslationsDir)) {
-            $this->markTestSkipped('sulu-preline-blocks-bundle translations directory not present.');
+            $this->assertDirectoryDoesNotExist($prelineTranslationsDir);
+
+            return;
         }
 
         /** @var array<string, list<string>> $keysByLocale */
