@@ -74,6 +74,108 @@ final class SuluDataNormalizerTest extends TestCase
         $this->assertNull(SuluDataNormalizer::resolveImageUrl('javascript:alert(1)'));
     }
 
+    public function testSanitizeUrlRejectsDangerousSchemesAndUnicodeWhitespaceBypasses(): void
+    {
+        // 1. Dangerous non-web schemes
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('file:///etc/passwd'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('blob:https://example.com/uuid'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('javascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('data:text/html,<script>alert(1)</script>'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('vbscript:msgbox(1)'));
+
+        // 2. Custom fallback
+        $this->assertSame('/safe', SuluDataNormalizer::sanitizeUrl('file:///etc/passwd', '/safe'));
+        $this->assertSame('/safe', SuluDataNormalizer::sanitizeUrl('blob:https://example.com/uuid', '/safe'));
+
+        // 3. Unicode whitespace and control character bypasses
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("java\u{00A0}script:alert(1)"));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("javascript\u{00A0}:alert(1)"));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("\u{2000}javascript:alert(1)"));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("java\u{200B}script:alert(1)"));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("\u{00A0}javascript:alert(1)\u{00A0}"));
+
+        // 4. Valid schemes and paths must remain intact
+        $this->assertSame('https://example.com/path?foo=bar#hash', SuluDataNormalizer::sanitizeUrl('https://example.com/path?foo=bar#hash'));
+        $this->assertSame('http://example.com', SuluDataNormalizer::sanitizeUrl('http://example.com'));
+        $this->assertSame('mailto:user@example.com', SuluDataNormalizer::sanitizeUrl('mailto:user@example.com'));
+        $this->assertSame('tel:+1234567890', SuluDataNormalizer::sanitizeUrl('tel:+1234567890'));
+        $this->assertSame('/about-us', SuluDataNormalizer::sanitizeUrl('/about-us'));
+        $this->assertSame('#top', SuluDataNormalizer::sanitizeUrl('#top'));
+        $this->assertSame('//cdn.example.com/lib.js', SuluDataNormalizer::sanitizeUrl('//cdn.example.com/lib.js'));
+        $this->assertSame('?query=test', SuluDataNormalizer::sanitizeUrl('?query=test'));
+    }
+
+    public function testSanitizeUrlRejectsMalformedUtf8Sequences(): void
+    {
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("javascript:/*\x80*/alert(1)"));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("javascript:alert(1)\x80"));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("javascript:alert(1)//\xff"));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("data:text/html,<script>alert(1)</script>\x80"));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl("file:///etc/passwd\x80"));
+    }
+
+    public function testSanitizeUrlRejectsNumericAsciiControlEntities(): void
+    {
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('jav&#x0D;ascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('jav&#13;ascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('data&#x0D;:text/html,<script>alert(1)</script>'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('&#13;javascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('java&#0;script:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('&#x00;javascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('&#x1F;javascript:alert(1)'));
+    }
+
+    public function testSanitizeUrlRejectsSemicolonLessNumericEntities(): void
+    {
+        // Decimal entities without trailing semicolons
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('javascript&#58alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('javascript&#0000058alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('&#106avascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('j&#97vascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('ja&#118ascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('jav&#97script:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('java&#115cript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('&#100ata:text/html,<script>alert(1)</script>'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('&#118bscript:msgbox(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('&#102ile:///etc/passwd'));
+
+        // Decimal control entities followed by letters (e.g. 'a')
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('jav&#13ascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('jav&#10ascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('jav&#9ascript:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('jav&#0ascript:alert(1)'));
+
+        // Hex entities without semicolons
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('jav&#x61script:alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('javascript&#x3a alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('javascript&#x3a/*comment*/alert(1)'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('data&#x3a text/html,evil'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('file&#x3a ///etc/passwd'));
+    }
+
+    public function testSanitizeUrlEntityFragmentCollisionAndLegitimateUrls(): void
+    {
+        // Entity references containing '#' must not be treated as URL fragment delimiters
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('foo&#bar:baz'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('jav&#99999999:alert(1)'));
+
+        // Legitimate URLs with fragments remain intact
+        $this->assertSame('/page#section', SuluDataNormalizer::sanitizeUrl('/page#section'));
+        $this->assertSame('https://example.com#intro', SuluDataNormalizer::sanitizeUrl('https://example.com#intro'));
+        $this->assertSame('https://example.com/path?foo=bar#hash', SuluDataNormalizer::sanitizeUrl('https://example.com/path?foo=bar#hash'));
+        $this->assertSame('page#section:1', SuluDataNormalizer::sanitizeUrl('page#section:1'));
+        $this->assertSame('#top', SuluDataNormalizer::sanitizeUrl('#top'));
+    }
+
+    public function testSanitizeUrlEnforcesSafeSchemeAllowlistOnLeadingColon(): void
+    {
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('ftp://example.com/file'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('ssh://git@github.com'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('gopher://example.com'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('disallowed:payload'));
+        $this->assertSame('#', SuluDataNormalizer::sanitizeUrl('foo:bar'));
+    }
+
     public function testResolveImageUrlHandlesStringsArraysAndObjects(): void
     {
         $this->assertNull(SuluDataNormalizer::resolveImageUrl(null));

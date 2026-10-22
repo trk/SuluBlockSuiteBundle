@@ -71,4 +71,17 @@ final class AttributeSanitizerTest extends TestCase
             AttributeSanitizer::render(['id' => 'card', 'data-x' => 'a"b<c>', 'required' => true, 'skipped' => false]),
         );
     }
+
+    public function testSanitizeRejectsDangerousSchemesAndUnicodeWhitespaceBypasses(): void
+    {
+        $sanitized = AttributeSanitizer::sanitize([
+            'href' => 'file:///etc/passwd',
+            'src' => 'blob:https://example.com/uuid',
+            'action' => "java\u{200B}script:alert(1)",
+            'poster' => "data\u{00A0}:image/png;base64,AAAA",
+            'formaction' => "vbscript\u{200D}:execute",
+        ]);
+
+        $this->assertSame([], $sanitized);
+    }
 }

@@ -246,4 +246,221 @@ YAML;
         $this->assertSame('valid_gallery', $presets[0]['id']);
         $this->assertSame('Masonry Lightbox', $presets[0]['title']);
     }
+
+    public function testGetPresetsSupportsLabelLocalizationResolution(): void
+    {
+        $yamlContent = <<<YAML
+presets:
+    labeled_preset:
+        label:
+            en: "English Label Title"
+            tr: "Türkçe Etiket Başlığı"
+        description:
+            en: "English Description"
+            tr: "Türkçe Açıklama"
+        props:
+            variant: "bordered"
+YAML;
+        \file_put_contents($this->tempDir . '/card.yaml', $yamlContent);
+
+        $provider = new YamlBlockPresetProvider($this->tempDir);
+
+        $enPresets = $provider->getPresets('card', 'en');
+        $this->assertCount(1, $enPresets);
+        $this->assertSame('English Label Title', $enPresets[0]['title']);
+
+        $trPresets = $provider->getPresets('card', 'tr');
+        $this->assertCount(1, $trPresets);
+        $this->assertSame('Türkçe Etiket Başlığı', $trPresets[0]['title']);
+    }
+
+    public function testSectionPresetHydratesReferencedCardAndGridChildPresets(): void
+    {
+        $cardYaml = <<<YAML
+presets:
+    hero_split_card:
+        label:
+            en: "Hero Split Card"
+            tr: "Hero Bölünmüş Kart"
+        props:
+            variant: "elevated"
+            color: "primary"
+        values:
+            title: "Default Card Title"
+            text: "<p>Default Card Body</p>"
+YAML;
+        \file_put_contents($this->tempDir . '/card.yaml', $cardYaml);
+
+        $gridYaml = <<<YAML
+presets:
+    feature_bento_grid:
+        title: "Feature Bento Grid"
+        props:
+            columns: "3"
+            gap: "lg"
+        values:
+            items:
+                - title: "Grid Item 1"
+                - title: "Grid Item 2"
+YAML;
+        \file_put_contents($this->tempDir . '/grid.yaml', $gridYaml);
+
+        $sectionYaml = <<<YAML
+presets:
+    hero_split_card:
+        title: "Hero Split Section"
+        props:
+            padding: "xl"
+        values:
+            rows:
+                - type: row_item
+                  columns:
+                      - type: column_item
+                        blocks:
+                            - type: card
+                              title: "Overridden Card Title"
+                              props:
+                                  preset: "hero_split_card"
+                      - type: column_item
+                        blocks:
+                            - type: grid
+                              props:
+                                  preset: "feature_bento_grid"
+                                  gap: "md"
+YAML;
+        \file_put_contents($this->tempDir . '/section.yaml', $sectionYaml);
+
+        $provider = new YamlBlockPresetProvider($this->tempDir);
+        $sectionPresets = $provider->getPresets('section', 'en');
+
+        $this->assertCount(1, $sectionPresets);
+        /** @var list<array{columns: list<array{blocks: list<array{title?: string, text?: string, items?: list<mixed>, props: array<string, mixed>}>}>}> $rows */
+        $rows = $sectionPresets[0]['values']['rows'] ?? [];
+
+        $cardBlock = $rows[0]['columns'][0]['blocks'][0];
+        $this->assertSame('Overridden Card Title', $cardBlock['title'] ?? null);
+        $this->assertSame('<p>Default Card Body</p>', $cardBlock['text'] ?? null);
+        $this->assertSame('hero_split_card', $cardBlock['props']['preset']);
+        $this->assertSame('elevated', $cardBlock['props']['variant']);
+        $this->assertSame('primary', $cardBlock['props']['color']);
+
+        $gridBlock = $rows[0]['columns'][1]['blocks'][0];
+        $this->assertSame('feature_bento_grid', $gridBlock['props']['preset']);
+        $this->assertSame('3', $gridBlock['props']['columns']);
+        $this->assertSame('md', $gridBlock['props']['gap']);
+        $this->assertCount(2, $gridBlock['items'] ?? []);
+    }
+
+    public function testSectionPresetAutoRegistersInlineChildPresetsAndLinksPresetProp(): void
+    {
+        $sectionYaml = <<<YAML
+presets:
+    cta_banner_section:
+        label:
+            en: "CTA Banner Section"
+            tr: "CTA Banner Bölümü"
+        description:
+            en: "Call to action banner"
+            tr: "Çağrı alanı"
+        preview_image: "/presets/wireframes/cta.svg"
+        props:
+            padding: "lg"
+        values:
+            rows:
+                - type: row_item
+                  columns:
+                      - type: column_item
+                        blocks:
+                            - type: reusable
+                              reusable_block: "uuid-reusable-1"
+                              props:
+                                  name: "Reusable Ref"
+                            - type: button
+                              label: "Get Started"
+                              url: "https://example.com"
+                              props:
+                                  variant: "solid"
+                                  size: "lg"
+                            - type: card
+                              title: "First Tier"
+                              props:
+                                  variant: "bordered"
+                            - type: card
+                              title: "Second Tier"
+                              props:
+                                  variant: "elevated"
+YAML;
+        \file_put_contents($this->tempDir . '/section.yaml', $sectionYaml);
+
+        $provider = new YamlBlockPresetProvider($this->tempDir);
+
+        $this->assertSame([], $provider->getPresets('reusable', 'en'));
+
+        $buttonPresets = $provider->getPresets('button', 'en');
+        $this->assertCount(1, $buttonPresets);
+        $this->assertSame('cta_banner_section', $buttonPresets[0]['id']);
+        $this->assertSame('CTA Banner Section', $buttonPresets[0]['title']);
+        $this->assertSame('Call to action banner', $buttonPresets[0]['description']);
+        $this->assertSame('/presets/wireframes/cta.svg', $buttonPresets[0]['preview_image']);
+        $this->assertSame(['variant' => 'solid', 'size' => 'lg'], $buttonPresets[0]['props']);
+        $this->assertSame(['label' => 'Get Started', 'url' => 'https://example.com'], $buttonPresets[0]['values'] ?? []);
+
+        $cardPresets = $provider->getPresets('card', 'en');
+        $this->assertCount(2, $cardPresets);
+        $this->assertSame('cta_banner_section_card_1', $cardPresets[0]['id']);
+        $this->assertSame('CTA Banner Section #1', $cardPresets[0]['title']);
+        $this->assertSame(['variant' => 'bordered'], $cardPresets[0]['props']);
+        $this->assertSame(['title' => 'First Tier'], $cardPresets[0]['values'] ?? []);
+
+        $this->assertSame('cta_banner_section_card_2', $cardPresets[1]['id']);
+        $this->assertSame('CTA Banner Section #2', $cardPresets[1]['title']);
+        $this->assertSame(['variant' => 'elevated'], $cardPresets[1]['props']);
+        $this->assertSame(['title' => 'Second Tier'], $cardPresets[1]['values'] ?? []);
+
+        $sectionPresets = $provider->getPresets('section', 'en');
+        $sectionValues = $sectionPresets[0]['values'] ?? [];
+        /** @var list<array{columns: list<array{blocks: list<array{props: array<string, mixed>}>}>}> $sectionRows */
+        $sectionRows = $sectionValues['rows'] ?? [];
+        $blocks = $sectionRows[0]['columns'][0]['blocks'];
+        $this->assertArrayNotHasKey('preset', $blocks[0]['props']);
+        $this->assertSame('cta_banner_section', $blocks[1]['props']['preset']);
+        $this->assertSame('cta_banner_section_card_1', $blocks[2]['props']['preset']);
+        $this->assertSame('cta_banner_section_card_2', $blocks[3]['props']['preset']);
+    }
+
+    public function testPathTraversalRejectionInGetPresets(): void
+    {
+        $outsideDir = \sys_get_temp_dir() . '/sulu_presets_outside_' . \uniqid('', true);
+        \mkdir($outsideDir, 0777, true);
+        $outsideYaml = <<<YAML
+presets:
+    evil_preset:
+        title: "Evil Traversal Preset"
+        props:
+            variant: "danger"
+YAML;
+        \file_put_contents($outsideDir . '/evil.yaml', $outsideYaml);
+
+        try {
+            $provider = new YamlBlockPresetProvider($this->tempDir);
+
+            // Compute relative traversal path from tempDir to outsideDir/evil
+            $relativePath = '../' . \basename($outsideDir) . '/evil';
+
+            // Without protection, this loads outsideDir/evil.yaml. With protection, it must return []
+            $this->assertSame([], $provider->getPresets($relativePath, 'en'));
+            $this->assertSame([], $provider->getPresets('../../etc/passwd', 'en'));
+            $this->assertSame([], $provider->getPresets('../evil', 'en'));
+            $this->assertSame([], $provider->getPresets("card\0evil", 'en'));
+            $this->assertSame([], $provider->getPresets('card/sub', 'en'));
+            $this->assertSame([], $provider->getPresets('..\\evil', 'en'));
+        } finally {
+            if (\is_file($outsideDir . '/evil.yaml')) {
+                \unlink($outsideDir . '/evil.yaml');
+            }
+            if (\is_dir($outsideDir)) {
+                \rmdir($outsideDir);
+            }
+        }
+    }
 }

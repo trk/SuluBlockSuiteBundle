@@ -13,9 +13,9 @@ final class ClassList
      * Joins any combination of CSS class strings, (nested) arrays of class strings, or falsy values
      * into a single whitespace-normalized class string. Non-string scalars are ignored.
      *
-     * @param string|array<int|string, mixed>|null|false ...$parts
+     * @param string|array<int|string, mixed>|false|null ...$parts
      */
-    public static function join(string|array|null|false ...$parts): string
+    public static function join(string|array|false|null ...$parts): string
     {
         $tokens = [];
 

@@ -387,4 +387,42 @@ final class PageLayoutProviderTest extends TestCase
         self::assertIsArray($first['blocks'][0]);
         self::assertSame('Resolved Title', $first['blocks'][0]['title'] ?? null);
     }
+
+    public function testPathTraversalRejectionInGetLayout(): void
+    {
+        $outsideDir = \sys_get_temp_dir() . '/sulu_layouts_outside_' . \uniqid('', true);
+        $layoutDir = $outsideDir . '/layouts';
+        \mkdir($layoutDir, 0777, true);
+
+        $secretYaml = <<<YAML
+key: secret_layout
+title: Secret Traversal Layout
+blocks:
+    - type: headline
+      title: Hacked
+YAML;
+        \file_put_contents($outsideDir . '/secret_layout.yaml', $secretYaml);
+
+        try {
+            $provider = new PageLayoutProvider(null, null, null, [$layoutDir]);
+
+            // Without protection, '../secret_layout' traverses out of $layoutDir to $outsideDir/secret_layout.yaml
+            self::assertNull($provider->getLayout('../secret_layout'));
+            self::assertNull($provider->getLayout('../../etc/passwd'));
+            self::assertNull($provider->getLayout('../outside'));
+            self::assertNull($provider->getLayout("secret\0layout"));
+            self::assertNull($provider->getLayout('secret/sub'));
+            self::assertNull($provider->getLayout('..\\secret_layout'));
+        } finally {
+            if (\is_file($outsideDir . '/secret_layout.yaml')) {
+                \unlink($outsideDir . '/secret_layout.yaml');
+            }
+            if (\is_dir($layoutDir)) {
+                \rmdir($layoutDir);
+            }
+            if (\is_dir($outsideDir)) {
+                \rmdir($outsideDir);
+            }
+        }
+    }
 }

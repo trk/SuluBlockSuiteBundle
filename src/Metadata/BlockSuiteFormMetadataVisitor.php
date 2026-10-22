@@ -16,6 +16,7 @@ use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TagMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadataVisitorInterface;
 use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
+use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator;
@@ -75,6 +76,13 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     private array $sharedSectionPrototypes = [];
 
     /**
+     * @var array<string, array<string, string>>
+     */
+    private array $navigationContextsCache = [];
+
+    private bool $isDiscoveringNavigationContexts = false;
+
+    /**
      * @var list<string>
      */
     private array $presetDirectories;
@@ -105,6 +113,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         private readonly ?BlockPresetProviderInterface $presetProvider = null,
         array $previewExcludedFields = [],
         array $previewPrimaryTextFields = [],
+        private readonly ?WebspaceManagerInterface $webspaceManager = null,
     ) {
         $dirs = \is_array($presetDirectory) ? \array_values($presetDirectory) : [$presetDirectory];
         $this->presetDirectories = \array_values(\array_filter($dirs, static fn (string $dir): bool => '' !== \trim($dir)));
@@ -288,6 +297,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
         // Normalize default_value types on content fields (e.g. checkbox string "true" -> bool true)
         $this->normalizeSectionFieldDefaults($contentSection);
+        $this->populateNavigationContextFields($contentSection, $locale);
 
         if ($includeSharedTabs) {
             if (!isset($excludedTabs['dynamic_content'])) {
@@ -408,6 +418,121 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                 $this->normalizeFieldDefaultOption($item);
             }
         }
+    }
+
+    private function populateNavigationContextFields(SectionMetadata $section, string $locale): void
+    {
+        foreach ($section->getItems() as $item) {
+            if ($item instanceof SectionMetadata) {
+                $this->populateNavigationContextFields($item, $locale);
+            } elseif ($item instanceof FieldMetadata && 'navigation_context' === $item->getName() && 'single_select' === $this->getFieldType($item)) {
+                $this->populateNavigationContextOptions($item, $locale);
+            }
+        }
+    }
+
+    private function populateNavigationContextOptions(FieldMetadata $field, string $locale): void
+    {
+        $discoveredContexts = $this->discoverWebspaceNavigationContexts($locale);
+        if ([] === $discoveredContexts) {
+            return;
+        }
+
+        /** @var array<string, OptionMetadata> $optionsByKey */
+        $optionsByKey = [];
+        $existingValuesOption = $field->findOption('values');
+        if (null !== $existingValuesOption && \is_array($existingValuesOption->getValue())) {
+            foreach ($existingValuesOption->getValue() as $existingOpt) {
+                if (\is_string($existingOpt->getName()) && '' !== $existingOpt->getName()) {
+                    $optionsByKey[$existingOpt->getName()] = $existingOpt;
+                }
+            }
+        }
+
+        foreach ($discoveredContexts as $contextKey => $contextTitle) {
+            if (isset($optionsByKey[$contextKey])) {
+                $optionsByKey[$contextKey]->setTitle($contextTitle, $locale);
+
+                continue;
+            }
+
+            $opt = new OptionMetadata();
+            $opt->setName($contextKey);
+            $opt->setValue($contextKey);
+            $opt->setTitle($contextTitle, $locale);
+            $optionsByKey[$contextKey] = $opt;
+        }
+
+        $valuesCollection = new OptionMetadata();
+        $valuesCollection->setName('values');
+        $valuesCollection->setType(OptionMetadata::TYPE_COLLECTION);
+        $valuesCollection->setValue(\array_values($optionsByKey));
+        $field->addOption($valuesCollection);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function discoverWebspaceNavigationContexts(string $locale): array
+    {
+        if (isset($this->navigationContextsCache[$locale])) {
+            return $this->navigationContextsCache[$locale];
+        }
+
+        /** @var array<string, string> $contexts */
+        $contexts = [];
+
+        if (null !== $this->webspaceManager && !$this->isDiscoveringNavigationContexts) {
+            $this->isDiscoveringNavigationContexts = true;
+            try {
+                foreach ($this->webspaceManager->getWebspaceCollection() as $webspace) {
+                    $navigation = $webspace->getNavigation();
+                    foreach ($navigation->getContexts() as $navContext) {
+                        $key = \trim($navContext->getKey());
+                        if ('' === $key) {
+                            continue;
+                        }
+                        $title = $navContext->getTitle($locale) ?? \ucfirst(\str_replace(['_', '-'], ' ', $key));
+                        $contexts[$key] ??= $title;
+                    }
+                }
+            } catch (\Throwable) {
+                // Fallback to XML scan below
+            } finally {
+                $this->isDiscoveringNavigationContexts = false;
+            }
+        }
+
+        if (null !== $this->projectDirectory) {
+            $webspacesDir = \rtrim($this->projectDirectory, '/') . '/config/webspaces';
+            if (\is_dir($webspacesDir)) {
+                $files = \glob($webspacesDir . '/*.xml');
+                if (false !== $files) {
+                    foreach ($files as $file) {
+                        $xml = @\simplexml_load_file($file);
+                        if (false === $xml) {
+                            continue;
+                        }
+                        $nodes = $xml->xpath('//*[local-name()="navigation"]/*[local-name()="contexts"]/*[local-name()="context"]') ?: [];
+                        foreach ($nodes as $node) {
+                            $key = \trim((string) ($node['key'] ?? ''));
+                            if ('' === $key) {
+                                continue;
+                            }
+                            $titles = $this->extractXmlTitles($node->meta ?? null);
+                            $title = $titles[$locale] ?? $titles['en'] ?? \ucfirst(\str_replace(['_', '-'], ' ', $key));
+                            $contexts[$key] ??= $title;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!$this->isDiscoveringNavigationContexts) {
+            $this->navigationContextsCache[$locale] = $contexts;
+        }
+
+        return $contexts;
     }
 
     private function normalizeFieldDefaultOption(FieldMetadata $field): void

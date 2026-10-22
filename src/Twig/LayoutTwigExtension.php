@@ -11,6 +11,8 @@ use Twig\TwigFunction;
 
 final class LayoutTwigExtension extends AbstractExtension
 {
+    private const MAX_RECURSION_DEPTH = 10;
+
     public function __construct(
         private readonly LayoutResolverInterface $layoutResolver,
         private readonly ?PageLayoutProviderInterface $layoutProvider = null,
@@ -28,6 +30,10 @@ final class LayoutTwigExtension extends AbstractExtension
             new TwigFunction('layout_attributes', [$this, 'getAttributes'], ['is_safe' => ['html']]),
             new TwigFunction('sulu_layout_load', [$this, 'loadLayout']),
             new TwigFunction('layout_load', [$this, 'loadLayout']),
+            new TwigFunction('sulu_layout_exists', [$this, 'hasLayout']),
+            new TwigFunction('layout_exists', [$this, 'hasLayout']),
+            new TwigFunction('sulu_layout_has_block', [$this, 'hasBlock']),
+            new TwigFunction('layout_has_block', [$this, 'hasBlock']),
             new TwigFunction('sulu_layout_render', [$this, 'renderLayout'], ['is_safe' => ['html']]),
             new TwigFunction('layout_render', [$this, 'renderLayout'], ['is_safe' => ['html']]),
             new TwigFunction('sulu_reusable_block_load', [$this, 'loadReusableBlock']),
@@ -75,6 +81,167 @@ final class LayoutTwigExtension extends AbstractExtension
         }
 
         return $this->layoutProvider->getReusableBlock($identifier, $locale);
+    }
+
+    /**
+     * Checks whether a page layout can be resolved for the given layout selection or fallback key.
+     *
+     * @param string|array<string, mixed>|null $layout
+     */
+    public function hasLayout(
+        string|array|null $layout,
+        ?string $defaultLayout = null,
+        ?string $locale = null,
+    ): bool {
+        return null !== $this->resolveLayoutData($layout, $defaultLayout, $locale);
+    }
+
+    /**
+     * Checks whether the resolved page layout contains at least one block of the given type.
+     *
+     * @param string|array<string, mixed>|null $layout
+     */
+    public function hasBlock(
+        string|array|null $layout,
+        string $blockType,
+        ?string $defaultLayout = null,
+        ?string $locale = null,
+    ): bool {
+        if ('' === \trim($blockType)) {
+            return false;
+        }
+
+        $layoutData = $this->resolveLayoutData($layout, $defaultLayout, $locale);
+
+        if (!\is_array($layoutData)) {
+            return false;
+        }
+
+        $innerContent = isset($layoutData['content']) && \is_array($layoutData['content']) ? $layoutData['content'] : [];
+        $rawBlocks = $layoutData['blocks'] ?? ($innerContent['blocks'] ?? []);
+        if (!\is_array($rawBlocks)) {
+            return false;
+        }
+
+        return $this->blocksContainType($rawBlocks, $blockType, $locale);
+    }
+
+    /**
+     * @param string|array<string, mixed>|null $layout
+     *
+     * @return array<string, mixed>|null
+     */
+    private function resolveLayoutData(
+        string|array|null $layout,
+        ?string $defaultLayout = null,
+        ?string $locale = null,
+    ): ?array {
+        $layoutData = null;
+        if (\is_string($layout) && '' !== \trim($layout)) {
+            $layoutData = $this->loadLayout($layout, $locale);
+        } elseif (\is_array($layout)) {
+            $inner = isset($layout['content']) && \is_array($layout['content']) ? $layout['content'] : $layout;
+            if (isset($inner['blocks']) && \is_array($inner['blocks'])) {
+                /** @var array<string, mixed> $inner */
+                $layoutData = $inner;
+            } else {
+                $layoutId = $inner['id'] ?? ($inner['uuid'] ?? null);
+                if (\is_string($layoutId) && '' !== \trim($layoutId)) {
+                    $layoutData = $this->loadLayout($layoutId, $locale);
+                }
+            }
+        }
+
+        if (null === $layoutData && null !== $defaultLayout && '' !== \trim($defaultLayout)) {
+            $layoutData = $this->loadLayout($defaultLayout, $locale);
+        }
+
+        return \is_array($layoutData) ? $layoutData : null;
+    }
+
+    /**
+     * @param array<int|string, mixed> $blocks
+     * @param array<string, bool> $visited
+     */
+    private function blocksContainType(
+        array $blocks,
+        string $blockType,
+        ?string $locale = null,
+        array &$visited = [],
+        int $depth = 0,
+    ): bool {
+        if ($depth > self::MAX_RECURSION_DEPTH) {
+            return false;
+        }
+
+        foreach ($blocks as $block) {
+            if (!\is_array($block)) {
+                continue;
+            }
+
+            $type = $block['type'] ?? null;
+            if ($type === $blockType) {
+                return true;
+            }
+
+            if ('reusable' === $type && isset($block['snippet'])) {
+                $snippetId = null;
+                $snippetBlocks = null;
+                if (\is_string($block['snippet'])) {
+                    $snippetId = $block['snippet'];
+                    if (isset($visited[$snippetId])) {
+                        continue;
+                    }
+                    $visited[$snippetId] = true;
+
+                    $reusable = $this->loadReusableBlock($snippetId, $locale);
+                    $snippetBlocks = \is_array($reusable['blocks'] ?? null) ? $reusable['blocks'] : null;
+                } elseif (\is_array($block['snippet'])) {
+                    $rawId = $block['snippet']['id'] ?? ($block['snippet']['uuid'] ?? null);
+                    if (\is_string($rawId) && '' !== $rawId) {
+                        $snippetId = $rawId;
+                        if (isset($visited[$snippetId])) {
+                            continue;
+                        }
+                        $visited[$snippetId] = true;
+                    }
+
+                    if (\is_array($block['snippet']['blocks'] ?? null)) {
+                        $snippetBlocks = $block['snippet']['blocks'];
+                    }
+                }
+
+                if (null !== $snippetBlocks && $this->blocksContainType($snippetBlocks, $blockType, $locale, $visited, $depth + 1)) {
+                    return true;
+                }
+            }
+
+            if ('section' === $type) {
+                if (isset($block['rows']) && \is_array($block['rows'])) {
+                    foreach ($block['rows'] as $row) {
+                        if (!\is_array($row) || !isset($row['columns']) || !\is_array($row['columns'])) {
+                            continue;
+                        }
+                        foreach ($row['columns'] as $column) {
+                            if (!\is_array($column) || !isset($column['blocks']) || !\is_array($column['blocks'])) {
+                                continue;
+                            }
+                            if ($this->blocksContainType($column['blocks'], $blockType, $locale, $visited, $depth + 1)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                if (isset($block['blocks']) && \is_array($block['blocks'])) {
+                    if ($this->blocksContainType($block['blocks'], $blockType, $locale, $visited, $depth + 1)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

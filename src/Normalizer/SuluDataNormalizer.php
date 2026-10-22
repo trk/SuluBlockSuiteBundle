@@ -93,7 +93,7 @@ final class SuluDataNormalizer
     }
 
     /**
-     * Sanitize a URL string by rejecting executable schemes (javascript:, vbscript:, data:).
+     * Sanitize a URL string by rejecting executable and dangerous schemes (javascript:, vbscript:, data:, file:, blob:).
      */
     public static function sanitizeUrl(string $url, string $fallback = '#'): string
     {
@@ -102,10 +102,73 @@ final class SuluDataNormalizer
             return $fallback;
         }
 
-        $decoded = \html_entity_decode($trimmed, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
-        $normalized = (string) \preg_replace('/[\x00-\x20]+/', '', $decoded);
-        if (1 === \preg_match('/^(?:javascript|vbscript|data):/i', $normalized)) {
+        if (!\mb_check_encoding($trimmed, 'UTF-8')) {
             return $fallback;
+        }
+
+        // Generic decoding of numeric character references (decimal and hex, with or without trailing semicolon)
+        // Strips ASCII control characters (0-31 and 127) and converts valid code points to UTF-8
+        $decoded = $trimmed;
+        for ($i = 0; $i < 2; ++$i) {
+            $prev = $decoded;
+            $numericDecoded = \preg_replace_callback(
+                '/&#(?:x([0-9a-f]+)|([0-9]+));?/i',
+                static function (array $m): string {
+                    $code = '' !== $m[1] ? (int) \hexdec($m[1]) : (int) $m[2];
+                    if ($code <= 31 || 127 === $code) {
+                        return '';
+                    }
+
+                    return (string) \mb_chr($code, 'UTF-8');
+                },
+                $decoded,
+            );
+            if (null === $numericDecoded || \PREG_NO_ERROR !== \preg_last_error()) {
+                return $fallback;
+            }
+
+            $decoded = \html_entity_decode($numericDecoded, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
+            if ($decoded === $prev) {
+                break;
+            }
+        }
+
+        // Clean invalid UTF-8 sequences
+        $cleanUtf8 = \mb_convert_encoding($decoded, 'UTF-8', 'UTF-8');
+
+        // Strip ASCII control characters/spaces as well as Unicode control and separator characters
+        $normalized = \preg_replace('/[\x00-\x20\p{C}\p{Z}]+/u', '', $cleanUtf8);
+        if (null === $normalized || \PREG_NO_ERROR !== \preg_last_error()) {
+            return $fallback;
+        }
+
+        // Reject explicit dangerous schemes
+        if (1 === \preg_match('/^(?:javascript|vbscript|data|file|blob):/i', $normalized)) {
+            return $fallback;
+        }
+
+        // Enforce safe scheme allowlist on any leading colon in first path segment before '/', '?', or '#'
+        // Ensure '#' is only treated as a URL fragment delimiter if it is NOT part of an HTML entity ('&#')
+        $firstColonPos = \strpos($normalized, ':');
+        $firstSlashPos = \strpos($normalized, '/');
+        $firstQuestionPos = \strpos($normalized, '?');
+
+        $firstHashPos = false;
+        if (1 === \preg_match('/(?<!&)#/', $normalized, $matches, \PREG_OFFSET_CAPTURE)) {
+            $firstHashPos = (int) $matches[0][1];
+        }
+
+        $delims = \array_filter(
+            [$firstSlashPos, $firstQuestionPos, $firstHashPos],
+            static fn ($pos) => false !== $pos,
+        );
+        $firstDelimiter = !empty($delims) ? \min($delims) : false;
+
+        if (false !== $firstColonPos && (false === $firstDelimiter || $firstColonPos < $firstDelimiter)) {
+            $scheme = \strtolower(\substr($normalized, 0, $firstColonPos));
+            if (!\in_array($scheme, ['http', 'https', 'mailto', 'tel', 'sms'], true)) {
+                return $fallback;
+            }
         }
 
         return $trimmed;
@@ -172,7 +235,7 @@ final class SuluDataNormalizer
         return $fallback;
     }
 
-    private static function sanitizeNullableUrl(string $url, ?string $fallback = null): ?string
+    public static function sanitizeNullableUrl(string $url, ?string $fallback = null): ?string
     {
         $sanitized = self::sanitizeUrl($url, '');
 

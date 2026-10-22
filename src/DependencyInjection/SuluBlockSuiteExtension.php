@@ -78,8 +78,28 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
 
         /** @var array{enabled: bool, yaml_dir: string|list<string>, enable_snippet_presets: bool} $presetsConfig */
         $presetsConfig = $config['presets'];
+        /** @var list<string> $mergedPresetYamlDirs */
+        $mergedPresetYamlDirs = [];
+        foreach ($configs as $rawConfig) {
+            if (\is_array($rawConfig) && isset($rawConfig['presets']) && \is_array($rawConfig['presets']) && isset($rawConfig['presets']['yaml_dir'])) {
+                $rawYamlDir = $rawConfig['presets']['yaml_dir'];
+                if (\is_string($rawYamlDir) && '' !== \trim($rawYamlDir)) {
+                    $mergedPresetYamlDirs[] = $rawYamlDir;
+                } elseif (\is_array($rawYamlDir)) {
+                    foreach ($rawYamlDir as $dirItem) {
+                        if (\is_string($dirItem) && '' !== \trim($dirItem)) {
+                            $mergedPresetYamlDirs[] = $dirItem;
+                        }
+                    }
+                }
+            }
+        }
+        $resolvedPresetYamlDir = \count($mergedPresetYamlDirs) > 1
+            ? \array_values(\array_unique($mergedPresetYamlDirs))
+            : $presetsConfig['yaml_dir'];
+
         $container->setParameter('sulu_block_suite.presets.enabled', $presetsConfig['enabled']);
-        $container->setParameter('sulu_block_suite.presets.yaml_dir', $presetsConfig['yaml_dir']);
+        $container->setParameter('sulu_block_suite.presets.yaml_dir', $resolvedPresetYamlDir);
         $container->setParameter('sulu_block_suite.presets.enable_snippet_presets', $presetsConfig['enable_snippet_presets']);
 
         /** @var array{enabled: bool} $reusableConfig */

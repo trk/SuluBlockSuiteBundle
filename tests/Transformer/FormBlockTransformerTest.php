@@ -86,7 +86,7 @@ final class FormBlockTransformerTest extends TestCase
     public function testResolvesNumericFormIdViaFormBuilderAndDetectsSubmittedQuery(): void
     {
         $formView = new FormView();
-        $symfonyForm = $this->createMock(FormInterface::class);
+        $symfonyForm = $this->createStub(FormInterface::class);
         $symfonyForm->method('createView')->willReturn($formView);
 
         $formBuilder = new class($symfonyForm) {

@@ -688,9 +688,9 @@ abstract class AbstractBlockComponent
      * Joins any combination of CSS class strings, arrays of class strings, or falsy values
      * into a single whitespace-normalized class string.
      *
-     * @param string|array<int|string, mixed>|null|false ...$parts
+     * @param string|array<int|string, mixed>|false|null ...$parts
      */
-    public function classes(string|array|null|false ...$parts): string
+    public function classes(string|array|false|null ...$parts): string
     {
         return ClassList::join(...$parts);
     }
@@ -1173,7 +1173,7 @@ abstract class AbstractBlockComponent
     {
         $keys = $this->dataKeys();
         $parent = \get_parent_class($this);
-        while (false !== $parent && $parent !== self::class && \is_subclass_of($parent, self::class)) {
+        while (false !== $parent && self::class !== $parent && \is_subclass_of($parent, self::class)) {
             $rm = new \ReflectionMethod($parent, 'dataKeys');
             if ($rm->getDeclaringClass()->getName() === $parent) {
                 /** @var list<string> $parentKeys */

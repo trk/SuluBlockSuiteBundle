@@ -73,6 +73,11 @@ final class ExportBlockPresetsCommand extends Command
 
         $blockTypeOpt = $input->getOption('block-type');
         $filterBlockType = \is_string($blockTypeOpt) && '' !== \trim($blockTypeOpt) ? \trim($blockTypeOpt) : null;
+        if (null !== $filterBlockType && 1 !== \preg_match('/^[a-zA-Z0-9_-]+$/', $filterBlockType)) {
+            $io->error(\sprintf('Invalid --block-type "%s". Only alphanumeric characters, dashes and underscores are allowed.', $filterBlockType));
+
+            return Command::FAILURE;
+        }
 
         $dryRun = (bool) $input->getOption('dry-run');
 
@@ -117,7 +122,7 @@ final class ExportBlockPresetsCommand extends Command
                 $configuredType = \trim($templateData['target_block']);
             }
 
-            if (null === $configuredType || '' === $configuredType) {
+            if (null === $configuredType || '' === $configuredType || 1 !== \preg_match('/^[a-zA-Z0-9_-]+$/', $configuredType)) {
                 continue;
             }
 
@@ -191,8 +196,19 @@ final class ExportBlockPresetsCommand extends Command
             \mkdir($baseDir, 0775, true);
         }
 
+        $realBase = \realpath($baseDir);
+        if (false === $realBase || !\is_dir($realBase)) {
+            $io->error('Target directory cannot be resolved or is not a directory.');
+
+            return Command::FAILURE;
+        }
+
         foreach ($exportedByBlock as $blockType => $newPresets) {
-            $filePath = $baseDir . '/' . $blockType . '.yaml';
+            if (1 !== \preg_match('/^[a-zA-Z0-9_-]+$/', $blockType)) {
+                continue;
+            }
+
+            $filePath = $realBase . \DIRECTORY_SEPARATOR . $blockType . '.yaml';
             /** @var array<string, mixed> $existingPresets */
             $existingPresets = [];
 

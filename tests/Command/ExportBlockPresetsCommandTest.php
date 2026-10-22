@@ -117,4 +117,65 @@ final class ExportBlockPresetsCommandTest extends TestCase
             'title' => 'Default Hero Heading',
         ], $presets['glass_hero_card']['values']);
     }
+
+    public function testExportBlockPresetsCommandRejectsPathTraversalInBlockTypeOption(): void
+    {
+        $snippetRepository = $this->createStub(SnippetRepositoryInterface::class);
+
+        $command = new ExportBlockPresetsCommand(
+            [$this->tempExportDir],
+            $snippetRepository,
+        );
+
+        $tester = new CommandTester($command);
+        $exitCode = $tester->execute([
+            '--locale' => 'en',
+            '--block-type' => '../../evil',
+        ]);
+
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString('Invalid --block-type', $tester->getDisplay());
+        self::assertFileDoesNotExist(\dirname($this->tempExportDir) . '/evil.yaml');
+    }
+
+    public function testExportBlockPresetsCommandSkipsSnippetsWithMaliciousTargetBlockTraversal(): void
+    {
+        $dimensionContent = $this->createStub(SnippetDimensionContentInterface::class);
+        $dimensionContent->method('getLocale')->willReturn('en');
+        $dimensionContent->method('getStage')->willReturn(DimensionContentInterface::STAGE_DRAFT);
+        $dimensionContent->method('getVersion')->willReturn(DimensionContentInterface::CURRENT_VERSION);
+        $dimensionContent->method('getTemplateKey')->willReturn('block_preset');
+        $dimensionContent->method('getTitle')->willReturn('Malicious Preset');
+        $dimensionContent->method('getTemplateData')->willReturn([
+            'target_block' => '../evil',
+            'preset_key' => 'hacked',
+            'props' => ['danger' => true],
+        ]);
+
+        $snippet = $this->createStub(SnippetInterface::class);
+        $snippet->method('getUuid')->willReturn('snippet-malicious-001');
+        $snippet->method('getDimensionContents')->willReturn(new ArrayCollection([$dimensionContent]));
+
+        $snippetRepository = $this->createMock(SnippetRepositoryInterface::class);
+        $snippetRepository->expects(self::once())
+            ->method('findBy')
+            ->willReturn([$snippet]);
+
+        $command = new ExportBlockPresetsCommand(
+            [$this->tempExportDir],
+            $snippetRepository,
+        );
+
+        $tester = new CommandTester($command);
+        $tester->execute(['--locale' => 'en']);
+
+        $outsideFile = \dirname($this->tempExportDir) . '/evil.yaml';
+        try {
+            self::assertFileDoesNotExist($outsideFile);
+        } finally {
+            if (\is_file($outsideFile)) {
+                \unlink($outsideFile);
+            }
+        }
+    }
 }

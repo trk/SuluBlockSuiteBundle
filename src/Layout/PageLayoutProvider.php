@@ -98,6 +98,11 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
         $resolvedLocale = $this->resolveLocale($locale);
         $normalizedId = \strtolower($trimId);
         $sluggedId = \str_replace([' ', '-'], '_', $normalizedId);
+
+        if (1 !== \preg_match('/^[a-zA-Z0-9_-]+$/', $sluggedId)) {
+            return null;
+        }
+
         $cacheKey = $resolvedLocale . ':' . $normalizedId;
 
         if (\array_key_exists($cacheKey, $this->cache)) {
@@ -176,11 +181,17 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
 
         // 2. Try filesystem YAML layouts if directory exists
         foreach ($this->layoutsDirectories as $dir) {
-            if (\is_dir($dir)) {
-                $yamlFile = \rtrim($dir, '/') . '/' . $sluggedId . '.yaml';
-                if (\is_file($yamlFile)) {
+            $realDir = \realpath($dir);
+            if (false === $realDir || !\is_dir($realDir)) {
+                continue;
+            }
+
+            $yamlFile = $realDir . \DIRECTORY_SEPARATOR . $sluggedId . '.yaml';
+            if (\is_file($yamlFile)) {
+                $realFile = \realpath($yamlFile);
+                if (false !== $realFile && \str_starts_with($realFile, $realDir . \DIRECTORY_SEPARATOR)) {
                     try {
-                        $data = Yaml::parseFile($yamlFile);
+                        $data = Yaml::parseFile($realFile);
                         if (\is_array($data)) {
                             /** @var array<string, mixed> $data */
                             return $this->cache[$cacheKey] = $data;

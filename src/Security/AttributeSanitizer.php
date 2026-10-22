@@ -159,9 +159,37 @@ final class AttributeSanitizer
             return true;
         }
 
-        $decoded = \html_entity_decode($value, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
-        $normalized = (string) \preg_replace('/[\x00-\x20]+/', '', $decoded);
+        $decoded = $value;
+        for ($i = 0; $i < 2; ++$i) {
+            $prev = $decoded;
+            $numericDecoded = \preg_replace_callback(
+                '/&#(?:x([0-9a-f]+)|([0-9]+));?/i',
+                static function (array $m): string {
+                    $code = '' !== $m[1] ? (int) \hexdec($m[1]) : (int) $m[2];
+                    if ($code <= 31 || 127 === $code) {
+                        return '';
+                    }
 
-        return 1 !== \preg_match('/^(?:javascript|vbscript|data):/i', $normalized);
+                    return (string) \mb_chr($code, 'UTF-8');
+                },
+                $decoded,
+            );
+            if (null === $numericDecoded || \PREG_NO_ERROR !== \preg_last_error()) {
+                return false;
+            }
+
+            $decoded = \html_entity_decode($numericDecoded, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
+            if ($decoded === $prev) {
+                break;
+            }
+        }
+
+        $cleanUtf8 = \mb_convert_encoding($decoded, 'UTF-8', 'UTF-8');
+        $normalized = \preg_replace('/[\x00-\x20\p{C}\p{Z}]+/u', '', $cleanUtf8);
+        if (null === $normalized || \PREG_NO_ERROR !== \preg_last_error()) {
+            return false;
+        }
+
+        return 1 !== \preg_match('/^(?:javascript|vbscript|data|file|blob):/i', $normalized);
     }
 }

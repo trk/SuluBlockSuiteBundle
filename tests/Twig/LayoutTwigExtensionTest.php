@@ -69,4 +69,127 @@ final class LayoutTwigExtensionTest extends TestCase
 
         $this->assertSame(['title' => 'Default', 'blocks' => []], $data);
     }
+
+    public function testHasBlockReturnsTrueWhenBlockPresent(): void
+    {
+        $stubResolver = $this->createStub(LayoutResolverInterface::class);
+        $extension = new LayoutTwigExtension($stubResolver);
+
+        $layout = [
+            'blocks' => [
+                ['type' => 'headline', 'title' => 'Title'],
+                ['type' => 'card', 'title' => 'Card'],
+            ],
+        ];
+
+        $this->assertTrue($extension->hasBlock($layout, 'card'));
+        $this->assertFalse($extension->hasBlock($layout, 'accordion'));
+    }
+
+    public function testHasBlockGuardsAgainstCircularReferencesInReusableBlocks(): void
+    {
+        $stubResolver = $this->createStub(LayoutResolverInterface::class);
+        $mockProvider = $this->createStub(PageLayoutProviderInterface::class);
+
+        // Cyclic reference: snippet-1 -> snippet-2 -> snippet-1
+        $mockProvider->method('getReusableBlock')
+            ->willReturnCallback(static function (string $id): array {
+                if ('snippet-1' === $id) {
+                    return [
+                        'blocks' => [
+                            ['type' => 'reusable', 'snippet' => 'snippet-2'],
+                        ],
+                    ];
+                }
+                if ('snippet-2' === $id) {
+                    return [
+                        'blocks' => [
+                            ['type' => 'reusable', 'snippet' => 'snippet-1'],
+                        ],
+                    ];
+                }
+
+                return [];
+            });
+
+        $extension = new LayoutTwigExtension($stubResolver, $mockProvider);
+
+        $layout = [
+            'blocks' => [
+                ['type' => 'reusable', 'snippet' => 'snippet-1'],
+            ],
+        ];
+
+        // Without protection, this enters infinite recursion and crashes PHP.
+        // With protection, it cleanly returns false.
+        $this->assertFalse($extension->hasBlock($layout, 'target_block'));
+    }
+
+    public function testHasBlockRespectsMaxRecursionDepthLimit(): void
+    {
+        $stubResolver = $this->createStub(LayoutResolverInterface::class);
+        $mockProvider = $this->createStub(PageLayoutProviderInterface::class);
+
+        // Deep chain of 15 levels: depth 1 -> depth 2 -> ... -> depth 15 (which contains 'target_block')
+        $mockProvider->method('getReusableBlock')
+            ->willReturnCallback(static function (string $id): array {
+                if (1 === \preg_match('/^level-(\d+)$/', $id, $matches)) {
+                    $level = (int) $matches[1];
+                    if ($level < 15) {
+                        return [
+                            'blocks' => [
+                                ['type' => 'reusable', 'snippet' => 'level-' . ($level + 1)],
+                            ],
+                        ];
+                    }
+
+                    return [
+                        'blocks' => [
+                            ['type' => 'target_block'],
+                        ],
+                    ];
+                }
+
+                return [];
+            });
+
+        $extension = new LayoutTwigExtension($stubResolver, $mockProvider);
+
+        $layout = [
+            'blocks' => [
+                ['type' => 'reusable', 'snippet' => 'level-1'],
+            ],
+        ];
+
+        // Max depth is 10, so level-15 should NOT be reached and should return false
+        $this->assertFalse($extension->hasBlock($layout, 'target_block'));
+    }
+
+    public function testHasBlockTraversesSectionBlocksWithNestedRowsAndColumns(): void
+    {
+        $stubResolver = $this->createStub(LayoutResolverInterface::class);
+        $extension = new LayoutTwigExtension($stubResolver);
+
+        $layout = [
+            'blocks' => [
+                [
+                    'type' => 'section',
+                    'rows' => [
+                        [
+                            'columns' => [
+                                [
+                                    'blocks' => [
+                                        ['type' => 'card', 'title' => 'Nested Card'],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->assertTrue($extension->hasBlock($layout, 'card'));
+        $this->assertFalse($extension->hasBlock($layout, 'accordion'));
+    }
 }

@@ -27,7 +27,9 @@ services:
             $presetProvider: '@Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
             $presetsEnabled: '%sulu_block_suite.presets.enabled%'
             $requestStack: '@?request_stack'
-        tags: ['sulu_content.block_visitor']
+        tags:
+            - 'sulu_content.block_visitor'
+            - 'sulu_block_suite.block_transformer'
 
     Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor:
         arguments:
@@ -41,6 +43,7 @@ services:
             $presetProvider: '@?Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
             $previewExcludedFields: '%sulu_block_suite.preview_tags.excluded_fields%'
             $previewPrimaryTextFields: '%sulu_block_suite.preview_tags.primary_text_fields%'
+            $webspaceManager: '@?sulu_core.webspace.webspace_manager'
         tags:
             - { name: 'sulu_admin.form_metadata_visitor', priority: -50 }
             - { name: 'sulu_admin.typed_form_metadata_visitor', priority: -50 }
