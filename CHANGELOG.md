@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-10-23
+
+### Added
+- **Search Dynamic Content Sources (`SuluSearchSourceProvider`)**: Added `search_results` (multi-item) and `search_context` (single-item) Dynamic Content sources to populate multi-item blocks (`grid`, `list`, `table`, `accordion`, `description_list`, and repeated `card` blocks) and header blocks from active search queries (`?q=`).
+- **Multi-Item Dynamic Content Pagination (`dynamic_pagination` & `dynamic_per_page`)**: Added configurable pagination styles (`none`, `numbers`, `prev_next`) and items-per-page slicing (`dynamic_per_page`, default `20`) independent of the total item cap (`dynamic_limit`), with automatic `_pagination` template rendering in `BlockRenderer`.
+
 ## [0.2.0] - 2026-10-22
 
 ### Added
