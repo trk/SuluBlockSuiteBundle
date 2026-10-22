@@ -1081,9 +1081,15 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             return \implode(' or ', \array_values($clauses));
         };
 
+        $limitVisibleCondition = $buildSourceVisibleCondition($limitSourceKeys);
+
         $conditionMap = [
-            'dynamic_limit' => $buildSourceVisibleCondition($limitSourceKeys),
-            'dynamic_offset' => $buildSourceVisibleCondition($limitSourceKeys),
+            'dynamic_limit' => $limitVisibleCondition,
+            'dynamic_offset' => $limitVisibleCondition,
+            'dynamic_pagination' => $limitVisibleCondition,
+            'dynamic_per_page' => null !== $limitVisibleCondition
+                ? "({$limitVisibleCondition}) and (__parent.dynamic_pagination == 'numbers' or __parent.dynamic_pagination == 'prev_next')"
+                : null,
             'dynamic_sort_by' => $buildSourceVisibleCondition($sortSourceKeys),
             'dynamic_sort_order' => $buildSourceVisibleCondition($sortSourceKeys),
             'dynamic_template_keys' => $buildSourceVisibleCondition($templateFilterSourceKeys),

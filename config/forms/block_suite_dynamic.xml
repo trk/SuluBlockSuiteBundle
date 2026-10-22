@@ -171,7 +171,7 @@
                 </property>
 
                 <property name="dynamic_limit" type="number" colspan="3" mandatory="false"
-                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection'">
+                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection' or __parent.dynamic_source == 'search_results'">
                     <meta>
                         <title lang="en">Limit</title>
                         <title lang="tr">Limit</title>
@@ -183,7 +183,7 @@
                 </property>
 
                 <property name="dynamic_offset" type="number" colspan="3" mandatory="false"
-                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection'">
+                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection' or __parent.dynamic_source == 'search_results'">
                     <meta>
                         <title lang="en">Offset</title>
                         <title lang="tr">Başlangıç</title>
@@ -192,6 +192,68 @@
                         <title lang="es">Desplazamiento</title>
                         <title lang="fr">Décalage</title>
                     </meta>
+                </property>
+
+                <property name="dynamic_pagination" type="single_select" colspan="3" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection' or __parent.dynamic_source == 'search_results'">
+                    <meta>
+                        <title lang="en">Pagination</title>
+                        <title lang="tr">Sayfalama</title>
+                        <title lang="de">Paginierung</title>
+                        <title lang="ru">Пагинация</title>
+                        <title lang="es">Paginación</title>
+                        <title lang="fr">Pagination</title>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="none"/>
+                        <param name="values" type="collection">
+                            <param name="none">
+                                <meta>
+                                    <title lang="en">None</title>
+                                    <title lang="tr">Yok</title>
+                                    <title lang="de">Keine</title>
+                                    <title lang="ru">Нет</title>
+                                    <title lang="es">Ninguna</title>
+                                    <title lang="fr">Aucune</title>
+                                </meta>
+                            </param>
+                            <param name="numbers">
+                                <meta>
+                                    <title lang="en">Page Numbers</title>
+                                    <title lang="tr">Sayfa Numaraları</title>
+                                    <title lang="de">Seitenzahlen</title>
+                                    <title lang="ru">Номера страниц</title>
+                                    <title lang="es">Números de Página</title>
+                                    <title lang="fr">Numéros de Page</title>
+                                </meta>
+                            </param>
+                            <param name="prev_next">
+                                <meta>
+                                    <title lang="en">Previous / Next</title>
+                                    <title lang="tr">Önceki / Sonraki</title>
+                                    <title lang="de">Zurück / Weiter</title>
+                                    <title lang="ru">Назад / Вперед</title>
+                                    <title lang="es">Anterior / Siguiente</title>
+                                    <title lang="fr">Précédent / Suivant</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="dynamic_per_page" type="number" colspan="3" mandatory="false"
+                          visibleCondition="(__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection' or __parent.dynamic_source == 'search_results') and (__parent.dynamic_pagination == 'numbers' or __parent.dynamic_pagination == 'prev_next')">
+                    <meta>
+                        <title lang="en">Items Per Page</title>
+                        <title lang="tr">Sayfa Başına Öğe</title>
+                        <title lang="de">Elemente pro Seite</title>
+                        <title lang="ru">Элементов на странице</title>
+                        <title lang="es">Elementos por Página</title>
+                        <title lang="fr">Éléments par Page</title>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="20"/>
+                    </params>
                 </property>
 
                 <property name="dynamic_sort_by" type="single_select" colspan="3" mandatory="false"

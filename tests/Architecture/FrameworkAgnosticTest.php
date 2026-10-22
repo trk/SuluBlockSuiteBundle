@@ -70,6 +70,7 @@ final class FrameworkAgnosticTest extends TestCase
             'src/DynamicContent/Provider/SuluCategorySourceProvider.php',
             'src/DynamicContent/Provider/SuluMediaCollectionSourceProvider.php',
             'src/DynamicContent/Provider/SuluPageSourceProvider.php',
+            'src/DynamicContent/Provider/SuluSearchSourceProvider.php',
             'assets/admin/components/PresetSelection/BlockCollectionBlockPreviewTransformer.js',
             'translations/admin.de.json',
             'translations/admin.en.json',

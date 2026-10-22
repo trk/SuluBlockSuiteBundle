@@ -216,6 +216,20 @@ final class BlockRenderer implements ResetInterface
                 $html = '<style>' . $block['_scoped_css'] . '</style>' . $html;
             }
 
+            if (
+                isset($block['_pagination'])
+                && \is_array($block['_pagination'])
+                && (($block['_pagination']['total_pages'] ?? 1) > 1)
+            ) {
+                $paginationTemplate = $this->resolveBlockTemplate('_pagination');
+                if (null !== $paginationTemplate) {
+                    $html .= $this->twig->render($paginationTemplate, \array_merge($context, [
+                        'pagination' => $block['_pagination'],
+                        'block' => $block,
+                    ]));
+                }
+            }
+
             return $html;
         } finally {
             --$this->renderDepth;

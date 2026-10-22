@@ -26,7 +26,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         ?SuluSmartContentQueryBridge $smartContentBridge = null,
         ?ContentResolverInterface $contentResolver = null,
         ?ContentAggregatorInterface $contentAggregator = null,
-        ?RequestStack $requestStack = null,
+        private readonly ?RequestStack $requestStack = null,
         ?ReferenceStoreInterface $referenceStore = null,
         ?TranslatorInterface $translator = null,
     ) {
@@ -88,7 +88,17 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 
         $provider = $entry['provider'];
         if ($entry['multi_item']) {
-            $items = $provider->resolveCollection($dynamicConfig, $contextPage);
+            $providerConfig = $dynamicConfig;
+            $rawPagination = $dynamicConfig['pagination'] ?? ($dynamicConfig['dynamic_pagination'] ?? 'none');
+            $paginationStyle = \is_string($rawPagination) ? \trim($rawPagination) : 'none';
+            $configuredLimit = isset($providerConfig['limit']) && \is_numeric($providerConfig['limit'])
+                ? (int) $providerConfig['limit']
+                : 0;
+            if (\in_array($paginationStyle, ['numbers', 'prev_next'], true) && $configuredLimit <= 0) {
+                $providerConfig['limit'] = 500;
+            }
+
+            $items = $provider->resolveCollection($providerConfig, $contextPage);
 
             return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig, $hideIfEmpty);
         }
@@ -158,6 +168,40 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             return [];
         }
 
+        $totalLimit = isset($dynamicConfig['limit']) && \is_numeric($dynamicConfig['limit'])
+            ? (int) $dynamicConfig['limit']
+            : 0;
+        if ($totalLimit > 0 && \count($filteredItems) > $totalLimit) {
+            $filteredItems = \array_slice($filteredItems, 0, $totalLimit);
+        }
+
+        $rawPagination = $dynamicConfig['pagination'] ?? ($dynamicConfig['dynamic_pagination'] ?? 'none');
+        $paginationStyle = \is_string($rawPagination) ? \trim($rawPagination) : 'none';
+        $paginationMeta = null;
+
+        if (\in_array($paginationStyle, ['numbers', 'prev_next'], true)) {
+            $rawPerPage = $dynamicConfig['per_page'] ?? ($dynamicConfig['dynamic_per_page'] ?? 20);
+            $perPage = \is_numeric($rawPerPage) ? \max(1, (int) $rawPerPage) : 20;
+            $totalItems = \count($filteredItems);
+            $totalPages = \max(1, (int) \ceil($totalItems / $perPage));
+
+            $rawFallbackPage = $dynamicConfig['current_page'] ?? 1;
+            $fallbackPage = \is_numeric($rawFallbackPage) ? (int) $rawFallbackPage : 1;
+            $rawPage = $this->requestStack?->getCurrentRequest()?->query->get('p', $fallbackPage) ?? $fallbackPage;
+            $currentPage = \is_numeric($rawPage) ? \max(1, \min((int) $rawPage, $totalPages)) : 1;
+
+            $filteredItems = \array_slice($filteredItems, ($currentPage - 1) * $perPage, $perPage);
+
+            $paginationMeta = [
+                'style' => $paginationStyle,
+                'current_page' => $currentPage,
+                'per_page' => $perPage,
+                'total_items' => $totalItems,
+                'total_pages' => $totalPages,
+                'param' => 'p',
+            ];
+        }
+
         $hydrateMode = isset($dynamicConfig['hydrate_mode']) && \is_string($dynamicConfig['hydrate_mode'])
             ? $dynamicConfig['hydrate_mode']
             : 'auto';
@@ -212,6 +256,9 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 
             $hydratedBlock = $block;
             $hydratedBlock['items'] = $hydratedInnerItems;
+            if (null !== $paginationMeta) {
+                $hydratedBlock['_pagination'] = $paginationMeta;
+            }
 
             return [$hydratedBlock];
         }
@@ -242,6 +289,11 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             }
 
             $hydratedList[] = $hydratedItem;
+        }
+
+        if (null !== $paginationMeta && [] !== $hydratedList) {
+            $lastIdx = \count($hydratedList) - 1;
+            $hydratedList[$lastIdx]['_pagination'] = $paginationMeta;
         }
 
         return $hydratedList;
@@ -397,6 +449,19 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             ];
         }
 
+        $rawPagination = isset($props['dynamic_pagination']) && \is_string($props['dynamic_pagination'])
+            ? \trim($props['dynamic_pagination'])
+            : 'none';
+        $pagination = \in_array($rawPagination, ['none', 'numbers', 'prev_next'], true)
+            ? $rawPagination
+            : 'none';
+        $perPage = isset($props['dynamic_per_page']) && \is_numeric($props['dynamic_per_page']) && (int) $props['dynamic_per_page'] > 0
+            ? (int) $props['dynamic_per_page']
+            : 20;
+        $limit = isset($props['dynamic_limit']) && \is_numeric($props['dynamic_limit'])
+            ? (int) $props['dynamic_limit']
+            : ('none' !== $pagination ? 0 : 6);
+
         return [
             'enabled' => 'none' !== $sourceType && '' !== $sourceType,
             'source_type' => $sourceType,
@@ -423,8 +488,10 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             'exclude_current' => (bool) ($props['dynamic_exclude_current'] ?? true),
             'sort_by' => $props['dynamic_sort_by'] ?? 'published',
             'sort_order' => $props['dynamic_sort_order'] ?? 'desc',
-            'limit' => isset($props['dynamic_limit']) && \is_numeric($props['dynamic_limit']) ? (int) $props['dynamic_limit'] : 6,
+            'limit' => $limit,
             'offset' => isset($props['dynamic_offset']) && \is_numeric($props['dynamic_offset']) ? (int) $props['dynamic_offset'] : 0,
+            'pagination' => $pagination,
+            'per_page' => $perPage,
             'mapping' => $mapping,
             'condition' => $condition,
         ];

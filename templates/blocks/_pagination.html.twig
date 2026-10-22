@@ -1,0 +1,52 @@
+{% set pagination = pagination|default(block._pagination|default(null)) %}
+{% if pagination is iterable and (pagination.total_pages|default(1)) > 1 %}
+    {% set current_page = pagination.current_page|default(1) %}
+    {% set total_pages = pagination.total_pages|default(1) %}
+    {% set style = pagination.style|default('numbers') %}
+    {% set param = pagination.param|default('p') %}
+    {% set base_query = (app is defined and app.request is defined and app.request is not null) ? app.request.query.all : {} %}
+    {% set base_path = (app is defined and app.request is defined and app.request is not null) ? app.request.pathInfo : '' %}
+
+    <nav aria-label="Pagination" data-pagination-style="{{ style }}">
+        <ul>
+            {% if current_page > 1 %}
+                {% set prev_params = base_query|merge({ (param): current_page - 1 }) %}
+                <li>
+                    <a href="{{ base_path }}?{{ prev_params|url_encode }}" rel="prev" aria-label="Previous page">Previous</a>
+                </li>
+            {% else %}
+                <li>
+                    <span aria-disabled="true">Previous</span>
+                </li>
+            {% endif %}
+
+            {% if style == 'numbers' %}
+                {% for page in 1..total_pages %}
+                    {% set page_params = base_query|merge({ (param): page }) %}
+                    <li>
+                        {% if page == current_page %}
+                            <a href="{{ base_path }}?{{ page_params|url_encode }}" aria-current="page">{{ page }}</a>
+                        {% else %}
+                            <a href="{{ base_path }}?{{ page_params|url_encode }}">{{ page }}</a>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            {% else %}
+                <li>
+                    <span>Page {{ current_page }} of {{ total_pages }}</span>
+                </li>
+            {% endif %}
+
+            {% if current_page < total_pages %}
+                {% set next_params = base_query|merge({ (param): current_page + 1 }) %}
+                <li>
+                    <a href="{{ base_path }}?{{ next_params|url_encode }}" rel="next" aria-label="Next page">Next</a>
+                </li>
+            {% else %}
+                <li>
+                    <span aria-disabled="true">Next</span>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endif %}

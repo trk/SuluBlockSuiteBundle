@@ -15,6 +15,7 @@ use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluArticleSourceProvid
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluCategorySourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluMediaCollectionSourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluPageSourceProvider;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluSearchSourceProvider;
 
 /**
  * Central registry for all Dynamic Content source providers (both built-in Sulu sources
@@ -86,6 +87,13 @@ final class DynamicContentSourceRegistry
                 requestStack: $requestStack,
                 referenceStore: $referenceStore,
                 smartContentBridge: $smartContentBridge,
+                translator: $this->translator,
+            ));
+        }
+
+        if (!isset($this->providers['search_results'])) {
+            $this->registerProvider(new SuluSearchSourceProvider(
+                requestStack: $requestStack,
                 translator: $this->translator,
             ));
         }
