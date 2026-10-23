@@ -18,6 +18,15 @@ const TAB_ICONS: {[string]: string} = {
     general: 'su-cog',
     dynamic_content: 'su-sync',
     advanced: 'su-code',
+    overview: 'su-document',
+    cabins: 'su-user',
+    technical: 'su-cog',
+    rates: 'su-tag',
+    media: 'su-image',
+    general_and_units_section: 'su-cog',
+    yacht_scope_section: 'fa-anchor',
+    destination_scope_section: 'su-web',
+    route_scope_section: 'su-map-pin',
 };
 
 let instanceCounter = 0;
