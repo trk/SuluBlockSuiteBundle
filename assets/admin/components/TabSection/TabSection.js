@@ -23,6 +23,7 @@ const TAB_ICONS: {[string]: string} = {
     technical: 'su-cog',
     rates: 'su-tag',
     media: 'su-image',
+    itinerary: 'su-map',
     general_and_units_section: 'su-cog',
     yacht_scope_section: 'fa-anchor',
     destination_scope_section: 'su-web',
