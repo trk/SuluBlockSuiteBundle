@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-10-26
+
+### Added
+- **Conditional Multi-Webspace Support (`sulu_block_suite.multi_webspace.enabled`)**: Automatic detection of `Totoglu\SuluMultiWebspaceBundle\SuluMultiWebspaceBundle` with graceful single-webspace degradation (hiding `webspace` fields, expanding sibling `colSpan=6` fields to `12`, and enforcing global template uniqueness).
+- **Page Layout Uniqueness & Optional Default Template (`PageLayoutUniquenessDataMapper`)**: Enforces 1-to-1 `(webspace, target_template)` uniqueness for default template layouts while allowing optional `target_template` (`— None (Custom Layout) —`) and explicit `title` (`Layout Name`) for custom per-page layouts.
+- **Snippet Live Preview (`SnippetPreviewProvider`, `SnippetPreviewController`, `PageLayoutPreviewResolver`)**: Real-time Sulu Admin live preview for `page_layout` and `reusable_block` snippets with automatic layout-usage page discovery (`target_template` and explicit `layout` assignment).
+- **AI & MCP Integration (`BlockSuiteMcpTools`, `BlockSuiteSchemaInspector`, `BlockSuitePayloadComposer`)**: Schema inspection, block/layout discovery, and structured payload composition tools for AI/MCP workflows.
+- **Inline Field Option Groups & Preview Block Focus (`withBlockFieldOptions`, `initPreviewBlockFocus`)**: Native Sulu `ArrowMenu` popover option groups on content fields and click-to-focus block synchronization in Sulu Live Preview.
+- **Deep Module Architecture**: Extracted 10 cohesive deep modules (`SnippetScopeResolver`, `PageLayoutPreviewResolver`, `FormSelectFieldPopulator`, `SharedXmlSectionLoader`, `PopoverOptionGroupNormalizer`, `DynamicSectionFormBuilder`, `PresetPayloadNormalizer`, `SuluContentDimensionExtractor`, `DynamicContentQueryFilterNormalizer`, `DynamicContentMappingApplier`).
+
 ## [0.2.1] - 2026-10-23
 
 ### Added
