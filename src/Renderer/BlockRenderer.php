@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Totoglu\SuluBlockSuiteBundle\Renderer;
 
 use Symfony\Contracts\Service\ResetInterface;
+use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface;
 use Twig\Environment;
 
@@ -34,6 +35,8 @@ final class BlockRenderer implements ResetInterface
      * @var array<string, bool>
      */
     private array $activeReusableSnippets = [];
+
+    private bool $previewFocusScriptInjected = false;
 
     /**
      * @param array<string, int>|list<string> $templateNamespaces
@@ -102,6 +105,7 @@ final class BlockRenderer implements ResetInterface
         $this->templateCache = [];
         $this->renderDepth = 0;
         $this->activeReusableSnippets = [];
+        $this->previewFocusScriptInjected = false;
     }
 
     public function setCollectionRenderer(?BlockCollectionRendererInterface $collectionRenderer): void
@@ -163,25 +167,7 @@ final class BlockRenderer implements ResetInterface
 
         $reusableSnippetId = null;
         if ('reusable' === $type) {
-            if (isset($block['snippet'])) {
-                $snippet = $block['snippet'];
-                if (\is_string($snippet) && '' !== \trim($snippet)) {
-                    $reusableSnippetId = \trim($snippet);
-                } elseif (\is_array($snippet)) {
-                    $innerSnippet = isset($snippet['content']) && \is_array($snippet['content']) ? $snippet['content'] : [];
-                    $candidateId = $snippet['uuid'] ?? ($snippet['id'] ?? ($innerSnippet['uuid'] ?? ($innerSnippet['id'] ?? null)));
-                    if (\is_string($candidateId) && '' !== \trim($candidateId)) {
-                        $reusableSnippetId = \trim($candidateId);
-                    }
-                }
-            }
-            if (null === $reusableSnippetId && isset($block['view']) && \is_array($block['view']) && isset($block['view']['snippet']) && \is_array($block['view']['snippet'])) {
-                $viewSnippetId = $block['view']['snippet']['id'] ?? ($block['view']['snippet']['uuid'] ?? null);
-                if (\is_string($viewSnippetId) && '' !== \trim($viewSnippetId)) {
-                    $reusableSnippetId = \trim($viewSnippetId);
-                }
-            }
-
+            $reusableSnippetId = SuluDataNormalizer::extractSnippetUuid($block);
             if (null !== $reusableSnippetId && isset($this->activeReusableSnippets[$reusableSnippetId])) {
                 return '';
             }
@@ -197,11 +183,22 @@ final class BlockRenderer implements ResetInterface
                 'block' => $block,
             ]));
 
-            if ('' === \trim($html)) {
+            $hasSummary = isset($block['_summary'])
+                && \is_array($block['_summary'])
+                && isset($block['_summary']['formatted_summary'])
+                && \is_string($block['_summary']['formatted_summary'])
+                && '' !== \trim($block['_summary']['formatted_summary']);
+            $hasEmptyState = isset($block['_empty_state'])
+                && \is_array($block['_empty_state'])
+                && isset($block['_empty_state']['message'])
+                && \is_string($block['_empty_state']['message'])
+                && '' !== \trim($block['_empty_state']['message']);
+
+            if ('' === \trim($html) && !$hasSummary && !$hasEmptyState) {
                 return $html;
             }
 
-            if (isset($block['_attributes']) && \is_array($block['_attributes']) && [] !== $block['_attributes']) {
+            if ('' !== \trim($html) && isset($block['_attributes']) && \is_array($block['_attributes']) && [] !== $block['_attributes']) {
                 /** @var array<string, string|bool> $attrs */
                 $attrs = $block['_attributes'];
                 $html = $this->injectRootAttributes($html, $attrs);
@@ -216,6 +213,45 @@ final class BlockRenderer implements ResetInterface
                 $html = '<style>' . $block['_scoped_css'] . '</style>' . $html;
             }
 
+            if ($hasSummary) {
+                /** @var array<string, mixed> $summaryData */
+                $summaryData = $block['_summary'];
+                $summaryPosition = isset($summaryData['position']) && \is_string($summaryData['position'])
+                    ? \trim($summaryData['position'])
+                    : 'top';
+                $summaryTemplate = $this->resolveBlockTemplate('_summary');
+                if (null !== $summaryTemplate) {
+                    if (\in_array($summaryPosition, ['top', 'both'], true)) {
+                        $topSummaryHtml = $this->twig->render($summaryTemplate, \array_merge($context, [
+                            'summary' => $summaryData,
+                            'summary_position' => 'top',
+                            'block' => $block,
+                        ]));
+                        $html = $topSummaryHtml . $html;
+                    }
+                    if (\in_array($summaryPosition, ['bottom', 'both'], true)) {
+                        $bottomSummaryHtml = $this->twig->render($summaryTemplate, \array_merge($context, [
+                            'summary' => $summaryData,
+                            'summary_position' => 'bottom',
+                            'block' => $block,
+                        ]));
+                        $html .= $bottomSummaryHtml;
+                    }
+                }
+            }
+
+            if ($hasEmptyState) {
+                /** @var array<string, mixed> $emptyStateData */
+                $emptyStateData = $block['_empty_state'];
+                $emptyStateTemplate = $this->resolveBlockTemplate('_empty_state');
+                if (null !== $emptyStateTemplate) {
+                    $html .= $this->twig->render($emptyStateTemplate, \array_merge($context, [
+                        'empty_state' => $emptyStateData,
+                        'block' => $block,
+                    ]));
+                }
+            }
+
             if (
                 isset($block['_pagination'])
                 && \is_array($block['_pagination'])
@@ -228,6 +264,18 @@ final class BlockRenderer implements ResetInterface
                         'block' => $block,
                     ]));
                 }
+            }
+
+            if (
+                !$this->previewFocusScriptInjected
+                && 1 === $this->renderDepth
+                && (
+                    true === ($context['preview'] ?? false)
+                    || (isset($block['_attributes']) && \is_array($block['_attributes']) && isset($block['_attributes']['data-block-id']))
+                )
+            ) {
+                $this->previewFocusScriptInjected = true;
+                $html .= self::getPreviewBlockFocusScript();
             }
 
             return $html;
@@ -291,7 +339,13 @@ final class BlockRenderer implements ResetInterface
         }
 
         if (null !== $this->collectionRenderer && empty($context['disable_auto_section'])) {
-            return $this->collectionRenderer->renderCollection($visibleBlocks, $context);
+            $output = $this->collectionRenderer->renderCollection($visibleBlocks, $context);
+            if (!$this->previewFocusScriptInjected && $this->hasPreviewBlocks($visibleBlocks, $context)) {
+                $this->previewFocusScriptInjected = true;
+                $output .= self::getPreviewBlockFocusScript();
+            }
+
+            return $output;
         }
 
         $output = '';
@@ -300,6 +354,25 @@ final class BlockRenderer implements ResetInterface
         }
 
         return $output;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $blocks
+     * @param array<string, mixed> $context
+     */
+    private function hasPreviewBlocks(array $blocks, array $context): bool
+    {
+        if (true === ($context['preview'] ?? false)) {
+            return true;
+        }
+
+        foreach ($blocks as $block) {
+            if (isset($block['_attributes']) && \is_array($block['_attributes']) && isset($block['_attributes']['data-block-id'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -360,29 +433,198 @@ final class BlockRenderer implements ResetInterface
      */
     private function normalizeBlock(mixed $block): ?array
     {
-        if (!\is_array($block) && !\is_object($block)) {
-            return null;
+        return SuluDataNormalizer::normalizeBlock($block);
+    }
+
+    /**
+     * Returns the self-contained website iframe script for Sulu Live Preview Block Focus.
+     */
+    public static function getPreviewBlockFocusScript(): string
+    {
+        return <<<'HTML'
+<script data-sulu-preview-block-focus="1">
+(function () {
+    if (window.parent === window) {
+        return;
+    }
+    if (typeof window.__suluBlockSuitePreviewFocusCleanup === 'function') {
+        try {
+            window.__suluBlockSuitePreviewFocusCleanup();
+        } catch (err) {}
+    }
+    window.__suluBlockSuitePreviewFocusInitialized = true;
+
+    var activeBlock = null;
+    var hoverIndicator = document.createElement('div');
+    Object.assign(hoverIndicator.style, {
+        position: 'absolute',
+        width: '6px',
+        backgroundColor: '#6db4c7',
+        borderRadius: '2px',
+        pointerEvents: 'none',
+        zIndex: '99998',
+        display: 'none',
+        transition: 'top 0.1s ease, left 0.1s ease, height 0.1s ease'
+    });
+
+    var focusIcon = document.createElement('button');
+    focusIcon.type = 'button';
+    focusIcon.title = 'Focus block in editor';
+    focusIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3m0 14v3m10-10h-3M5 12H2m15.07-7.07-2.12 2.12M9.05 14.95l-2.12 2.12m0-12.14 2.12 2.12m7.9 7.9 2.12 2.12"></path></svg>';
+    Object.assign(focusIcon.style, {
+        position: 'absolute',
+        width: '27px',
+        height: '26px',
+        borderRadius: '3px',
+        background: '#6db4c7',
+        color: '#fff',
+        border: 'none',
+        display: 'none',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        zIndex: '99999',
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
+        transition: 'opacity 0.15s ease'
+    });
+
+    function ensureAttached() {
+        if (!document.body) {
+            return false;
+        }
+        if (!document.body.contains(hoverIndicator)) {
+            document.body.appendChild(hoverIndicator);
+        }
+        if (!document.body.contains(focusIcon)) {
+            document.body.appendChild(focusIcon);
+        }
+        return true;
+    }
+
+    function positionIndicators(target) {
+        if (!target || !ensureAttached()) {
+            return;
+        }
+        activeBlock = target;
+        var rect = target.getBoundingClientRect();
+
+        hoverIndicator.style.top = (window.scrollY + rect.top) + 'px';
+        hoverIndicator.style.left = (window.scrollX + Math.max(0, rect.left)) + 'px';
+        hoverIndicator.style.height = rect.height + 'px';
+        hoverIndicator.style.display = 'block';
+
+        focusIcon.style.top = (window.scrollY + rect.top + 6) + 'px';
+        focusIcon.style.left = (window.scrollX + Math.max(0, rect.left) + 8) + 'px';
+        focusIcon.style.display = 'flex';
+    }
+
+    function hideIndicators() {
+        hoverIndicator.style.display = 'none';
+        focusIcon.style.display = 'none';
+        activeBlock = null;
+    }
+
+    focusIcon.addEventListener('click', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (!activeBlock) {
+            return;
         }
 
-        if (\is_object($block)) {
-            if (\method_exists($block, 'getContent')) {
-                /** @var mixed $block */
-                $block = $block->getContent();
-            } elseif (\method_exists($block, 'toArray')) {
-                /** @var mixed $block */
-                $block = $block->toArray();
-            } elseif ($block instanceof \stdClass) {
-                $block = (array) $block;
-            } else {
-                return null;
+        var ids = [];
+        var current = activeBlock;
+        while (current && current !== document.body) {
+            if (current.hasAttribute('data-block-id')) {
+                var bid = current.getAttribute('data-block-id');
+                if (bid && ids.indexOf(bid) === -1) {
+                    ids.unshift(bid);
+                }
+            }
+            current = current.parentElement;
+        }
+
+        if (ids.length === 0) {
+            return;
+        }
+
+        var targetOrigin = '*';
+        if (document.referrer) {
+            try {
+                targetOrigin = new URL(document.referrer).origin;
+            } catch (err) {
+                targetOrigin = '*';
             }
         }
 
-        if (!\is_array($block)) {
-            return null;
+        window.parent.postMessage(
+            {
+                type: 'sulu-preview-block-click',
+                id: ids[ids.length - 1],
+                ids: ids
+            },
+            targetOrigin
+        );
+    });
+
+    function onMouseOver(e) {
+        var target = e.target && typeof e.target.closest === 'function' ? e.target.closest('[data-block-id]') : null;
+        if (!target) {
+            return;
+        }
+        positionIndicators(target);
+    }
+
+    function onMouseMove(e) {
+        if (!activeBlock) {
+            return;
+        }
+        var rect = activeBlock.getBoundingClientRect();
+        var insideBlock = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+        var overIcon = focusIcon.contains(e.target);
+
+        if (!insideBlock && !overIcon) {
+            hideIndicators();
+        }
+    }
+
+    function onAdminMessage(e) {
+        var data = e.data;
+        if (!data || data.type !== 'sulu-admin-block-focus' || typeof data.id !== 'string' || !data.id) {
+            return;
         }
 
-        /** @var array<string, mixed> $block */
-        return $block;
+        var selector = '[data-block-id="' + data.id.replace(/"/g, '\\"') + '"]';
+        var target = document.querySelector(selector);
+        if (!target) {
+            return;
+        }
+
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        positionIndicators(target);
+        setTimeout(function () {
+            positionIndicators(target);
+        }, 350);
+    }
+
+    document.addEventListener('mouseover', onMouseOver);
+    document.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('scroll', hideIndicators, { passive: true });
+    window.addEventListener('message', onAdminMessage);
+
+    window.__suluBlockSuitePreviewFocusCleanup = function () {
+        document.removeEventListener('mouseover', onMouseOver);
+        document.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('scroll', hideIndicators);
+        window.removeEventListener('message', onAdminMessage);
+        if (hoverIndicator.parentNode) {
+            hoverIndicator.parentNode.removeChild(hoverIndicator);
+        }
+        if (focusIcon.parentNode) {
+            focusIcon.parentNode.removeChild(focusIcon);
+        }
+    };
+})();
+</script>
+HTML;
     }
 }

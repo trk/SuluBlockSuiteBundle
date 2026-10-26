@@ -188,4 +188,76 @@ final class BlockRendererTest extends TestCase
 
         $this->assertSame('START::END', $output);
     }
+
+    public function testRenderBlockRendersSummaryAndEmptyStateTemplates(): void
+    {
+        $loader = new ArrayLoader([
+            '@SuluBlockSuite/blocks/grid.html.twig' => '<div class="grid">{{ block.items|length }} items</div>',
+            '@SuluBlockSuite/blocks/_summary.html.twig' => '<div class="summary-{{ summary_position }}">{{ summary.formatted_summary }}</div>',
+            '@SuluBlockSuite/blocks/_empty_state.html.twig' => '<div class="empty-state">{{ empty_state.message }}</div>',
+        ]);
+        $twig = new Environment($loader);
+        $renderer = new BlockRenderer($twig, null, ['@SuluBlockSuite/blocks']);
+
+        $withSummary = $renderer->renderBlock([
+            'type' => 'grid',
+            'items' => [['title' => 'A'], ['title' => 'B']],
+            '_summary' => [
+                'formatted_summary' => 'Showing 2 of 200 yachts',
+                'position' => 'both',
+                'total_items' => 200,
+                'unfiltered_total' => 500,
+                'showing_count' => 2,
+                'is_filtered' => true,
+            ],
+        ]);
+
+        $this->assertSame(
+            '<div class="summary-top">Showing 2 of 200 yachts</div><div class="grid">2 items</div><div class="summary-bottom">Showing 2 of 200 yachts</div>',
+            $withSummary,
+        );
+
+        $withEmptyState = $renderer->renderBlock([
+            'type' => 'grid',
+            'items' => [],
+            '_empty_state' => [
+                'message' => 'No yachts found matching your criteria.',
+                'is_filtered' => true,
+            ],
+        ]);
+
+        $this->assertSame(
+            '<div class="grid">0 items</div><div class="empty-state">No yachts found matching your criteria.</div>',
+            $withEmptyState,
+        );
+    }
+
+    public function testRenderBlocksInPreviewModeInjectsDataBlockIdAndPreviewFocusScriptOnce(): void
+    {
+        $loader = new ArrayLoader([
+            '@SuluBlockSuite/blocks/hero.html.twig' => '<section class="hero">{{ block.title }}</section>',
+            '@SuluBlockSuite/blocks/text.html.twig' => '<div class="text">{{ block.title }}</div>',
+        ]);
+        $twig = new Environment($loader);
+        $pipeline = new BlockTransformPipeline([new DefaultAttributesTransformer()]);
+        $renderer = new BlockRenderer($twig, $pipeline, ['@SuluBlockSuite/blocks']);
+
+        $blocks = [
+            ['type' => 'hero', '_id' => 'blk11111', 'title' => 'Hero'],
+            ['type' => 'text', '_id' => 'blk22222', 'title' => 'Text', 'props' => ['id' => 'custom-text-id']],
+        ];
+
+        // 1. Public website render: no data-block-id and no preview script
+        $publicHtml = $renderer->renderBlocks($blocks, []);
+        $this->assertStringNotContainsString('data-block-id', $publicHtml);
+        $this->assertStringNotContainsString('sulu-preview-block-click', $publicHtml);
+
+        // 2. Sulu Preview render: both blocks get data-block-id, and preview focus script is appended exactly once
+        $renderer->reset();
+        $previewHtml = $renderer->renderBlocks($blocks, ['preview' => true]);
+        $this->assertStringContainsString('<section class="hero" data-block-id="blk11111">Hero</section>', $previewHtml);
+        $this->assertStringContainsString('<div class="text" id="custom-text-id" data-block-id="blk22222">Text</div>', $previewHtml);
+        $this->assertSame(1, \substr_count($previewHtml, 'data-sulu-preview-block-focus="1"'));
+        $this->assertStringContainsString('sulu-preview-block-click', $previewHtml);
+    }
 }

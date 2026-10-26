@@ -11,7 +11,10 @@ use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
+use Totoglu\SuluBlockSuiteBundle\Ai\BlockSuitePayloadComposer;
+use Totoglu\SuluBlockSuiteBundle\Ai\BlockSuiteSchemaInspector;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\Mcp\BlockSuiteMcpTools;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformerInterface;
 use Totoglu\SuluBlockSuiteBundle\Transformer\NestedBlockFlattenerInterface;
@@ -19,6 +22,8 @@ use Totoglu\SuluBlockSuiteBundle\Transformer\NestedBlockFlattenerInterface;
 final class SuluBlockSuiteExtension extends Extension implements PrependExtensionInterface
 {
     private const FORM_TITLE_PROVIDER_CLASS = 'Sulu\\Bundle\\FormBundle\\TitleProvider\\DimensionContentTitleProvider';
+    private const MCP_TOOL_ATTRIBUTE_CLASS = 'Mcp\\Capability\\Attribute\\McpTool';
+    private const MULTI_WEBSPACE_BUNDLE_CLASS = 'Totoglu\\SuluMultiWebspaceBundle\\SuluMultiWebspaceBundle';
 
     public function prepend(ContainerBuilder $container): void
     {
@@ -76,6 +81,18 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
             $container->setDefinition('sulu_block_suite.form.title_provider.snippet', $snippetTitleProvider);
         }
 
+        if (\class_exists(self::MCP_TOOL_ATTRIBUTE_CLASS)) {
+            $mcpToolsDefinition = new Definition(BlockSuiteMcpTools::class, [
+                new Reference(BlockSuiteSchemaInspector::class),
+                new Reference(BlockSuitePayloadComposer::class),
+            ]);
+            $mcpToolsDefinition->setAutoconfigured(true);
+            $mcpToolsDefinition->addTag('mcp.tool', ['method' => 'inspectBlocks']);
+            $mcpToolsDefinition->addTag('mcp.tool', ['method' => 'listPresets']);
+            $mcpToolsDefinition->addTag('mcp.tool', ['method' => 'composeBlock']);
+            $container->setDefinition(BlockSuiteMcpTools::class, $mcpToolsDefinition);
+        }
+
         /** @var array{enabled: bool, yaml_dir: string|list<string>, enable_snippet_presets: bool} $presetsConfig */
         $presetsConfig = $config['presets'];
         /** @var list<string> $mergedPresetYamlDirs */
@@ -105,6 +122,11 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
         /** @var array{enabled: bool} $reusableConfig */
         $reusableConfig = $config['reusable_blocks'];
         $container->setParameter('sulu_block_suite.reusable_blocks.enabled', $reusableConfig['enabled']);
+
+        /** @var array{enabled: ?bool} $multiWebspaceConfig */
+        $multiWebspaceConfig = $config['multi_webspace'];
+        $multiWebspaceEnabled = $multiWebspaceConfig['enabled'] ?? $this->detectMultiWebspaceBundle($container);
+        $container->setParameter('sulu_block_suite.multi_webspace.enabled', $multiWebspaceEnabled);
 
         /** @var array{enabled: bool, yaml_dir: string|list<string>, defaults: array<string, scalar|null>, mappings: array<string, array<string, string>>} $layoutConfig */
         $layoutConfig = $config['layout'];
@@ -143,5 +165,18 @@ final class SuluBlockSuiteExtension extends Extension implements PrependExtensio
         )));
         $container->setParameter('sulu_block_suite.preview_tags.excluded_fields', $excludedFields);
         $container->setParameter('sulu_block_suite.preview_tags.primary_text_fields', $primaryTextFields);
+    }
+
+    private function detectMultiWebspaceBundle(ContainerBuilder $container): bool
+    {
+        if ($container->hasParameter('kernel.bundles')) {
+            $bundles = $container->getParameter('kernel.bundles');
+            if (\is_array($bundles)) {
+                return isset($bundles['SuluMultiWebspaceBundle'])
+                    || \in_array(self::MULTI_WEBSPACE_BUNDLE_CLASS, $bundles, true);
+            }
+        }
+
+        return \class_exists(self::MULTI_WEBSPACE_BUNDLE_CLASS);
     }
 }

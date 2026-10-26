@@ -1,6 +1,6 @@
 // @flow
 import React from 'react';
-import {action, observable, toJS} from 'mobx';
+import {action, isArrayLike, observable, toJS} from 'mobx';
 import {observer} from 'mobx-react';
 import Icon from 'sulu-admin-bundle/components/Icon';
 import NumberField from 'sulu-admin-bundle/components/Number';
@@ -185,8 +185,8 @@ export default class HotspotPicker extends React.Component<Props> {
         const opt = schemaOptions[optionName];
         const rawVal = opt.value !== undefined ? opt.value : opt;
 
-        if (Array.isArray(rawVal)) {
-            return rawVal
+        if (isArrayLike(rawVal)) {
+            return Array.from(rawVal)
                 .map((item) => {
                     if (typeof item === 'string') {
                         return {label: item, value: item};

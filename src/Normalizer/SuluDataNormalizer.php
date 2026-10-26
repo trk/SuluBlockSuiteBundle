@@ -412,4 +412,75 @@ final class SuluDataNormalizer
 
         return $raw;
     }
+
+    /**
+     * Unwraps a Sulu block structure (`array`, `ContentView`/`getContent()`, `toArray()`, or `\stdClass`)
+     * into an associative array.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function normalizeBlock(mixed $block): ?array
+    {
+        if (!\is_array($block) && !\is_object($block)) {
+            return null;
+        }
+
+        if (\is_object($block)) {
+            if (\method_exists($block, 'getContent')) {
+                /** @var mixed $block */
+                $block = $block->getContent();
+            } elseif (\method_exists($block, 'toArray')) {
+                /** @var mixed $block */
+                $block = $block->toArray();
+            } elseif ($block instanceof \stdClass) {
+                $block = (array) $block;
+            } else {
+                return null;
+            }
+        }
+
+        if (!\is_array($block)) {
+            return null;
+        }
+
+        /** @var array<string, mixed> $block */
+        return $block;
+    }
+
+    /**
+     * Extracts a reusable snippet UUID from a Sulu block array (`snippet`, `reusable_snippet`, or `view.snippet`).
+     *
+     * @param array<string, mixed> $block
+     */
+    public static function extractSnippetUuid(array $block): ?string
+    {
+        foreach (['snippet', 'reusable_snippet'] as $key) {
+            $snippet = $block[$key] ?? null;
+            if (\is_string($snippet) && '' !== \trim($snippet)) {
+                return \trim($snippet);
+            }
+            if (\is_array($snippet)) {
+                $innerContent = isset($snippet['content']) && \is_array($snippet['content']) ? $snippet['content'] : [];
+                $candidate = $snippet['uuid'] ?? ($snippet['id'] ?? ($innerContent['uuid'] ?? ($innerContent['id'] ?? null)));
+                if (\is_string($candidate) && '' !== \trim($candidate)) {
+                    return \trim($candidate);
+                }
+            }
+        }
+
+        if (
+            isset($block['view'])
+            && \is_array($block['view'])
+            && isset($block['view']['snippet'])
+            && \is_array($block['view']['snippet'])
+        ) {
+            $viewSnippet = $block['view']['snippet'];
+            $candidate = $viewSnippet['id'] ?? ($viewSnippet['uuid'] ?? null);
+            if (\is_string($candidate) && '' !== \trim($candidate)) {
+                return \trim($candidate);
+            }
+        }
+
+        return null;
+    }
 }

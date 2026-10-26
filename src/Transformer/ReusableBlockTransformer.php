@@ -142,6 +142,10 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
                 return [];
             }
 
+            $parentBlockId = isset($block['_sulu_block_id']) && \is_string($block['_sulu_block_id']) && '' !== \trim($block['_sulu_block_id'])
+                ? \trim($block['_sulu_block_id'])
+                : (isset($block['_id']) && \is_string($block['_id']) && '' !== \trim($block['_id']) ? \trim($block['_id']) : null);
+
             /** @var list<array<string, mixed>> $result */
             $result = [];
             foreach ($innerBlocks as $inner) {
@@ -157,6 +161,10 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
                 if ('reusable' === $innerType) {
                     $nestedGroupId = 'reusable_' . (++$this->groupSequence);
                     foreach ($this->expandReusableBlock($normalized, $locale, $nestedGroupId, $isNested, $depth + 1) as $nestedItem) {
+                        if (null !== $parentBlockId) {
+                            $nestedItem['_sulu_block_id'] = $parentBlockId;
+                            $nestedItem['_reusable_parent_block_id'] = $parentBlockId;
+                        }
                         $result[] = $nestedItem;
                     }
 
@@ -168,6 +176,10 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
                     if (null !== $flattener) {
                         foreach ($this->flattenBlock($flattener, $normalized, $locale, $groupId, $depth) as $leafBlock) {
                             $leafBlock['_section_group'] ??= $groupId;
+                            if (null !== $parentBlockId) {
+                                $leafBlock['_sulu_block_id'] = $parentBlockId;
+                                $leafBlock['_reusable_parent_block_id'] = $parentBlockId;
+                            }
                             $result[] = $leafBlock;
                         }
 
@@ -178,6 +190,10 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
                 }
 
                 $normalized['_section_group'] ??= $groupId;
+                if (null !== $parentBlockId) {
+                    $normalized['_sulu_block_id'] = $parentBlockId;
+                    $normalized['_reusable_parent_block_id'] = $parentBlockId;
+                }
                 $result[] = $normalized;
             }
 
@@ -427,34 +443,7 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
      */
     private function extractSnippetId(array $block): ?string
     {
-        foreach (['snippet', 'reusable_snippet'] as $key) {
-            $snippet = $block[$key] ?? null;
-            if (\is_string($snippet) && '' !== \trim($snippet)) {
-                return \trim($snippet);
-            }
-            if (\is_array($snippet)) {
-                $innerContent = isset($snippet['content']) && \is_array($snippet['content']) ? $snippet['content'] : [];
-                $candidate = $snippet['uuid'] ?? ($snippet['id'] ?? ($innerContent['uuid'] ?? ($innerContent['id'] ?? null)));
-                if (\is_string($candidate) && '' !== \trim($candidate)) {
-                    return \trim($candidate);
-                }
-            }
-        }
-
-        if (
-            isset($block['view'])
-            && \is_array($block['view'])
-            && isset($block['view']['snippet'])
-            && \is_array($block['view']['snippet'])
-        ) {
-            $viewSnippet = $block['view']['snippet'];
-            $candidate = $viewSnippet['id'] ?? ($viewSnippet['uuid'] ?? null);
-            if (\is_string($candidate) && '' !== \trim($candidate)) {
-                return \trim($candidate);
-            }
-        }
-
-        return null;
+        return SuluDataNormalizer::extractSnippetUuid($block);
     }
 
     /**
@@ -484,29 +473,6 @@ final class ReusableBlockTransformer implements BlockTransformerInterface, Reset
      */
     private function normalizeBlock(mixed $block): ?array
     {
-        if (!\is_array($block) && !\is_object($block)) {
-            return null;
-        }
-
-        if (\is_object($block)) {
-            if (\method_exists($block, 'getContent')) {
-                /** @var mixed $block */
-                $block = $block->getContent();
-            } elseif (\method_exists($block, 'toArray')) {
-                /** @var mixed $block */
-                $block = $block->toArray();
-            } elseif ($block instanceof \stdClass) {
-                $block = (array) $block;
-            } else {
-                return null;
-            }
-        }
-
-        if (!\is_array($block)) {
-            return null;
-        }
-
-        /** @var array<string, mixed> $block */
-        return $block;
+        return SuluDataNormalizer::normalizeBlock($block);
     }
 }

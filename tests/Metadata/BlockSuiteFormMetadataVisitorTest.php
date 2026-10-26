@@ -11,6 +11,10 @@ use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\OptionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TagMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\MetadataInterface;
+use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderInterface;
+use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
+use Symfony\Component\DependencyInjection\Container;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor;
 use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
@@ -114,7 +118,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         $this->assertSame(['en' => '__tabs'], $tabsSection->getLabels());
 
         $tabItems = $tabsSection->getItems();
-        $this->assertSame(['content', 'settings', 'general', 'dynamic_content', 'advanced'], \array_keys($tabItems));
+        $this->assertSame(['content', 'settings', 'general', 'advanced', 'dynamic_content'], \array_keys($tabItems));
 
         /** @var SectionMetadata $resolvedContent */
         $resolvedContent = $tabItems['content'];
@@ -163,7 +167,7 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
 
         /** @var SectionMetadata $tabsSection */
         $tabsSection = $reusableForm->getItems()['__tabs'];
-        $this->assertSame(['content', 'dynamic_content', 'advanced'], \array_keys($tabsSection->getItems()));
+        $this->assertSame(['content', 'advanced', 'dynamic_content'], \array_keys($tabsSection->getItems()));
     }
 
     public function testVisitTypedFormMetadataRespectsTabsExcludeTagAndCustomTabOrder(): void
@@ -594,5 +598,488 @@ final class BlockSuiteFormMetadataVisitorTest extends TestCase
         /** @var SectionMetadata $resolvedSubSettings */
         $resolvedSubSettings = $subTabItems['settings'];
         $this->assertArrayHasKey('props/layout', $resolvedSubSettings->getItems());
+    }
+
+    public function testMultipleBlockSubItemTypesReceiveIsDynamicTemplateCheckboxFieldExcludedFromTargetMapping(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor();
+
+        $cardSubItem = new FormMetadata();
+        $cardSubItem->setKey('card');
+        $subContent = new SectionMetadata('content');
+        $subContent->setLabel('Content', 'en');
+        $subTitle = new FieldMetadata('title');
+        $subTitle->setType('text_line');
+        $subContent->addItem($subTitle);
+        $cardSubItem->addItem($subContent);
+        $subSettings = new SectionMetadata('settings');
+        $subSettings->setLabel('Settings', 'en');
+        $styleField = new FieldMetadata('panel_style');
+        $styleField->setType('single_select');
+        $subSettings->addItem($styleField);
+        $cardSubItem->addItem($subSettings);
+
+        $itemsBlock = new FieldMetadata('items');
+        $itemsBlock->setType('block');
+        $itemsBlock->addType($cardSubItem);
+
+        $gridBlock = new FormMetadata();
+        $gridBlock->setKey('grid');
+        $gridContent = new SectionMetadata('content');
+        $gridContent->addItem($itemsBlock);
+        $gridBlock->addItem($gridContent);
+
+        $typedForm = new TypedFormMetadata();
+        $typedForm->addForm('grid', $gridBlock);
+
+        $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
+
+        /** @var SectionMetadata $subTabsSection */
+        $subTabsSection = $cardSubItem->getItems()['__tabs'];
+        /** @var SectionMetadata $resolvedSubContent */
+        $resolvedSubContent = $subTabsSection->getItems()['content'];
+        $subContentItems = $resolvedSubContent->getItems();
+
+        $this->assertArrayHasKey('is_dynamic_template', $subContentItems);
+        /** @var FieldMetadata $templateField */
+        $templateField = $subContentItems['is_dynamic_template'];
+        $this->assertSame('checkbox', $templateField->getType());
+        $this->assertFalse($templateField->findOption('default_value')?->getValue());
+        $this->assertSame(
+            "__parent.__parent.dynamic_source != null and __parent.__parent.dynamic_source != 'none' and __parent.__parent.dynamic_source != ''",
+            $templateField->getVisibleCondition(),
+        );
+
+        // Must NOT be exposed as a mappable target field in dynamic_mapping
+        /** @var SectionMetadata $gridTabs */
+        $gridTabs = $gridBlock->getItems()['__tabs'];
+        /** @var SectionMetadata $gridDyn */
+        $gridDyn = $gridTabs->getItems()['dynamic_content'];
+        /** @var FieldMetadata $gridMapping */
+        $gridMapping = $gridDyn->getItems()['props/dynamic_mapping'];
+        $targetSelect = $gridMapping->getTypes()['field_map']->getItems()['target_field'];
+        $this->assertInstanceOf(FieldMetadata::class, $targetSelect);
+        /** @var list<OptionMetadata> $targetValues */
+        $targetValues = (array) $targetSelect->findOption('values')?->getValue();
+        $targetNames = \array_map(static fn (OptionMetadata $opt): string => (string) $opt->getName(), $targetValues);
+        $this->assertContains('title', $targetNames);
+        $this->assertNotContains('is_dynamic_template', $targetNames);
+    }
+
+    public function testDynamicContentSectionExposesSummaryEmptyStateFieldsAndSubBlockCollectionTargets(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor();
+
+        $cardSubItem = new FormMetadata();
+        $cardSubItem->setKey('card');
+        $subContent = new SectionMetadata('content');
+        $subTitle = new FieldMetadata('title');
+        $subTitle->setType('text_line');
+        $subContent->addItem($subTitle);
+
+        $elementsField = new FieldMetadata('elements');
+        $elementsField->setType('block');
+        $elementsField->setLabel('Elements', 'en');
+        $buttonType = new FormMetadata();
+        $buttonType->setKey('button');
+        $buttonType->setTitle('Buttons', 'en');
+        $elementsField->addType($buttonType);
+        $badgeType = new FormMetadata();
+        $badgeType->setKey('badge');
+        $badgeType->setTitle('Badges', 'en');
+        $elementsField->addType($badgeType);
+        $subContent->addItem($elementsField);
+
+        $cardSubItem->addItem($subContent);
+
+        $itemsBlock = new FieldMetadata('items');
+        $itemsBlock->setType('block');
+        $itemsBlock->addType($cardSubItem);
+
+        $gridBlock = new FormMetadata();
+        $gridBlock->setKey('grid');
+        $gridContent = new SectionMetadata('content');
+        $gridContent->addItem($itemsBlock);
+        $gridBlock->addItem($gridContent);
+
+        $typedForm = new TypedFormMetadata();
+        $typedForm->addForm('grid', $gridBlock);
+
+        $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
+
+        /** @var SectionMetadata $gridTabs */
+        $gridTabs = $gridBlock->getItems()['__tabs'];
+        /** @var SectionMetadata $gridDyn */
+        $gridDyn = $gridTabs->getItems()['dynamic_content'];
+        $dynItems = $gridDyn->getItems();
+
+        $this->assertArrayHasKey('props/dynamic_show_summary', $dynItems);
+        $this->assertArrayHasKey('props/dynamic_summary_text', $dynItems);
+        $this->assertArrayHasKey('props/dynamic_filtered_summary_text', $dynItems);
+        $this->assertArrayHasKey('props/dynamic_empty_message', $dynItems);
+
+        /** @var FieldMetadata $gridMapping */
+        $gridMapping = $dynItems['props/dynamic_mapping'];
+        $targetSelect = $gridMapping->getTypes()['field_map']->getItems()['target_field'];
+        $this->assertInstanceOf(FieldMetadata::class, $targetSelect);
+        /** @var list<OptionMetadata> $targetValues */
+        $targetValues = (array) $targetSelect->findOption('values')?->getValue();
+        $targetNames = \array_map(static fn (OptionMetadata $opt): string => (string) $opt->getName(), $targetValues);
+
+        $this->assertContains('title', $targetNames);
+        $this->assertContains('elements', $targetNames);
+        $this->assertContains('buttons', $targetNames);
+        $this->assertContains('badges', $targetNames);
+    }
+
+    public function testPopoverOptionGroupsRegisterBackingFieldsInjectStorageKeyAndRemoveDuplicateSettingsFields(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor();
+
+        $headlineBlock = new FormMetadata();
+        $headlineBlock->setKey('headline');
+
+        $contentSection = new SectionMetadata('content');
+        $titleField = new FieldMetadata('title');
+        $titleField->setType('text_line');
+
+        $tagCollection = new OptionMetadata();
+        $tagCollection->setName('tag');
+        $tagCollection->setType(OptionMetadata::TYPE_COLLECTION);
+
+        $defaultOpt = new OptionMetadata();
+        $defaultOpt->setName('_default');
+        $defaultOpt->setValue('h2');
+        $tagCollection->addValueOption($defaultOpt);
+
+        $iconOpt = new OptionMetadata();
+        $iconOpt->setName('_icon');
+        $iconOpt->setValue('heading');
+        $tagCollection->addValueOption($iconOpt);
+
+        $h1Opt = new OptionMetadata();
+        $h1Opt->setName('h1');
+        $h1Opt->setValue('H1');
+        $tagCollection->addValueOption($h1Opt);
+
+        $h2Opt = new OptionMetadata();
+        $h2Opt->setName('h2');
+        $h2Opt->setValue('H2');
+        $tagCollection->addValueOption($h2Opt);
+
+        $titleField->addOption($tagCollection);
+
+        $colorCollection = new OptionMetadata();
+        $colorCollection->setName('title_color');
+        $colorCollection->setType(OptionMetadata::TYPE_COLLECTION);
+
+        $colorIconOpt = new OptionMetadata();
+        $colorIconOpt->setName('_icon');
+        $colorIconOpt->setValue('brush');
+        $colorCollection->addValueOption($colorIconOpt);
+
+        $primaryOpt = new OptionMetadata();
+        $primaryOpt->setName('primary');
+        $primaryOpt->setValue('Primary Blue');
+        $colorCollection->addValueOption($primaryOpt);
+
+        $darkOpt = new OptionMetadata();
+        $darkOpt->setName('dark');
+        $darkOpt->setValue('Dark');
+        $colorCollection->addValueOption($darkOpt);
+
+        $titleField->addOption($colorCollection);
+        $contentSection->addItem($titleField);
+        $headlineBlock->addItem($contentSection);
+
+        // Settings section with a duplicate 'tag' property and no other fields -> should be pruned when empty!
+        $settingsSection = new SectionMetadata('settings');
+        $duplicateTagField = new FieldMetadata('tag');
+        $duplicateTagField->setType('single_select');
+        $settingsSection->addItem($duplicateTagField);
+        $headlineBlock->addItem($settingsSection);
+
+        $typedForm = new TypedFormMetadata();
+        $typedForm->addForm('headline', $headlineBlock);
+
+        $visitor->visitTypedFormMetadata($typedForm, 'block', 'en');
+
+        /** @var SectionMetadata $tabs */
+        $tabs = $headlineBlock->getItems()['__tabs'];
+        $tabItems = $tabs->getItems();
+
+        // Duplicate 'tag' was removed from settings, leaving settings empty so the settings tab is omitted!
+        $this->assertArrayNotHasKey('settings', $tabItems);
+
+        /** @var SectionMetadata $enhancedContent */
+        $enhancedContent = $tabItems['content'];
+        $contentItems = $enhancedContent->getItems();
+
+        // Verify no redundant hidden backing fields are added to content section
+        $this->assertArrayNotHasKey('props/tag', $contentItems);
+        $this->assertArrayNotHasKey('props/title_color', $contentItems);
+
+        // Verify _storage_key, _default, and localized option titles were injected into title's collections
+        /** @var FieldMetadata $enhancedTitle */
+        $enhancedTitle = $contentItems['title'];
+        $enhancedTagCollection = $enhancedTitle->findOption('tag');
+        $this->assertNotNull($enhancedTagCollection);
+        /** @var list<OptionMetadata> $tagChildren */
+        $tagChildren = (array) $enhancedTagCollection->getValue();
+        $childByName = [];
+        foreach ($tagChildren as $child) {
+            $childByName[(string) $child->getName()] = $child;
+        }
+        $this->assertArrayHasKey('_storage_key', $childByName);
+        $this->assertSame('props/tag', $childByName['_storage_key']->getValue());
+        $this->assertArrayHasKey('_default', $childByName);
+        $this->assertSame('h2', $childByName['_default']->getValue());
+        $this->assertSame('H1', $childByName['h1']->getTitle('en'));
+        $this->assertSame('H2', $childByName['h2']->getTitle('en'));
+
+        $enhancedColorCollection = $enhancedTitle->findOption('title_color');
+        $this->assertNotNull($enhancedColorCollection);
+        /** @var list<OptionMetadata> $colorChildren */
+        $colorChildren = (array) $enhancedColorCollection->getValue();
+        $colorChildByName = [];
+        foreach ($colorChildren as $child) {
+            $colorChildByName[(string) $child->getName()] = $child;
+        }
+        $this->assertArrayHasKey('_storage_key', $colorChildByName);
+        $this->assertSame('props/title_color', $colorChildByName['_storage_key']->getValue());
+        // When _default is omitted in XML, defaults to first selectable option ('primary')
+        $this->assertArrayHasKey('_default', $colorChildByName);
+        $this->assertSame('primary', $colorChildByName['_default']->getValue());
+
+        // Verify Dynamic Content target_field dropdown does not include hidden backing fields
+        /** @var SectionMetadata $dynSection */
+        $dynSection = $tabItems['dynamic_content'];
+        /** @var FieldMetadata $dynMapping */
+        $dynMapping = $dynSection->getItems()['props/dynamic_mapping'];
+        $targetSelect = $dynMapping->getTypes()['field_map']->getItems()['target_field'];
+        $this->assertInstanceOf(FieldMetadata::class, $targetSelect);
+        /** @var list<OptionMetadata> $targetValues */
+        $targetValues = (array) $targetSelect->findOption('values')?->getValue();
+        $targetNames = \array_map(static fn (OptionMetadata $opt): string => (string) $opt->getName(), $targetValues);
+        $this->assertContains('title', $targetNames);
+        $this->assertNotContains('props/tag', $targetNames);
+        $this->assertNotContains('tag', $targetNames);
+    }
+
+    public function testPopulatesSingleTemplateSelectionAndTemplateSelectionFields(): void
+    {
+        $pageForms = new TypedFormMetadata();
+        $defaultPage = new FormMetadata();
+        $defaultPage->setKey('default');
+        $defaultPage->setTitles(['en' => 'Default Page', 'tr' => 'Varsayılan Sayfa']);
+        $pageForms->addForm('default', $defaultPage);
+
+        $landingPage = new FormMetadata();
+        $landingPage->setKey('landing');
+        $landingPage->setTitles(['en' => 'Landing Page', 'tr' => 'Karşılama Sayfası']);
+        $pageForms->addForm('landing', $landingPage);
+
+        $articleForms = new TypedFormMetadata();
+        $blogArticle = new FormMetadata();
+        $blogArticle->setKey('blog_post');
+        $blogArticle->setGroup('blog');
+        $blogArticle->setTitles(['en' => 'Blog Post', 'tr' => 'Blog Yazısı']);
+        $articleForms->addForm('blog_post', $blogArticle);
+
+        $newsArticle = new FormMetadata();
+        $newsArticle->setKey('news_item');
+        $newsArticle->setGroup('news');
+        $newsArticle->setTitles(['en' => 'News Item', 'tr' => 'Haber']);
+        $articleForms->addForm('news_item', $newsArticle);
+
+        $formProvider = new class($pageForms, $articleForms) implements MetadataProviderInterface {
+            public function __construct(
+                private readonly TypedFormMetadata $pageForms,
+                private readonly TypedFormMetadata $articleForms,
+            ) {
+            }
+
+            public function getMetadata(string $key, string $locale, array $metadataOptions = []): MetadataInterface
+            {
+                return match ($key) {
+                    'page' => $this->pageForms,
+                    'article' => $this->articleForms,
+                    default => new TypedFormMetadata(),
+                };
+            }
+        };
+
+        $container = new Container();
+        $container->set('form', $formProvider);
+        $registry = new MetadataProviderRegistry($container);
+
+        $visitor = new BlockSuiteFormMetadataVisitor(
+            metadataProviderRegistry: $registry,
+        );
+
+        $blockForm = new FormMetadata();
+        $blockForm->setKey('content_listing');
+
+        $contentSection = new SectionMetadata('content');
+
+        // 1. Default single_template_selection (defaults to 'page' templates)
+        $singleTemplateField = new FieldMetadata('page_template');
+        $singleTemplateField->setType('single_template_selection');
+        $singleTemplateField->setRequired(true);
+        $contentSection->addItem($singleTemplateField);
+
+        // 2. Filtered template_selection for 'articles' with group='blog'
+        $multiTemplateField = new FieldMetadata('article_templates');
+        $multiTemplateField->setType('template_selection');
+        $typeOpt = new OptionMetadata();
+        $typeOpt->setName('template_type');
+        $typeOpt->setValue('articles');
+        $multiTemplateField->addOption($typeOpt);
+        $groupOpt = new OptionMetadata();
+        $groupOpt->setName('groups');
+        $groupOpt->setValue('blog');
+        $multiTemplateField->addOption($groupOpt);
+        $contentSection->addItem($multiTemplateField);
+
+        $blockForm->addItem($contentSection);
+
+        $typedBlockForms = new TypedFormMetadata();
+        $typedBlockForms->addForm('content_listing', $blockForm);
+
+        $visitor->visitTypedFormMetadata($typedBlockForms, 'block', 'en');
+
+        /** @var SectionMetadata $tabs */
+        $tabs = $blockForm->getItems()['__tabs'];
+        /** @var SectionMetadata $enhancedContent */
+        $enhancedContent = $tabs->getItems()['content'];
+        $contentItems = $enhancedContent->getItems();
+
+        /** @var FieldMetadata $enhancedSingle */
+        $enhancedSingle = $contentItems['page_template'];
+        $singleValuesOpt = $enhancedSingle->findOption('values');
+        $this->assertNotNull($singleValuesOpt);
+        /** @var list<OptionMetadata> $singleOpts */
+        $singleOpts = (array) $singleValuesOpt->getValue();
+        $this->assertCount(2, $singleOpts);
+        $this->assertSame('default', $singleOpts[0]->getName());
+        $this->assertSame('Default Page', $singleOpts[0]->getTitle('en'));
+        $this->assertSame('landing', $singleOpts[1]->getName());
+        $this->assertSame('Landing Page', $singleOpts[1]->getTitle('en'));
+        // Mandatory single_template_selection receives default_value automatically
+        $this->assertSame('default', $enhancedSingle->findOption('default_value')?->getValue());
+
+        /** @var FieldMetadata $enhancedMulti */
+        $enhancedMulti = $contentItems['article_templates'];
+        $multiValuesOpt = $enhancedMulti->findOption('values');
+        $this->assertNotNull($multiValuesOpt);
+        /** @var list<OptionMetadata> $multiOpts */
+        $multiOpts = (array) $multiValuesOpt->getValue();
+        $this->assertCount(1, $multiOpts);
+        $this->assertSame('blog_post', $multiOpts[0]->getName());
+        $this->assertSame('Blog Post', $multiOpts[0]->getTitle('en'));
+    }
+
+    public function testPopulatesSingleWebspaceSelectAndWebspaceSelectFields(): void
+    {
+        $ws1 = new \Sulu\Component\Webspace\Webspace();
+        $ws1->setKey('totoglu');
+        $ws1->setName('Totoglu Global');
+
+        $ws2 = new \Sulu\Component\Webspace\Webspace();
+        $ws2->setKey('turkiye');
+        $ws2->setName('Totoglu Turkiye');
+
+        $collection = new \Sulu\Component\Webspace\Manager\WebspaceCollection();
+        $collection->setWebspaces(['totoglu' => $ws1, 'turkiye' => $ws2]);
+
+        $webspaceManager = $this->createStub(\Sulu\Component\Webspace\Manager\WebspaceManagerInterface::class);
+        $webspaceManager->method('getWebspaceCollection')->willReturn($collection);
+
+        $visitor = new BlockSuiteFormMetadataVisitor(
+            webspaceManager: $webspaceManager,
+        );
+
+        $snippetForm = new FormMetadata();
+        $snippetForm->setKey('page_layout');
+
+        $singleWs = new FieldMetadata('webspace');
+        $singleWs->setType('single_webspace_select');
+        $singleWs->setRequired(true);
+        $snippetForm->addItem($singleWs);
+
+        $globalWs = new FieldMetadata('preset_webspace');
+        $globalWs->setType('single_webspace_select');
+        $includeGlobalOpt = new OptionMetadata();
+        $includeGlobalOpt->setName('include_global');
+        $includeGlobalOpt->setValue('true');
+        $globalWs->addOption($includeGlobalOpt);
+        $snippetForm->addItem($globalWs);
+
+        $multiWs = new FieldMetadata('webspaces');
+        $multiWs->setType('webspace_select');
+        $snippetForm->addItem($multiWs);
+
+        $visitor->visitFormMetadata($snippetForm, 'en');
+
+        /** @var FieldMetadata $visitedSingle */
+        $visitedSingle = $snippetForm->getItems()['webspace'];
+        $this->assertSame('single_select', $visitedSingle->getType());
+        /** @var list<OptionMetadata> $singleOpts */
+        $singleOpts = (array) $visitedSingle->findOption('values')?->getValue();
+        $this->assertCount(2, $singleOpts);
+        $this->assertSame('totoglu', $singleOpts[0]->getName());
+        $this->assertSame('Totoglu Global', $singleOpts[0]->getTitle('en'));
+        $this->assertSame('turkiye', $singleOpts[1]->getName());
+        $this->assertSame('totoglu', $visitedSingle->findOption('default_value')?->getValue());
+
+        /** @var FieldMetadata $visitedGlobal */
+        $visitedGlobal = $snippetForm->getItems()['preset_webspace'];
+        $this->assertSame('single_select', $visitedGlobal->getType());
+        /** @var list<OptionMetadata> $globalOpts */
+        $globalOpts = (array) $visitedGlobal->findOption('values')?->getValue();
+        $this->assertCount(3, $globalOpts);
+        $this->assertSame('_global', $globalOpts[0]->getName());
+        $this->assertSame('_global', $visitedGlobal->findOption('default_value')?->getValue());
+
+        /** @var FieldMetadata $visitedMulti */
+        $visitedMulti = $snippetForm->getItems()['webspaces'];
+        $this->assertSame('select', $visitedMulti->getType());
+        /** @var list<OptionMetadata> $multiOpts */
+        $multiOpts = (array) $visitedMulti->findOption('values')?->getValue();
+        $this->assertCount(2, $multiOpts);
+    }
+
+    public function testHidesWebspaceFieldAndExpandsSiblingColSpanWhenMultiWebspaceIsDisabled(): void
+    {
+        $visitor = new BlockSuiteFormMetadataVisitor(
+            multiWebspaceEnabled: false,
+        );
+
+        $snippetForm = new FormMetadata();
+        $snippetForm->setKey('page_layout');
+
+        $singleWs = new FieldMetadata('webspace');
+        $singleWs->setType('single_webspace_select');
+        $singleWs->setRequired(true);
+        $singleWs->setColSpan(6);
+        $snippetForm->addItem($singleWs);
+
+        $targetTemplate = new FieldMetadata('target_template');
+        $targetTemplate->setType('single_template_selection');
+        $targetTemplate->setColSpan(6);
+        $snippetForm->addItem($targetTemplate);
+
+        $visitor->visitFormMetadata($snippetForm, 'en');
+
+        /** @var FieldMetadata $visitedWs */
+        $visitedWs = $snippetForm->getItems()['webspace'];
+        $this->assertSame('single_select', $visitedWs->getType());
+        $this->assertFalse($visitedWs->isRequired());
+        $this->assertSame('false', $visitedWs->getVisibleCondition());
+        $this->assertSame('_global', $visitedWs->findOption('default_value')?->getValue());
+
+        /** @var FieldMetadata $visitedTemplate */
+        $visitedTemplate = $snippetForm->getItems()['target_template'];
+        $this->assertSame(12, $visitedTemplate->getColSpan());
     }
 }

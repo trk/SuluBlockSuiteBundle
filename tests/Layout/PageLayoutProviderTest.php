@@ -425,4 +425,166 @@ YAML;
             }
         }
     }
+
+    public function testGetLayoutResolvesByWebspaceAndTargetTemplate(): void
+    {
+        $totogluSnippet = $this->createStub(SnippetInterface::class);
+        $totogluSnippet->method('getUuid')->willReturn('totoglu-home-uuid');
+
+        $totogluUnlocalized = $this->createStub(SnippetDimensionContentInterface::class);
+        $totogluUnlocalized->method('getTemplateKey')->willReturn('page_layout');
+        $totogluUnlocalized->method('getStage')->willReturn('live');
+        $totogluUnlocalized->method('getLocale')->willReturn(null);
+        $totogluUnlocalized->method('getVersion')->willReturn(0);
+        $totogluUnlocalized->method('getTemplateData')->willReturn([
+            'webspace' => 'totoglu',
+            'target_template' => 'homepage',
+        ]);
+
+        $totogluLocalized = $this->createStub(SnippetDimensionContentInterface::class);
+        $totogluLocalized->method('getTemplateKey')->willReturn('page_layout');
+        $totogluLocalized->method('getStage')->willReturn('live');
+        $totogluLocalized->method('getLocale')->willReturn('en');
+        $totogluLocalized->method('getVersion')->willReturn(0);
+        $totogluLocalized->method('getTitle')->willReturn('Totoglu Homepage Layout');
+        $totogluLocalized->method('getTemplateData')->willReturn([
+            'blocks' => [['type' => 'headline', 'title' => 'Totoglu Hero']],
+        ]);
+        $totogluSnippet->method('getDimensionContents')->willReturn(
+            new ArrayCollection([$totogluUnlocalized, $totogluLocalized]),
+        );
+
+        $turkiyeSnippet = $this->createStub(SnippetInterface::class);
+        $turkiyeSnippet->method('getUuid')->willReturn('turkiye-home-uuid');
+
+        $turkiyeUnlocalized = $this->createStub(SnippetDimensionContentInterface::class);
+        $turkiyeUnlocalized->method('getTemplateKey')->willReturn('page_layout');
+        $turkiyeUnlocalized->method('getStage')->willReturn('live');
+        $turkiyeUnlocalized->method('getLocale')->willReturn(null);
+        $turkiyeUnlocalized->method('getVersion')->willReturn(0);
+        $turkiyeUnlocalized->method('getTemplateData')->willReturn([
+            'webspace' => 'turkiye',
+            'target_template' => 'homepage',
+        ]);
+
+        $turkiyeLocalized = $this->createStub(SnippetDimensionContentInterface::class);
+        $turkiyeLocalized->method('getTemplateKey')->willReturn('page_layout');
+        $turkiyeLocalized->method('getStage')->willReturn('live');
+        $turkiyeLocalized->method('getLocale')->willReturn('en');
+        $turkiyeLocalized->method('getVersion')->willReturn(0);
+        $turkiyeLocalized->method('getTitle')->willReturn('Turkiye Homepage Layout');
+        $turkiyeLocalized->method('getTemplateData')->willReturn([
+            'blocks' => [['type' => 'headline', 'title' => 'Turkiye Hero']],
+        ]);
+        $turkiyeSnippet->method('getDimensionContents')->willReturn(
+            new ArrayCollection([$turkiyeUnlocalized, $turkiyeLocalized]),
+        );
+
+        $repo = $this->createMock(SnippetRepositoryInterface::class);
+        $repo->expects(self::once())
+            ->method('findBy')
+            ->willReturn([$totogluSnippet, $turkiyeSnippet]);
+
+        $provider = new PageLayoutProvider($repo);
+
+        $totogluLayout = $provider->getLayout('homepage', 'en', 'totoglu');
+        self::assertNotNull($totogluLayout);
+        self::assertSame('totoglu-home-uuid', $totogluLayout['uuid']);
+        self::assertSame('Totoglu Homepage Layout', $totogluLayout['title']);
+
+        $turkiyeLayout = $provider->getLayout('homepage', 'en', 'turkiye');
+        self::assertNotNull($turkiyeLayout);
+        self::assertSame('turkiye-home-uuid', $turkiyeLayout['uuid']);
+        self::assertSame('Turkiye Homepage Layout', $turkiyeLayout['title']);
+
+        // Unmatched webspace receives null when all layouts are scoped to other webspaces
+        self::assertNull($provider->getLayout('homepage', 'en', 'other_webspace'));
+    }
+
+    public function testGetReusableBlockFiltersOutDifferentWebspace(): void
+    {
+        $snippet = $this->createStub(SnippetInterface::class);
+        $snippet->method('getUuid')->willReturn('reusable-totoglu-uuid');
+
+        $unlocalizedDim = $this->createStub(SnippetDimensionContentInterface::class);
+        $unlocalizedDim->method('getTemplateKey')->willReturn('reusable_block');
+        $unlocalizedDim->method('getStage')->willReturn('live');
+        $unlocalizedDim->method('getLocale')->willReturn(null);
+        $unlocalizedDim->method('getVersion')->willReturn(0);
+        $unlocalizedDim->method('getTemplateData')->willReturn([
+            'webspace' => 'totoglu',
+        ]);
+
+        $liveDim = $this->createStub(SnippetDimensionContentInterface::class);
+        $liveDim->method('getTemplateKey')->willReturn('reusable_block');
+        $liveDim->method('getStage')->willReturn('live');
+        $liveDim->method('getLocale')->willReturn('en');
+        $liveDim->method('getVersion')->willReturn(0);
+        $liveDim->method('getTitle')->willReturn('Totoglu Footer');
+        $liveDim->method('getTemplateData')->willReturn([
+            'blocks' => [['type' => 'headline', 'title' => 'Footer']],
+        ]);
+
+        $snippet->method('getDimensionContents')->willReturn(new ArrayCollection([$unlocalizedDim, $liveDim]));
+
+        $repo = $this->createStub(SnippetRepositoryInterface::class);
+        $repo->method('getOneBy')->willReturn($snippet);
+
+        $provider = new PageLayoutProvider($repo);
+
+        $allowed = $provider->getReusableBlock('reusable-totoglu-uuid', 'en', 'totoglu');
+        self::assertNotNull($allowed);
+        self::assertSame('totoglu', $allowed['webspace']);
+
+        $blocked = $provider->getReusableBlock('reusable-totoglu-uuid', 'en', 'turkiye');
+        self::assertNull($blocked);
+    }
+
+    public function testGetLayoutPrioritizesTargetTemplateOverTitleMatchWhenMultiWebspaceIsDisabled(): void
+    {
+        $titleMatchedSnippet = $this->createStub(SnippetInterface::class);
+        $titleMatchedSnippet->method('getUuid')->willReturn('title-matched-uuid');
+        $titleMatchedDim = $this->createStub(SnippetDimensionContentInterface::class);
+        $titleMatchedDim->method('getTemplateKey')->willReturn('page_layout');
+        $titleMatchedDim->method('getStage')->willReturn('live');
+        $titleMatchedDim->method('getLocale')->willReturn('en');
+        $titleMatchedDim->method('getVersion')->willReturn(0);
+        $titleMatchedDim->method('getTitle')->willReturn('Homepage');
+        $titleMatchedDim->method('getTemplateData')->willReturn([
+            'blocks' => [['type' => 'headline', 'title' => 'Title Match']],
+        ]);
+        $titleMatchedSnippet->method('getDimensionContents')->willReturn(new ArrayCollection([$titleMatchedDim]));
+
+        $templateMatchedSnippet = $this->createStub(SnippetInterface::class);
+        $templateMatchedSnippet->method('getUuid')->willReturn('template-matched-uuid');
+        $templateMatchedUnlocalized = $this->createStub(SnippetDimensionContentInterface::class);
+        $templateMatchedUnlocalized->method('getTemplateKey')->willReturn('page_layout');
+        $templateMatchedUnlocalized->method('getStage')->willReturn('live');
+        $templateMatchedUnlocalized->method('getLocale')->willReturn(null);
+        $templateMatchedUnlocalized->method('getVersion')->willReturn(0);
+        $templateMatchedUnlocalized->method('getTemplateData')->willReturn([
+            'target_template' => 'homepage',
+        ]);
+        $templateMatchedDim = $this->createStub(SnippetDimensionContentInterface::class);
+        $templateMatchedDim->method('getTemplateKey')->willReturn('page_layout');
+        $templateMatchedDim->method('getStage')->willReturn('live');
+        $templateMatchedDim->method('getLocale')->willReturn('en');
+        $templateMatchedDim->method('getVersion')->willReturn(0);
+        $templateMatchedDim->method('getTitle')->willReturn('Zzz Explicit Template Layout');
+        $templateMatchedDim->method('getTemplateData')->willReturn([
+            'blocks' => [['type' => 'headline', 'title' => 'Explicit Template Match']],
+        ]);
+        $templateMatchedSnippet->method('getDimensionContents')->willReturn(
+            new ArrayCollection([$templateMatchedUnlocalized, $templateMatchedDim]),
+        );
+
+        $repo = $this->createStub(SnippetRepositoryInterface::class);
+        $repo->method('findBy')->willReturn([$titleMatchedSnippet, $templateMatchedSnippet]);
+
+        $provider = new PageLayoutProvider($repo, multiWebspaceEnabled: false);
+        $resolved = $provider->getLayout('homepage', 'en', 'totoglu');
+
+        self::assertNotNull($resolved);
+        self::assertSame('template-matched-uuid', $resolved['uuid']);
+    }
 }

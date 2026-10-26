@@ -49,6 +49,8 @@
     "sulu_block_suite.dynamic_filter_tags_desc": "Sélectionnez des étiquettes pour filtrer.",
     "sulu_block_suite.dynamic_filter_template": "Filtrer par clé de modèle",
     "sulu_block_suite.dynamic_filter_template_desc": "Clés de modèle séparées par des virgules.",
+    "sulu_block_suite.dynamic_is_template": "Utiliser comme modèle de contenu dynamique",
+    "sulu_block_suite.dynamic_is_template_info": "Marquez cet élément comme modèle visuel pour les éléments de contenu dynamique à cette position. Les éléments non cochés sont affichés comme des éléments statiques normaux.",
     "sulu_block_suite.dynamic_limit": "Limite d'éléments",
     "sulu_block_suite.dynamic_limit_desc": "Nombre maximum d'éléments à générer.",
     "sulu_block_suite.dynamic_media_selection": "Médias spécifiques",
@@ -105,6 +107,7 @@
     "sulu_block_suite.no_presets_found": "Aucun préréglage correspondant trouvé.",
     "sulu_block_suite.no_reusable_block_selected": "Aucun bloc réutilisable sélectionné",
     "sulu_block_suite.open_in_new_tab": "Modifier dans un nouvel onglet",
+    "sulu_block_suite.page_layout_duplicate_webspace_template": "Une mise en page pour l'espace web \"%webspace%\" et le modèle \"%template%\" existe déjà (\"%title%\"). Chaque modèle ne peut être attribué qu'une seule fois par espace web.",
     "sulu_block_suite.preset_desc_label": "Description",
     "sulu_block_suite.preset_gallery_title": "Galerie de préréglages",
     "sulu_block_suite.preset_title_label": "Nom du préréglage",
@@ -120,9 +123,9 @@
     "sulu_block_suite.reusable_block_not_in_use": "Pas encore utilisé",
     "sulu_block_suite.reusable_block_resources": "ressources",
     "sulu_block_suite.reusable_block_search_placeholder": "Rechercher par titre ou description...",
-    "sulu_block_suite.reusable_block_select_prompt": "Sélectionnez une section partagée de Block Suite. Les modifications seront synchronisées sur toutes les pages.",
+    "sulu_block_suite.reusable_block_select_prompt": "Sélectionnez une section partagée dans Blocs. Les modifications seront synchronisées sur toutes les pages.",
     "sulu_block_suite.reusable_block_used_in": "Utilisé dans",
-    "sulu_block_suite.reusable_blocks": "Blocs réutilisables",
+    "sulu_block_suite.reusable_blocks": "Réutilisables",
     "sulu_block_suite.reusable_desc_label": "Description",
     "sulu_block_suite.reusable_title_label": "Titre du Bloc Réutilisable",
     "sulu_block_suite.save_as_preset": "Enregistrer comme préréglage",
@@ -137,5 +140,6 @@
     "sulu_block_suite.search_presets": "Rechercher des préréglages...",
     "sulu_block_suite.select_reusable_block": "Sélectionner un bloc réutilisable",
     "sulu_block_suite.tab_content": "Contenu",
-    "sulu_block_suite.title": "Block Suite"
+    "sulu_block_suite.template_selection_none": "— Aucun (Mise en Page Personnalisée) —",
+    "sulu_block_suite.title": "Blocs"
 }

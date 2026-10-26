@@ -16,6 +16,8 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
 {
     private readonly DynamicContentSourceRegistry $registry;
 
+    private readonly DynamicContentMappingApplier $mappingApplier;
+
     /**
      * @param iterable<DynamicContentSourceProviderInterface> $customProviders
      */
@@ -29,6 +31,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         private readonly ?RequestStack $requestStack = null,
         ?ReferenceStoreInterface $referenceStore = null,
         ?TranslatorInterface $translator = null,
+        ?DynamicContentMappingApplier $mappingApplier = null,
     ) {
         $this->registry = new DynamicContentSourceRegistry(
             $customProviders,
@@ -40,6 +43,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             $referenceStore,
             $translator,
         );
+        $this->mappingApplier = $mappingApplier ?? new DynamicContentMappingApplier($this->targetFieldResolver, $this->registry);
     }
 
     /**
@@ -99,21 +103,30 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             }
 
             $items = $provider->resolveCollection($providerConfig, $contextPage);
+            if ($provider instanceof AbstractDynamicContentSourceProvider) {
+                $items = $provider->applyCustomOutputsToCollection($items);
+            }
+            $collectionMeta = $provider instanceof ConfigurableDynamicContentSourceProviderInterface
+                ? $provider->resolveCollectionMeta($providerConfig, $contextPage)
+                : [];
 
-            return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig, $hideIfEmpty);
+            return $this->hydrateCollection($block, $items, $mapping, $condition, $dynamicConfig, $hideIfEmpty, $collectionMeta);
         }
 
         $itemData = $provider->resolveSingle($dynamicConfig, $contextPage);
         if (null === $itemData) {
             return $hideIfEmpty ? [] : [$block];
         }
+        if ($provider instanceof AbstractDynamicContentSourceProvider) {
+            $itemData = $provider->applyCustomOutputs($itemData);
+        }
 
-        if (null !== $condition && !$this->evaluateCondition($itemData, $condition)) {
+        if (null !== $condition && !$this->mappingApplier->evaluateCondition($itemData, $condition)) {
             return [];
         }
 
         $appliedCount = 0;
-        $hydrated = $this->applyMapping($block, $itemData, $mapping, $appliedCount);
+        $hydrated = $this->mappingApplier->applyMapping($block, $itemData, $mapping, $appliedCount);
         if ($hideIfEmpty && 0 === $appliedCount) {
             return [];
         }
@@ -141,6 +154,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
      * @param array<string, mixed>|null $condition
      * @param array<string, mixed> $dynamicConfig
      * @param bool $hideIfEmpty drop items (and the whole block) when no mapped field resolves to a value
+     * @param array{unfiltered_total?: int|null, filtered_total?: int|null, is_filtered?: bool} $collectionMeta
      *
      * @return list<array<string, mixed>>
      */
@@ -151,20 +165,67 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         ?array $condition,
         array $dynamicConfig = [],
         bool $hideIfEmpty = false,
+        array $collectionMeta = [],
     ): array {
-        if ([] === $items) {
-            return [];
+        $hydrateMode = isset($dynamicConfig['hydrate_mode']) && \is_string($dynamicConfig['hydrate_mode'])
+            ? $dynamicConfig['hydrate_mode']
+            : 'auto';
+        $blockType = isset($block['type']) && \is_string($block['type']) ? $block['type'] : '';
+
+        $blockMetadata = (null !== $this->targetFieldResolver && '' !== $blockType)
+            ? $this->targetFieldResolver->resolveBlockMetadata($blockType)
+            : null;
+        $isMultipleBlock = (null !== $blockMetadata && $blockMetadata['multiple'])
+            || (\array_key_exists('items', $block) && \is_array($block['items']));
+        $defaultItemType = null !== $blockMetadata
+            ? $blockMetadata['default_item_type']
+            : ('' !== $blockType ? $blockType . '_item' : null);
+
+        $shouldHydrateInnerItems = 'items' === $hydrateMode
+            || ('repeater' !== $hydrateMode && $isMultipleBlock);
+
+        /** @var list<array<string, mixed>> $rawSubItems */
+        $rawSubItems = [];
+        $hasExplicitTemplate = false;
+        if ($shouldHydrateInnerItems && isset($block['items']) && \is_array($block['items'])) {
+            foreach ($block['items'] as $subItem) {
+                if (\is_array($subItem)) {
+                    /** @var array<string, mixed> $subItem */
+                    $rawSubItems[] = $subItem;
+                    if ($this->isTemplateSubItem($subItem)) {
+                        $hasExplicitTemplate = true;
+                    }
+                }
+            }
         }
 
         $filteredItems = [];
         foreach ($items as $itemData) {
-            if (null !== $condition && !$this->evaluateCondition($itemData, $condition)) {
+            if (null !== $condition && !$this->mappingApplier->evaluateCondition($itemData, $condition)) {
                 continue;
             }
             $filteredItems[] = $itemData;
         }
 
-        if ([] === $filteredItems) {
+        $totalFilteredCount = isset($collectionMeta['filtered_total'])
+            ? \max(0, $collectionMeta['filtered_total'])
+            : \count($filteredItems);
+        $unfilteredTotal = isset($collectionMeta['unfiltered_total'])
+            ? \max(0, $collectionMeta['unfiltered_total'])
+            : $totalFilteredCount;
+        $isFiltered = isset($collectionMeta['is_filtered'])
+            ? (bool) $collectionMeta['is_filtered']
+            : ($unfilteredTotal !== $totalFilteredCount);
+
+        $rawShowSummary = $dynamicConfig['show_summary'] ?? ($dynamicConfig['dynamic_show_summary'] ?? 'none');
+        $showSummary = \is_string($rawShowSummary) && \in_array(\trim($rawShowSummary), ['none', 'top', 'bottom', 'both'], true)
+            ? \trim($rawShowSummary)
+            : 'none';
+        $rawEmptyMessage = $dynamicConfig['empty_message'] ?? ($dynamicConfig['dynamic_empty_message'] ?? '');
+        $emptyMessage = \is_string($rawEmptyMessage) ? \trim($rawEmptyMessage) : '';
+        $hasEmptyStateSupport = !$hideIfEmpty && ('' !== $emptyMessage || $isFiltered || 'none' !== $showSummary);
+
+        if ([] === $filteredItems && !$hasEmptyStateSupport && (!$shouldHydrateInnerItems || !$hasExplicitTemplate || $hideIfEmpty)) {
             return [];
         }
 
@@ -178,8 +239,11 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         $rawPagination = $dynamicConfig['pagination'] ?? ($dynamicConfig['dynamic_pagination'] ?? 'none');
         $paginationStyle = \is_string($rawPagination) ? \trim($rawPagination) : 'none';
         $paginationMeta = null;
+        $currentPage = 1;
+        $perPage = \max(1, \count($filteredItems));
+        $totalPages = 1;
 
-        if (\in_array($paginationStyle, ['numbers', 'prev_next'], true)) {
+        if ([] !== $filteredItems && \in_array($paginationStyle, ['numbers', 'prev_next'], true)) {
             $rawPerPage = $dynamicConfig['per_page'] ?? ($dynamicConfig['dynamic_per_page'] ?? 20);
             $perPage = \is_numeric($rawPerPage) ? \max(1, (int) $rawPerPage) : 20;
             $totalItems = \count($filteredItems);
@@ -202,33 +266,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             ];
         }
 
-        $hydrateMode = isset($dynamicConfig['hydrate_mode']) && \is_string($dynamicConfig['hydrate_mode'])
-            ? $dynamicConfig['hydrate_mode']
-            : 'auto';
-        $blockType = isset($block['type']) && \is_string($block['type']) ? $block['type'] : '';
-
-        $blockMetadata = (null !== $this->targetFieldResolver && '' !== $blockType)
-            ? $this->targetFieldResolver->resolveBlockMetadata($blockType)
-            : null;
-        $isMultipleBlock = (null !== $blockMetadata && $blockMetadata['multiple'])
-            || (\array_key_exists('items', $block) && \is_array($block['items']));
-        $defaultItemType = null !== $blockMetadata
-            ? $blockMetadata['default_item_type']
-            : ('' !== $blockType ? $blockType . '_item' : null);
-
-        $shouldHydrateInnerItems = 'items' === $hydrateMode
-            || ('repeater' !== $hydrateMode && $isMultipleBlock);
-
         if ($shouldHydrateInnerItems) {
-            /** @var array<string, mixed> $templateItem */
-            $templateItem = (isset($block['items']) && \is_array($block['items']) && isset($block['items'][0]) && \is_array($block['items'][0]))
-                ? $block['items'][0]
-                : [];
-
-            if (!isset($templateItem['type']) && null !== $defaultItemType && '' !== $defaultItemType) {
-                $templateItem['type'] = $defaultItemType;
-            }
-
             /** @var array<string, string> $itemMapping */
             $itemMapping = [];
             foreach ($mapping as $targetKey => $sourcePath) {
@@ -241,22 +279,75 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             }
 
             $hydratedInnerItems = [];
-            foreach ($filteredItems as $itemData) {
-                $appliedCount = 0;
-                $hydratedItem = $this->applyMapping($templateItem, $itemData, $itemMapping, $appliedCount);
-                if ($hideIfEmpty && 0 === $appliedCount) {
-                    continue;
+            $dynamicHydratedCount = 0;
+
+            if ($hasExplicitTemplate) {
+                foreach ($rawSubItems as $subItem) {
+                    if (!$this->isTemplateSubItem($subItem)) {
+                        if (!isset($subItem['type']) && null !== $defaultItemType && '' !== $defaultItemType) {
+                            $subItem['type'] = $defaultItemType;
+                        }
+                        $hydratedInnerItems[] = $subItem;
+
+                        continue;
+                    }
+
+                    $templateItem = $this->stripTemplateItemFlags($subItem);
+                    if (!isset($templateItem['type']) && null !== $defaultItemType && '' !== $defaultItemType) {
+                        $templateItem['type'] = $defaultItemType;
+                    }
+
+                    foreach ($filteredItems as $itemData) {
+                        $appliedCount = 0;
+                        $hydratedItem = $this->mappingApplier->applyMapping($templateItem, $itemData, $itemMapping, $appliedCount);
+                        if ($hideIfEmpty && 0 === $appliedCount) {
+                            continue;
+                        }
+                        $hydratedInnerItems[] = $hydratedItem;
+                        ++$dynamicHydratedCount;
+                    }
                 }
-                $hydratedInnerItems[] = $hydratedItem;
+
+                if ($hideIfEmpty && 0 === $dynamicHydratedCount) {
+                    return [];
+                }
+            } else {
+                /** @var array<string, mixed> $templateItem */
+                $templateItem = $rawSubItems[0] ?? [];
+                if (!isset($templateItem['type']) && null !== $defaultItemType && '' !== $defaultItemType) {
+                    $templateItem['type'] = $defaultItemType;
+                }
+
+                foreach ($filteredItems as $itemData) {
+                    $appliedCount = 0;
+                    $hydratedItem = $this->mappingApplier->applyMapping($templateItem, $itemData, $itemMapping, $appliedCount);
+                    if ($hideIfEmpty && 0 === $appliedCount) {
+                        continue;
+                    }
+                    $hydratedInnerItems[] = $hydratedItem;
+                    ++$dynamicHydratedCount;
+                }
             }
 
-            if ([] === $hydratedInnerItems) {
+            if ([] === $hydratedInnerItems && !$hasEmptyStateSupport) {
                 return [];
             }
 
-            $hydratedBlock = $block;
+            $hydratedBlock = $this->enrichBlockWithSummaryAndEmptyState(
+                $block,
+                $dynamicConfig,
+                $unfilteredTotal,
+                $totalFilteredCount,
+                $dynamicHydratedCount,
+                $currentPage,
+                $perPage,
+                $totalPages,
+                $isFiltered,
+                $showSummary,
+                $emptyMessage,
+            );
             $hydratedBlock['items'] = $hydratedInnerItems;
-            if (null !== $paginationMeta) {
+            if (null !== $paginationMeta && $dynamicHydratedCount > 0) {
                 $hydratedBlock['_pagination'] = $paginationMeta;
             }
 
@@ -266,7 +357,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         $hydratedList = [];
         foreach ($filteredItems as $itemData) {
             $appliedCount = 0;
-            $hydratedItem = $this->applyMapping($block, $itemData, $mapping, $appliedCount);
+            $hydratedItem = $this->mappingApplier->applyMapping($block, $itemData, $mapping, $appliedCount);
             if ($hideIfEmpty && 0 === $appliedCount) {
                 continue;
             }
@@ -492,9 +583,101 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             'offset' => isset($props['dynamic_offset']) && \is_numeric($props['dynamic_offset']) ? (int) $props['dynamic_offset'] : 0,
             'pagination' => $pagination,
             'per_page' => $perPage,
+            'show_summary' => isset($props['dynamic_show_summary']) && \is_string($props['dynamic_show_summary'])
+                ? \trim($props['dynamic_show_summary'])
+                : 'none',
+            'summary_text' => isset($props['dynamic_summary_text']) && \is_string($props['dynamic_summary_text'])
+                ? \trim($props['dynamic_summary_text'])
+                : '',
+            'filtered_summary_text' => isset($props['dynamic_filtered_summary_text']) && \is_string($props['dynamic_filtered_summary_text'])
+                ? \trim($props['dynamic_filtered_summary_text'])
+                : '',
+            'empty_message' => isset($props['dynamic_empty_message']) && \is_string($props['dynamic_empty_message'])
+                ? \trim($props['dynamic_empty_message'])
+                : '',
             'mapping' => $mapping,
             'condition' => $condition,
         ];
+    }
+
+    /**
+     * Enriches a hydrated collection block with `_summary`, `_empty_state`, and `%total%`/`%count%`/`%showing%`
+     * token interpolation in parent block header fields (`title`, `headline`, `subtitle`, `description`, `summary`).
+     *
+     * @param array<string, mixed> $block
+     * @param array<string, mixed> $dynamicConfig
+     *
+     * @return array<string, mixed>
+     */
+    private function enrichBlockWithSummaryAndEmptyState(
+        array $block,
+        array $dynamicConfig,
+        int $unfilteredTotal,
+        int $totalFilteredCount,
+        int $showingCount,
+        int $currentPage,
+        int $perPage,
+        int $totalPages,
+        bool $isFiltered,
+        string $showSummary,
+        string $emptyMessage,
+    ): array {
+        $fromItem = $showingCount > 0 ? (($currentPage - 1) * $perPage) + 1 : 0;
+        $toItem = $showingCount > 0 ? $fromItem + $showingCount - 1 : 0;
+
+        $summaryTokens = [
+            '%total%' => (string) $unfilteredTotal,
+            '%count%' => (string) $totalFilteredCount,
+            '%showing%' => (string) $showingCount,
+            '%from%' => (string) $fromItem,
+            '%to%' => (string) $toItem,
+            '%page%' => (string) $currentPage,
+            '%pages%' => (string) $totalPages,
+        ];
+
+        $enriched = $block;
+        foreach (['title', 'headline', 'subtitle', 'description', 'summary'] as $headerField) {
+            if (isset($enriched[$headerField]) && \is_string($enriched[$headerField]) && \str_contains($enriched[$headerField], '%')) {
+                $enriched[$headerField] = \strtr($enriched[$headerField], $summaryTokens);
+            }
+        }
+
+        if ('none' !== $showSummary) {
+            $rawSummaryText = $dynamicConfig['summary_text'] ?? ($dynamicConfig['dynamic_summary_text'] ?? '');
+            $summaryText = \is_string($rawSummaryText) ? \trim($rawSummaryText) : '';
+            $rawFilteredText = $dynamicConfig['filtered_summary_text'] ?? ($dynamicConfig['dynamic_filtered_summary_text'] ?? '');
+            $filteredSummaryText = \is_string($rawFilteredText) ? \trim($rawFilteredText) : '';
+
+            $chosenTemplate = ($isFiltered && '' !== $filteredSummaryText)
+                ? $filteredSummaryText
+                : ('' !== $summaryText
+                    ? $summaryText
+                    : ($isFiltered
+                        ? 'Found %count% results (showing %showing% of %total%)'
+                        : 'Showing %showing% of %total% items'));
+
+            $enriched['_summary'] = [
+                'unfiltered_total' => $unfilteredTotal,
+                'total_items' => $totalFilteredCount,
+                'showing_count' => $showingCount,
+                'from_item' => $fromItem,
+                'to_item' => $toItem,
+                'current_page' => $currentPage,
+                'total_pages' => $totalPages,
+                'is_filtered' => $isFiltered,
+                'formatted_summary' => \strtr($chosenTemplate, $summaryTokens),
+                'position' => $showSummary,
+            ];
+        }
+
+        if (0 === $showingCount && '' !== $emptyMessage) {
+            $enriched['_empty_state'] = [
+                'message' => \strtr($emptyMessage, $summaryTokens),
+                'is_filtered' => $isFiltered,
+            ];
+        }
+
+        return $enriched;
     }
 
     private function unwrapContentViews(mixed $value): mixed
@@ -516,264 +699,16 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
     }
 
     /**
-     * @param array<string, mixed> $block
-     * @param array<string, mixed> $pageData
-     * @param array<string, string> $mapping
-     * @param int $appliedCount incremented for every mapped field that received a non-empty dynamic value
-     *
-     * @return array<string, mixed>
-     */
-    private function applyMapping(array $block, array $pageData, array $mapping, int &$appliedCount = 0): array
-    {
-        $hydrated = $block;
-
-        if ([] === $mapping) {
-            $mapping = $this->buildAutoMapping($block, $pageData);
-        }
-
-        foreach ($mapping as $targetField => $sourcePath) {
-            if ('' === $targetField || '' === $sourcePath) {
-                continue;
-            }
-
-            $value = $this->extractValue($pageData, $sourcePath);
-
-            // Smart Fallback: only override if the resolved dynamic value is non-empty
-            if ($this->isValuePresent($value)) {
-                $hydrated[$targetField] = $value;
-                ++$appliedCount;
-            }
-        }
-
-        return $hydrated;
-    }
-
-    /**
-     * Builds an automatic target-to-source field mapping using:
-     * 1. Equal field name matching against non-empty source data keys.
-     * 2. Field type compatibility when block field metadata (`BlockTargetFieldMetadataResolver`) is available.
-     *
-     * @param array<string, mixed> $block
-     * @param array<string, mixed> $pageData
-     *
-     * @return array<string, string>
-     */
-    private function buildAutoMapping(array $block, array $pageData): array
-    {
-        /** @var array<string, string|null> $targetFields */
-        $targetFields = [];
-        $blockType = isset($block['type']) && \is_string($block['type']) ? $block['type'] : '';
-
-        if (null !== $this->targetFieldResolver && '' !== $blockType) {
-            foreach ($this->targetFieldResolver->resolveTargetFields($blockType) as $fieldMeta) {
-                $targetFields[$fieldMeta['name']] = $fieldMeta['type'];
-            }
-        }
-
-        foreach (\array_keys($block) as $key) {
-            if (\in_array($key, ['type', 'props', 'id', 'items', 'settings'], true) || \str_starts_with($key, '_')) {
-                continue;
-            }
-            if (!\array_key_exists($key, $targetFields)) {
-                $targetFields[$key] = null;
-            }
-        }
-
-        /** @var array<string, string> $declaredSourceTypes */
-        $declaredSourceTypes = [];
-        foreach ($this->registry->getProviders() as $provider) {
-            foreach ($provider->getSourceFields() as $sourceField) {
-                $declaredSourceTypes[$sourceField['name']] ??= $sourceField['type'];
-            }
-        }
-
-        /** @var array<string, string> $availableSourceTypes */
-        $availableSourceTypes = [];
-        foreach ($pageData as $sourceKey => $sourceValue) {
-            if (\str_starts_with($sourceKey, '_') || \in_array($sourceKey, ['id', 'uuid', 'template'], true)) {
-                continue;
-            }
-            if (!$this->isValuePresent($sourceValue)) {
-                continue;
-            }
-            $availableSourceTypes[$sourceKey] = $this->inferSourceValueType(
-                $sourceValue,
-                $declaredSourceTypes[$sourceKey] ?? null,
-            );
-        }
-
-        /** @var array<string, string> $mapping */
-        $mapping = [];
-        /** @var array<string, true> $usedSources */
-        $usedSources = [];
-
-        // 1. Equal field name match
-        foreach ($targetFields as $targetField => $targetType) {
-            if (\array_key_exists($targetField, $pageData) && $this->isValuePresent($pageData[$targetField])) {
-                $mapping[$targetField] = $targetField;
-                $usedSources[$targetField] = true;
-            }
-        }
-
-        // 2. Field type compatibility match via resolved block field metadata
-        foreach ($targetFields as $targetField => $targetType) {
-            if (isset($mapping[$targetField]) || null === $targetType) {
-                continue;
-            }
-
-            $matchedSource = null;
-            foreach ($availableSourceTypes as $sourceKey => $sourceType) {
-                if ($sourceType === $targetType && !isset($usedSources[$sourceKey])) {
-                    $matchedSource = $sourceKey;
-                    break;
-                }
-            }
-
-            if (null === $matchedSource) {
-                foreach ($availableSourceTypes as $sourceKey => $sourceType) {
-                    if ($sourceType === $targetType) {
-                        $matchedSource = $sourceKey;
-                        break;
-                    }
-                }
-            }
-
-            if (null !== $matchedSource) {
-                $mapping[$targetField] = $matchedSource;
-                $usedSources[$matchedSource] = true;
-            }
-        }
-
-        return $mapping;
-    }
-
-    private function inferSourceValueType(mixed $value, ?string $declaredType): string
-    {
-        if (\is_array($value)) {
-            if (isset($value['id']) || isset($value['url']) || isset($value['thumbnails'])) {
-                return 'media';
-            }
-
-            return 'array';
-        }
-
-        if (\is_bool($value)) {
-            return 'boolean';
-        }
-
-        if (\is_int($value) || \is_float($value)) {
-            return 'number';
-        }
-
-        if (null !== $declaredType && '' !== $declaredType) {
-            return $declaredType;
-        }
-
-        if (\is_string($value)) {
-            if (\str_starts_with($value, '/') || \str_starts_with($value, 'http://') || \str_starts_with($value, 'https://')) {
-                return 'link';
-            }
-
-            if ($value !== \strip_tags($value) || \mb_strlen($value, 'UTF-8') > 120) {
-                return 'text';
-            }
-        }
-
-        return 'string';
-    }
-
-    /**
-     * Extracts a value from source data supporting dot-notation (`a.b`),
-     * pipe-separated fallback chains (`headline|title`, `summary|content:length=160`),
-     * and inline text modifiers (`:length=160`, `:limit=160`, `:truncate=160`, `:plain`).
-     *
      * @param array<string, mixed> $data
      */
     public function extractValue(array $data, string $path): mixed
     {
-        $alternatives = \explode('|', $path);
-        $lastValue = null;
-
-        foreach ($alternatives as $rawCandidate) {
-            $candidate = \trim($rawCandidate);
-            if ('' === $candidate) {
-                continue;
-            }
-
-            $fieldPath = $candidate;
-            $maxLength = 0;
-            $stripHtml = false;
-
-            if (1 === \preg_match('/^([^:]+):(?:length|limit|truncate)=(\d+)$/i', $candidate, $matches)) {
-                $fieldPath = \trim($matches[1]);
-                $maxLength = (int) $matches[2];
-                $stripHtml = true;
-            } elseif (1 === \preg_match('/^([^:]+):plain$/i', $candidate, $matches)) {
-                $fieldPath = \trim($matches[1]);
-                $maxLength = 0;
-                $stripHtml = true;
-            }
-
-            $val = $this->extractSinglePathValue($data, $fieldPath);
-
-            if ($stripHtml) {
-                $val = \is_scalar($val) ? self::truncatePlainText((string) $val, $maxLength) : null;
-            }
-
-            $lastValue = $val;
-            if ($this->isValuePresent($val)) {
-                return $val;
-            }
-        }
-
-        return $lastValue;
+        return $this->mappingApplier->extractValue($data, $path);
     }
 
     public static function truncatePlainText(string $value, int $maxLength = 160): string
     {
-        if ('' === \trim($value)) {
-            return '';
-        }
-
-        $spaced = \preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr|section|article)>|<br\s*\/?>/i', ' ', $value) ?? $value;
-        $stripped = \strip_tags($spaced);
-        $decoded = \html_entity_decode($stripped, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
-        $decoded = \str_replace(['<', '>'], '', $decoded);
-        $normalized = \trim(\preg_replace('/\s+/u', ' ', $decoded) ?? $decoded);
-
-        if ('' === $normalized || $maxLength <= 0) {
-            return $normalized;
-        }
-
-        if (\mb_strlen($normalized, 'UTF-8') <= $maxLength) {
-            return $normalized;
-        }
-
-        if ($maxLength <= 3) {
-            return \mb_substr($normalized, 0, $maxLength, 'UTF-8');
-        }
-
-        $cut = \mb_substr($normalized, 0, $maxLength - 3, 'UTF-8');
-
-        return \rtrim($cut, " \t\n\r\0\x0B.,;:-") . '...';
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     */
-    private function extractSinglePathValue(array $data, string $path): mixed
-    {
-        $segments = \explode('.', $path);
-        $current = $data;
-
-        foreach ($segments as $segment) {
-            if (!\is_array($current) || !\array_key_exists($segment, $current)) {
-                return null;
-            }
-            $current = $current[$segment];
-        }
-
-        return $current;
+        return DynamicContentMappingApplier::truncatePlainText($value, $maxLength);
     }
 
     /**
@@ -782,71 +717,54 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
      */
     public function evaluateCondition(array $data, array $condition): bool
     {
-        $field = isset($condition['field']) && \is_string($condition['field']) ? $condition['field'] : '';
-        if ('' === $field) {
-            return true;
-        }
-
-        $operator = isset($condition['operator']) && \is_string($condition['operator']) ? $condition['operator'] : 'not_empty';
-        $val = $this->extractValue($data, $field);
-        $hasValue = $this->isValuePresent($val);
-
-        $condVal = isset($condition['value']) && \is_scalar($condition['value']) ? (string) $condition['value'] : '';
-        $strVal = \is_scalar($val) ? (string) $val : '';
-
-        return match ($operator) {
-            'is_empty', 'empty' => !$hasValue,
-            'equals', 'eq' => $strVal === $condVal,
-            'not_equals', 'neq' => $strVal !== $condVal,
-            'contains' => $this->evaluateContains($val, $strVal, $condVal),
-            'not_contains' => !$this->evaluateContains($val, $strVal, $condVal),
-            'starts_with' => '' !== $condVal && \str_starts_with(\strtolower($strVal), \strtolower($condVal)),
-            'ends_with' => '' !== $condVal && \str_ends_with(\strtolower($strVal), \strtolower($condVal)),
-            'in' => \in_array($strVal, \array_map('trim', \explode(',', $condVal)), true),
-            'gt' => \is_numeric($strVal) && \is_numeric($condVal) ? (float) $strVal > (float) $condVal : $strVal > $condVal,
-            'gte' => \is_numeric($strVal) && \is_numeric($condVal) ? (float) $strVal >= (float) $condVal : $strVal >= $condVal,
-            'lt' => \is_numeric($strVal) && \is_numeric($condVal) ? (float) $strVal < (float) $condVal : $strVal < $condVal,
-            'lte' => \is_numeric($strVal) && \is_numeric($condVal) ? (float) $strVal <= (float) $condVal : $strVal <= $condVal,
-            default => $hasValue, // 'not_empty'
-        };
-    }
-
-    private function evaluateContains(mixed $val, string $strVal, string $condVal): bool
-    {
-        if ('' === $condVal) {
-            return false;
-        }
-
-        if (\is_array($val)) {
-            foreach ($val as $item) {
-                if (\is_scalar($item) && \strtolower((string) $item) === \strtolower($condVal)) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        return \str_contains(\strtolower($strVal), \strtolower($condVal));
-    }
-
-    private function isValuePresent(mixed $value): bool
-    {
-        if (null === $value) {
-            return false;
-        }
-        if (\is_string($value) && '' === \trim($value)) {
-            return false;
-        }
-        if (\is_array($value) && [] === $value) {
-            return false;
-        }
-
-        return true;
+        return $this->mappingApplier->evaluateCondition($data, $condition);
     }
 
     private function isTruthy(mixed $value): bool
     {
         return true === $value || 1 === $value || 'true' === $value || '1' === $value;
+    }
+
+    /**
+     * @param array<string, mixed> $subItem
+     */
+    private function isTemplateSubItem(array $subItem): bool
+    {
+        if ($this->isTruthy($subItem['is_dynamic_template'] ?? ($subItem['is_template'] ?? false))) {
+            return true;
+        }
+
+        $props = $subItem['props'] ?? null;
+        if (\is_array($props)) {
+            return $this->isTruthy($props['is_dynamic_template'] ?? ($props['is_template'] ?? false));
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string, mixed> $subItem
+     *
+     * @return array<string, mixed>
+     */
+    private function stripTemplateItemFlags(array $subItem): array
+    {
+        $cleaned = $subItem;
+        if (\array_key_exists('is_dynamic_template', $cleaned)) {
+            $cleaned['is_dynamic_template'] = false;
+        }
+        if (\array_key_exists('is_template', $cleaned)) {
+            $cleaned['is_template'] = false;
+        }
+        if (isset($cleaned['props']) && \is_array($cleaned['props'])) {
+            if (\array_key_exists('is_dynamic_template', $cleaned['props'])) {
+                $cleaned['props']['is_dynamic_template'] = false;
+            }
+            if (\array_key_exists('is_template', $cleaned['props'])) {
+                $cleaned['props']['is_template'] = false;
+            }
+        }
+
+        return $cleaned;
     }
 }

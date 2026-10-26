@@ -15,6 +15,7 @@ use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Page\Infrastructure\Sulu\Search\Visitor\WebsitePageReindexProviderEnhancerInterface;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
+use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 
 /**
  * Enhances Sulu 3 Website Page search documents (CMS-IG Seal) by recursively extracting
@@ -518,24 +519,7 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
      */
     private function extractReusableUuid(array $block): ?string
     {
-        foreach (['snippet', 'reusable_snippet'] as $key) {
-            $val = $block[$key] ?? null;
-            if (\is_string($val) && '' !== \trim($val)) {
-                return \trim($val);
-            }
-            if (\is_array($val) && isset($val['id']) && \is_string($val['id']) && '' !== \trim($val['id'])) {
-                return \trim($val['id']);
-            }
-        }
-
-        if (isset($block['view']) && \is_array($block['view']) && isset($block['view']['snippet']) && \is_array($block['view']['snippet'])) {
-            $viewId = $block['view']['snippet']['id'] ?? null;
-            if (\is_string($viewId) && '' !== \trim($viewId)) {
-                return \trim($viewId);
-            }
-        }
-
-        return null;
+        return SuluDataNormalizer::extractSnippetUuid($block);
     }
 
     /**
@@ -549,6 +533,9 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
         if (isset($block['_hidden']) && true === $block['_hidden']) {
             return true;
         }
+        if ($this->isTruthyFlag($block['is_dynamic_template'] ?? ($block['is_template'] ?? null))) {
+            return true;
+        }
 
         $props = $block['props'] ?? null;
         if (\is_string($props) && '' !== \trim($props)) {
@@ -558,11 +545,21 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
             }
         }
 
-        if (\is_array($props) && isset($props['status']) && 'disabled' === $props['status']) {
-            return true;
+        if (\is_array($props)) {
+            if (isset($props['status']) && 'disabled' === $props['status']) {
+                return true;
+            }
+            if ($this->isTruthyFlag($props['is_dynamic_template'] ?? ($props['is_template'] ?? null))) {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    private function isTruthyFlag(mixed $value): bool
+    {
+        return true === $value || 1 === $value || 'true' === $value || '1' === $value;
     }
 
     private function normalizePlainText(string $value, bool $isRichText = false): string

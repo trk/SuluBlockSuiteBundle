@@ -463,4 +463,72 @@ YAML;
             }
         }
     }
+
+    public function testGetPresetsFiltersSnippetPresetsByWebspace(): void
+    {
+        $totogluSnippet = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetInterface::class);
+        $totogluSnippet->method('getUuid')->willReturn('preset-totoglu-1');
+
+        $totogluUnlocalized = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface::class);
+        $totogluUnlocalized->method('getTemplateKey')->willReturn('block_preset');
+        $totogluUnlocalized->method('getStage')->willReturn('live');
+        $totogluUnlocalized->method('getLocale')->willReturn(null);
+        $totogluUnlocalized->method('getVersion')->willReturn(0);
+        $totogluUnlocalized->method('getTemplateData')->willReturn([
+            'webspace' => 'totoglu',
+        ]);
+
+        $totogluLocalized = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface::class);
+        $totogluLocalized->method('getTemplateKey')->willReturn('block_preset');
+        $totogluLocalized->method('getStage')->willReturn('live');
+        $totogluLocalized->method('getLocale')->willReturn('en');
+        $totogluLocalized->method('getVersion')->willReturn(0);
+        $totogluLocalized->method('getTitle')->willReturn('Totoglu Exclusive Preset');
+        $totogluLocalized->method('getTemplateData')->willReturn([
+            'block' => [['type' => 'card', 'props' => ['variant' => 'totoglu']]],
+        ]);
+        $totogluSnippet->method('getDimensionContents')->willReturn(
+            new \Doctrine\Common\Collections\ArrayCollection([$totogluUnlocalized, $totogluLocalized]),
+        );
+
+        $globalSnippet = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetInterface::class);
+        $globalSnippet->method('getUuid')->willReturn('preset-global-1');
+
+        $globalUnlocalized = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface::class);
+        $globalUnlocalized->method('getTemplateKey')->willReturn('block_preset');
+        $globalUnlocalized->method('getStage')->willReturn('live');
+        $globalUnlocalized->method('getLocale')->willReturn(null);
+        $globalUnlocalized->method('getVersion')->willReturn(0);
+        $globalUnlocalized->method('getTemplateData')->willReturn([
+            'webspace' => '_global',
+        ]);
+
+        $globalLocalized = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface::class);
+        $globalLocalized->method('getTemplateKey')->willReturn('block_preset');
+        $globalLocalized->method('getStage')->willReturn('live');
+        $globalLocalized->method('getLocale')->willReturn('en');
+        $globalLocalized->method('getVersion')->willReturn(0);
+        $globalLocalized->method('getTitle')->willReturn('Global Shared Preset');
+        $globalLocalized->method('getTemplateData')->willReturn([
+            'block' => [['type' => 'card', 'props' => ['variant' => 'global']]],
+        ]);
+        $globalSnippet->method('getDimensionContents')->willReturn(
+            new \Doctrine\Common\Collections\ArrayCollection([$globalUnlocalized, $globalLocalized]),
+        );
+
+        $repo = $this->createStub(\Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface::class);
+        $repo->method('findBy')->willReturn([$totogluSnippet, $globalSnippet]);
+
+        $provider = new YamlBlockPresetProvider($this->tempDir, null, $repo, true);
+
+        $totogluPresets = $provider->getPresets('card', 'en', 'totoglu');
+        $totogluIds = \array_column($totogluPresets, 'id');
+        $this->assertContains('snippet_preset-totoglu-1', $totogluIds);
+        $this->assertContains('snippet_preset-global-1', $totogluIds);
+
+        $turkiyePresets = $provider->getPresets('card', 'en', 'turkiye');
+        $turkiyeIds = \array_column($turkiyePresets, 'id');
+        $this->assertNotContains('snippet_preset-totoglu-1', $turkiyeIds);
+        $this->assertContains('snippet_preset-global-1', $turkiyeIds);
+    }
 }

@@ -23,6 +23,8 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
      */
     private array $resolvedEntityCache = [];
 
+    private readonly DynamicContentQueryFilterNormalizer $queryFilterNormalizer;
+
     public function __construct(
         private readonly ?PageRepositoryInterface $pageRepository = null,
         private readonly ?ContentResolverInterface $contentResolver = null,
@@ -31,7 +33,9 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
         private readonly ?ContentAggregatorInterface $contentAggregator = null,
         private readonly ?RequestAnalyzerInterface $requestAnalyzer = null,
         private readonly ?SuluSmartContentQueryBridge $smartContentBridge = null,
+        ?DynamicContentQueryFilterNormalizer $queryFilterNormalizer = null,
     ) {
+        $this->queryFilterNormalizer = $queryFilterNormalizer ?? new DynamicContentQueryFilterNormalizer();
     }
 
     public function reset(): void
@@ -533,15 +537,12 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
 
         $resolvedLocale = $this->resolveLocale($locale);
 
-        /** @var array<string, mixed> $filters */
-        $filters = [
-            'locale' => $resolvedLocale,
-            'stage' => DimensionContentInterface::STAGE_LIVE,
-        ];
+        /** @var array<string, mixed> $baseFilters */
+        $baseFilters = [];
 
-        $uuids = $this->normalizeStringList($criteria['uuids'] ?? ($criteria['ids'] ?? null));
+        $uuids = $this->queryFilterNormalizer->normalizeStringList($criteria['uuids'] ?? ($criteria['ids'] ?? null));
         if ([] !== $uuids) {
-            $filters['uuids'] = $uuids;
+            $baseFilters['uuids'] = $uuids;
         }
 
         $resolvedParentUuid = null;
@@ -559,19 +560,17 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
             if (null === $resolvedParentUuid || '' === $resolvedParentUuid) {
                 return [];
             }
-            $filters['parentId'] = $resolvedParentUuid;
+            $baseFilters['parentId'] = $resolvedParentUuid;
         }
 
         $descendantOfId = null;
         if (isset($criteria['descendant_of_id']) && \is_string($criteria['descendant_of_id']) && '' !== \trim($criteria['descendant_of_id'])) {
             $descendantOfId = \trim($criteria['descendant_of_id']);
-            $filters['descendantOfId'] = $descendantOfId;
+            $baseFilters['descendantOfId'] = $descendantOfId;
         }
 
-        $rawCategories = $criteria['category_keys'] ?? ($criteria['categories'] ?? null);
-        $hasStringCategoryKeys = [] === $this->normalizeIntList($criteria['category_ids'] ?? $rawCategories)
-            && [] !== $this->normalizeStringList($rawCategories);
-        $navigationContexts = $this->normalizeStringList($criteria['navigation_contexts'] ?? ($criteria['navigation_context'] ?? null));
+        $hasStringCategoryKeys = $this->queryFilterNormalizer->hasStringCategoryKeys($criteria);
+        $navigationContexts = $this->queryFilterNormalizer->normalizeStringList($criteria['navigation_contexts'] ?? ($criteria['navigation_context'] ?? null));
         $hasCustomDepth = isset($criteria['depth']) && \is_numeric($criteria['depth']) && (int) $criteria['depth'] > 0;
         $bridgeDataSource = $resolvedParentUuid ?? $descendantOfId;
 
@@ -584,26 +583,21 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
             && null !== $this->smartContentBridge
             && $this->smartContentBridge->hasProvider('pages')
         ) {
-            $excludedIds = $this->normalizeStringList($criteria['exclude_ids'] ?? ($criteria['exclude_id'] ?? null));
-            $rawLimit = isset($criteria['limit']) && \is_numeric($criteria['limit']) ? (int) $criteria['limit'] : 10;
-            $limit = \max(1, \min(100, $rawLimit));
-
-            $bridgeQuery = $criteria;
-            if ([] !== $excludedIds) {
-                $bridgeQuery['limit'] = \min(100, $limit + \count($excludedIds));
-            }
+            $smartPlan = $this->queryFilterNormalizer->buildSmartContentQuery($criteria);
 
             $flatIds = $this->smartContentBridge->queryFlatIds(
                 providerType: 'pages',
-                config: $bridgeQuery,
+                config: $smartPlan['bridgeQuery'],
                 locale: $resolvedLocale,
                 dataSource: $bridgeDataSource,
                 includeSubFolders: null === $resolvedParentUuid && null !== $descendantOfId,
             );
 
-            $filteredIds = [] !== $excludedIds
-                ? \array_slice(\array_values(\array_diff($flatIds, $excludedIds)), 0, $limit)
-                : \array_slice($flatIds, 0, $limit);
+            $filteredIds = $this->queryFilterNormalizer->sliceSmartContentIds(
+                $flatIds,
+                $smartPlan['excludedIds'],
+                $smartPlan['limit'],
+            );
 
             return $this->loadAndNormalizePagesByOrderedUuids($filteredIds, $resolvedLocale);
         }
@@ -613,79 +607,24 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
         }
 
         if (isset($criteria['webspace_key']) && \is_string($criteria['webspace_key']) && '' !== \trim($criteria['webspace_key'])) {
-            $filters['webspaceKey'] = \trim($criteria['webspace_key']);
+            $baseFilters['webspaceKey'] = \trim($criteria['webspace_key']);
         } else {
             $webspaceKey = $this->resolveCurrentWebspaceKey();
             if (null !== $webspaceKey) {
-                $filters['webspaceKey'] = $webspaceKey;
+                $baseFilters['webspaceKey'] = $webspaceKey;
             }
         }
 
-        $templateKeys = $this->normalizeStringList($criteria['template_keys'] ?? ($criteria['templates'] ?? ($criteria['template'] ?? null)));
-        if ([] !== $templateKeys) {
-            $filters['templateKeys'] = $templateKeys;
-        }
-
-        $tagIds = $this->normalizeIntList($criteria['tag_ids'] ?? null);
-        $rawTags = $criteria['tag_names'] ?? ($criteria['tags'] ?? ($criteria['tag'] ?? null));
-        if ([] === $tagIds && null !== $rawTags) {
-            $tagIds = $this->normalizeIntList($rawTags);
-        }
-        if ([] !== $tagIds) {
-            $filters['tagIds'] = $tagIds;
-        } else {
-            $tagNames = $this->normalizeStringList($rawTags);
-            if ([] !== $tagNames) {
-                $filters['tagNames'] = $tagNames;
-            }
-        }
-
-        $categoryIds = $this->normalizeIntList($criteria['category_ids'] ?? null);
-        $rawCategories = $criteria['category_keys'] ?? ($criteria['categories'] ?? null);
-        if ([] === $categoryIds && null !== $rawCategories) {
-            $categoryIds = $this->normalizeIntList($rawCategories);
-        }
-        if ([] !== $categoryIds) {
-            $filters['categoryIds'] = $categoryIds;
-        } else {
-            $categoryKeys = $this->normalizeStringList($rawCategories);
-            if ([] !== $categoryKeys) {
-                $filters['categoryKeys'] = $categoryKeys;
-            }
-        }
-
-        $navigationContexts = $this->normalizeStringList($criteria['navigation_contexts'] ?? ($criteria['navigation_context'] ?? null));
-        if ([] !== $navigationContexts) {
-            $filters['navigationContexts'] = $navigationContexts;
-        }
-
-        if (isset($criteria['depth']) && \is_numeric($criteria['depth']) && (int) $criteria['depth'] > 0) {
-            $filters['depth'] = (int) $criteria['depth'];
-        }
-
-        $offset = isset($criteria['offset']) && \is_numeric($criteria['offset'])
-            ? \max(0, \min(500, (int) $criteria['offset']))
-            : 0;
-        $excludedIds = $this->normalizeStringList($criteria['exclude_ids'] ?? ($criteria['exclude_id'] ?? null));
-
-        $rawLimit = isset($criteria['limit']) && \is_numeric($criteria['limit']) ? (int) $criteria['limit'] : 10;
-        $limit = \max(1, \min(100, $rawLimit));
-        // Fetch extra rows when offset or excluded IDs are applied in memory
-        $filters['limit'] = $limit + $offset + \count($excludedIds);
-
-        /** @var array<string, 'asc'|'desc'> $sortBy */
-        $sortBy = ['created' => 'desc'];
-        if (isset($criteria['sort_by']) && \is_string($criteria['sort_by']) && '' !== \trim($criteria['sort_by'])) {
-            $rawOrder = $criteria['sort_order'] ?? 'desc';
-            $order = (\is_string($rawOrder) && 'asc' === \strtolower($rawOrder)) ? 'asc' : 'desc';
-            $sortField = \trim($criteria['sort_by']);
-            if ('published' === $sortField) {
-                $sortField = 'workflowPublished';
-            }
-            if (\in_array($sortField, ['id', 'uuid', 'title', 'authored', 'workflowPublished', 'created', 'changed'], true)) {
-                $sortBy = [$sortField => $order];
-            }
-        }
+        $queryPlan = $this->queryFilterNormalizer->buildRepositoryQueryPlan(
+            criteria: $criteria,
+            locale: $resolvedLocale,
+            baseFilters: $baseFilters,
+        );
+        $filters = $queryPlan['filters'];
+        $sortBy = $queryPlan['sortBy'];
+        $limit = $queryPlan['limit'];
+        $offset = $queryPlan['offset'];
+        $excludedIds = $queryPlan['excludedIds'];
 
         try {
             /**
@@ -744,59 +683,6 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
     }
 
     /**
-     * @return list<string>
-     */
-    private function normalizeStringList(mixed $raw): array
-    {
-        if (\is_string($raw)) {
-            return \array_values(\array_filter(
-                \array_map('trim', \explode(',', $raw)),
-                static fn (string $v): bool => '' !== $v,
-            ));
-        }
-
-        if (\is_array($raw)) {
-            $list = [];
-            foreach ($raw as $item) {
-                if (\is_string($item) && '' !== \trim($item)) {
-                    $list[] = \trim($item);
-                }
-            }
-
-            return $list;
-        }
-
-        return [];
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function normalizeIntList(mixed $raw): array
-    {
-        if (\is_int($raw)) {
-            return [$raw];
-        }
-
-        if (\is_string($raw)) {
-            $raw = \explode(',', $raw);
-        }
-
-        if (\is_array($raw)) {
-            $list = [];
-            foreach ($raw as $item) {
-                if (\is_numeric($item)) {
-                    $list[] = (int) $item;
-                }
-            }
-
-            return $list;
-        }
-
-        return [];
-    }
-
-    /**
      * @return array<string, mixed>|null
      */
     private function normalizePageEntity(PageInterface $page, string $locale): ?array
@@ -827,94 +713,12 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
             $this->referenceStore?->add($uuid, PageInterface::RESOURCE_KEY);
         }
 
-        if (null !== $this->contentResolver) {
-            try {
-                $resolved = $this->contentResolver->resolve($dimensionContent);
-                /** @var array<string, mixed> $pageData */
-                $pageData = $resolved['content'];
-                $pageData['id'] = $uuid;
-                $pageData['uuid'] = $uuid;
-
-                $title = $dimensionContent->getTitle();
-                if (null !== $title) {
-                    $pageData['title'] = $title;
-                }
-                $pageData['headline'] = $this->firstNonEmptyString($pageData['headline'] ?? null, $pageData['title'] ?? null);
-
-                /** @var mixed $excerptDesc */
-                $excerptDesc = null;
-                /** @var mixed $excerptImage */
-                $excerptImage = null;
-                $excerpt = $resolved['extension']['excerpt'] ?? null;
-                if (\is_array($excerpt)) {
-                    $excerptDesc = $excerpt['description'] ?? null;
-                    $excerptImage = $excerpt['image'] ?? null;
-                }
-
-                $rawSummary = $pageData['summary'] ?? null;
-                $rawDescription = $pageData['description'] ?? null;
-                $rawBodyContent = $pageData['content'] ?? null;
-
-                $pageData['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, $excerptDesc, $rawBodyContent);
-                $pageData['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, $excerptDesc, $rawBodyContent);
-                $pageData['image'] = $this->firstNonEmptyMedia($pageData['image'] ?? null, $excerptImage);
-
-                if (isset($resolved['view']['url']) && \is_string($resolved['view']['url'])) {
-                    $pageData['url'] = $resolved['view']['url'];
-                    $pageData['link'] = $resolved['view']['url'];
-                }
-
-                if (null !== $dimensionContent->getAuthored()) {
-                    $pageData['authored'] = $dimensionContent->getAuthored()->format('c');
-                    $pageData['date'] = $pageData['authored'];
-                }
-
-                if (null !== $dimensionContent->getAuthor()) {
-                    $pageData['author'] = $dimensionContent->getAuthor();
-                }
-
-                $enriched = $this->enrichPageMetadata($pageData, $page, $dimensionContent);
-                if (null !== $cacheKey) {
-                    $this->resolvedEntityCache[$cacheKey] = $enriched;
-                }
-
-                return $enriched;
-            } catch (\Throwable) {
-                // Fallback to direct entity getters
-            }
-        }
-
-        /** @var array<string, mixed> $pageData */
-        $pageData = $dimensionContent->getTemplateData();
-        $pageData['id'] = $uuid;
-        $pageData['uuid'] = $uuid;
-        $entityTitle = $dimensionContent->getTitle();
-        $pageData['title'] = $entityTitle;
-        $pageData['headline'] = $this->firstNonEmptyString($pageData['headline'] ?? null, $entityTitle);
-
-        $excerptDesc = $dimensionContent->getExcerptDescription();
-        $rawSummary = $pageData['summary'] ?? null;
-        $rawDescription = $pageData['description'] ?? null;
-        $rawBodyContent = $pageData['content'] ?? null;
-
-        $pageData['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, $excerptDesc, $rawBodyContent);
-        $pageData['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, $excerptDesc, $rawBodyContent);
-        $pageData['image'] = $this->firstNonEmptyMedia($pageData['image'] ?? null, $dimensionContent->getExcerptImage());
-
-        $route = $dimensionContent->getRoute();
-        if (null !== $route) {
-            $pageData['url'] = $route->getSlug();
-            $pageData['link'] = $route->getSlug();
-        }
-
-        if (null !== $dimensionContent->getAuthored()) {
-            $pageData['authored'] = $dimensionContent->getAuthored()->format('c');
-            $pageData['date'] = $pageData['authored'];
-        }
-
-        if (null !== $dimensionContent->getAuthor()) {
-            $pageData['author'] = $dimensionContent->getAuthor();
-        }
+        $pageData = SuluContentDimensionExtractor::normalizeDimensionContent(
+            $uuid,
+            $dimensionContent,
+            $this->contentResolver,
+            includeAuthorName: true,
+        );
 
         $enriched = $this->enrichPageMetadata($pageData, $page, $dimensionContent);
         if (null !== $cacheKey) {
@@ -939,22 +743,6 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
             $pageData['parent_id'] ??= $parent->getUuid();
         }
 
-        $templateKey = $dimensionContent->getTemplateKey();
-        if (null !== $templateKey && '' !== $templateKey) {
-            $pageData['template'] ??= $templateKey;
-        }
-
-        $tagNames = $dimensionContent->getExcerptTagNames();
-        if ([] !== $tagNames) {
-            $pageData['tags'] ??= \array_values($tagNames);
-            $pageData['badge'] ??= $tagNames[\array_key_first($tagNames)];
-        }
-
-        $categoryIds = $dimensionContent->getExcerptCategoryIds();
-        if ([] !== $categoryIds) {
-            $pageData['categories'] ??= \array_values($categoryIds);
-        }
-
         return $pageData;
     }
 
@@ -963,82 +751,17 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
         string $locale,
         bool $allowReload = true,
     ): ?PageDimensionContentInterface {
-        $isPreview = $this->isPreviewContext();
+        $reloadCallback = ($allowReload && null !== $this->pageRepository && '' !== $page->getUuid())
+            ? fn (): ?PageInterface => $this->findPageEntityByUuid($page->getUuid(), $locale)
+            : null;
 
-        if (null !== $this->contentAggregator) {
-            try {
-                /** @var PageDimensionContentInterface $aggregated */
-                $aggregated = $this->contentAggregator->aggregate($page, [
-                    'locale' => $locale,
-                    'stage' => DimensionContentInterface::STAGE_LIVE,
-                ]);
-
-                return $aggregated;
-            } catch (\Throwable) {
-                if ($isPreview) {
-                    try {
-                        /** @var PageDimensionContentInterface $aggregatedDraft */
-                        $aggregatedDraft = $this->contentAggregator->aggregate($page, [
-                            'locale' => $locale,
-                            'stage' => DimensionContentInterface::STAGE_DRAFT,
-                        ]);
-
-                        return $aggregatedDraft;
-                    } catch (\Throwable) {
-                        // Fall back to direct dimension inspection / reload
-                    }
-                }
-            }
-        }
-
-        /** @var iterable<PageDimensionContentInterface> $dimensionContents */
-        $dimensionContents = $page->getDimensionContents();
-
-        $draftFallback = null;
-        foreach ($dimensionContents as $content) {
-            if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()) {
-                continue;
-            }
-            if ($content->getLocale() === $locale) {
-                $stage = $content->getStage();
-                if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
-                    return $content;
-                }
-                if ($isPreview && DimensionContentInterface::STAGE_DRAFT === $stage) {
-                    $draftFallback ??= $content;
-                }
-            }
-        }
-
-        if (null !== $draftFallback) {
-            return $draftFallback;
-        }
-
-        // If localized dimension content was not initialized on this entity (e.g. parent proxy), reload it
-        if ($allowReload && null !== $this->pageRepository && '' !== $page->getUuid()) {
-            $reloaded = $this->findPageEntityByUuid($page->getUuid(), $locale);
-            if (null !== $reloaded) {
-                return $this->extractDimensionContent($reloaded, $locale, false);
-            }
-        }
-
-        foreach ($dimensionContents as $content) {
-            if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion() || null !== $content->getLocale()) {
-                continue;
-            }
-            if (null === $content->getTitle() && [] === $content->getTemplateData()) {
-                continue;
-            }
-            $stage = $content->getStage();
-            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
-                return $content;
-            }
-            if ($isPreview && DimensionContentInterface::STAGE_DRAFT === $stage) {
-                $draftFallback ??= $content;
-            }
-        }
-
-        return $draftFallback;
+        return SuluContentDimensionExtractor::extractDimensionContent(
+            $page,
+            $locale,
+            $this->contentAggregator,
+            $this->isPreviewContext(),
+            $reloadCallback,
+        );
     }
 
     private function findPageEntityByUuid(string $uuid, string $locale): ?PageInterface
@@ -1107,13 +830,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
 
     private function isPreviewContext(): bool
     {
-        $request = $this->requestStack?->getCurrentRequest();
-        if (null === $request) {
-            return false;
-        }
-
-        return $request->attributes->getBoolean('preview')
-            || $request->attributes->getBoolean('_sulu_preview');
+        return SuluContentDimensionExtractor::isPreviewContext($this->requestStack);
     }
 
     /**
@@ -1196,13 +913,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
 
     private function firstNonEmptyString(mixed ...$candidates): ?string
     {
-        foreach ($candidates as $candidate) {
-            if (\is_string($candidate) && '' !== \trim($candidate)) {
-                return $candidate;
-            }
-        }
-
-        return null;
+        return SuluContentDimensionExtractor::firstNonEmptyString(...$candidates);
     }
 
     private function resolveSummaryWithContentFallback(
@@ -1211,38 +922,17 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
         mixed $excerptDescription,
         mixed $content,
     ): ?string {
-        $resolved = $this->firstNonEmptyString($summary, $description, $excerptDescription);
-        if (null !== $resolved) {
-            return $resolved;
-        }
-
-        if (\is_string($content) && '' !== \trim($content)) {
-            $truncated = DynamicContentHydrator::truncatePlainText($content, 160);
-            if ('' !== $truncated) {
-                return $truncated;
-            }
-        }
-
-        return null;
+        return SuluContentDimensionExtractor::resolveSummaryWithContentFallback(
+            $summary,
+            $description,
+            $excerptDescription,
+            $content,
+        );
     }
 
     private function firstNonEmptyMedia(mixed ...$candidates): mixed
     {
-        foreach ($candidates as $candidate) {
-            if (null === $candidate) {
-                continue;
-            }
-            if (\is_string($candidate) && '' === \trim($candidate)) {
-                continue;
-            }
-            if (\is_array($candidate) && [] === $candidate) {
-                continue;
-            }
-
-            return $candidate;
-        }
-
-        return null;
+        return SuluContentDimensionExtractor::firstNonEmptyMedia(...$candidates);
     }
 
     /**

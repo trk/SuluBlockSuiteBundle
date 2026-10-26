@@ -22,6 +22,8 @@ class DynamicContentTwigExtensionTest extends TestCase
         $this->assertContains('hydrate_blocks', $functionNames);
         $this->assertContains('sulu_block_suite_transform_block', $functionNames);
         $this->assertContains('block_transform', $functionNames);
+        $this->assertContains('sulu_user_loggedin_and_preview', $functionNames);
+        $this->assertContains('sulu_preview_block_focus_script', $functionNames);
 
         $filterNames = \array_map(static fn ($f) => $f->getName(), $extension->getFilters());
         $this->assertContains('sulu_block_suite_hydrate_blocks', $filterNames);
@@ -184,6 +186,31 @@ class DynamicContentTwigExtensionTest extends TestCase
         self::assertNull($extension->hydrateBlockTree(null, [], ['rows', 'columns', 'blocks']));
         self::assertSame($spacer, $extension->hydrateBlockTree($spacer, []));
         self::assertSame($spacer, $extension->hydrateBlockTree($spacer, [], []));
+    }
+
+    public function testSuluUserLoggedinAndPreviewChecksRequestAndReferer(): void
+    {
+        $pipeline = $this->createStub(BlockTransformPipelineInterface::class);
+        $extension = new DynamicContentTwigExtension($pipeline);
+
+        $this->assertFalse($extension->isUserLoggedInAndPreview(null));
+
+        $publicRequest = new \Symfony\Component\HttpFoundation\Request();
+        $this->assertFalse($extension->isUserLoggedInAndPreview($publicRequest));
+
+        $previewWithPublicReferer = new \Symfony\Component\HttpFoundation\Request();
+        $previewWithPublicReferer->attributes->set('preview', true);
+        $previewWithPublicReferer->headers->set('referer', 'https://example.com/en/about');
+        $this->assertFalse($extension->isUserLoggedInAndPreview($previewWithPublicReferer));
+
+        $previewWithAdminReferer = new \Symfony\Component\HttpFoundation\Request();
+        $previewWithAdminReferer->attributes->set('preview', true);
+        $previewWithAdminReferer->headers->set('referer', 'https://example.com/admin/');
+        $this->assertTrue($extension->isUserLoggedInAndPreview($previewWithAdminReferer));
+
+        $script = $extension->renderPreviewBlockFocusScript();
+        $this->assertStringContainsString('data-sulu-preview-block-focus="1"', $script);
+        $this->assertStringContainsString('sulu-preview-block-click', $script);
     }
 
     /**

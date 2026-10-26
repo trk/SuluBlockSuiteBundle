@@ -6,10 +6,12 @@ namespace Totoglu\SuluBlockSuiteBundle\Tests\Metadata;
 
 use PHPUnit\Framework\TestCase;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\OptionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Content\Application\PropertyResolver\PropertyResolverProviderInterface;
 use Sulu\Content\Application\PropertyResolver\Resolver\DefaultPropertyResolver;
+use Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteMetadataResolver;
 
 final class BlockSuiteMetadataResolverTest extends TestCase
@@ -242,5 +244,97 @@ final class BlockSuiteMetadataResolverTest extends TestCase
         $this->assertSame(['id' => 42, 'url' => '/media/42/bg.jpg'], $propsContent['bg_image'] ?? null);
         $propsView = $resolved['props']->getView();
         $this->assertSame(['id' => 42], $propsView['bg_image'] ?? null);
+    }
+
+    public function testResolveItemsAppliesInlineOptionGroupDefaultsAtBlockAndSubItemLevels(): void
+    {
+        $defaultResolver = new DefaultPropertyResolver();
+        $propertyResolverProvider = $this->createStub(PropertyResolverProviderInterface::class);
+        $propertyResolverProvider->method('getPropertyResolver')->willReturn($defaultResolver);
+
+        $resolver = new BlockSuiteMetadataResolver($propertyResolverProvider);
+        $visitor = new BlockSuiteFormMetadataVisitor();
+
+        $blockForm = new FormMetadata();
+        $blockForm->setKey('cta');
+
+        $contentSection = new SectionMetadata('content');
+
+        $titleField = new FieldMetadata('title');
+        $titleField->setType('text_line');
+        $tagGroup = new OptionMetadata();
+        $tagGroup->setName('tag');
+        $tagGroup->setType(OptionMetadata::TYPE_COLLECTION);
+        $tagDefault = new OptionMetadata();
+        $tagDefault->setName('_default');
+        $tagDefault->setValue('h2');
+        $tagGroup->addValueOption($tagDefault);
+        $h1 = new OptionMetadata();
+        $h1->setName('h1');
+        $h1->setValue('H1');
+        $tagGroup->addValueOption($h1);
+        $h2 = new OptionMetadata();
+        $h2->setName('h2');
+        $h2->setValue('H2');
+        $tagGroup->addValueOption($h2);
+        $titleField->addOption($tagGroup);
+        $contentSection->addItem($titleField);
+
+        $itemsBlock = new FieldMetadata('items');
+        $itemsBlock->setType('block');
+        $itemsBlock->setDefaultType('item');
+
+        $itemForm = new FormMetadata();
+        $itemForm->setKey('item');
+        $linkField = new FieldMetadata('link');
+        $linkField->setType('link');
+        $styleGroup = new OptionMetadata();
+        $styleGroup->setName('button_style');
+        $styleGroup->setType(OptionMetadata::TYPE_COLLECTION);
+        $styleDefault = new OptionMetadata();
+        $styleDefault->setName('_default');
+        $styleDefault->setValue('solid');
+        $styleGroup->addValueOption($styleDefault);
+        $solid = new OptionMetadata();
+        $solid->setName('solid');
+        $solid->setValue('Solid');
+        $styleGroup->addValueOption($solid);
+        $outline = new OptionMetadata();
+        $outline->setName('outline');
+        $outline->setValue('Outline');
+        $styleGroup->addValueOption($outline);
+        $linkField->addOption($styleGroup);
+        $itemForm->addItem($linkField);
+        $itemsBlock->addType($itemForm);
+        $contentSection->addItem($itemsBlock);
+
+        $blockForm->addItem($contentSection);
+
+        $visitor->enhanceBlockTabs($blockForm, 'en');
+
+        $resolved = $resolver->resolveItems(
+            $blockForm->getItems(),
+            [
+                'title' => 'Get Started',
+                'items' => [
+                    [
+                        'type' => 'item',
+                        'link' => ['href' => 'https://example.com'],
+                    ],
+                ],
+            ],
+            'en',
+        );
+
+        $this->assertArrayHasKey('props', $resolved);
+        $propsContent = $resolved['props']->getContent();
+        $this->assertIsArray($propsContent);
+        $this->assertSame('h2', $propsContent['tag'] ?? null);
+
+        $this->assertArrayHasKey('items', $resolved);
+        $itemsContent = $resolved['items']->getContent();
+        $this->assertIsArray($itemsContent);
+        $this->assertIsArray($itemsContent[0] ?? null);
+        $this->assertSame('solid', $itemsContent[0]['button_style'] ?? null);
     }
 }

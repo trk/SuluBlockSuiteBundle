@@ -192,4 +192,35 @@ final class LayoutTwigExtensionTest extends TestCase
         $this->assertTrue($extension->hasBlock($layout, 'card'));
         $this->assertFalse($extension->hasBlock($layout, 'accordion'));
     }
+
+    public function testHasLayoutResolvesActiveWebspaceFromRequestWhenWebspaceKeyOmitted(): void
+    {
+        $stubResolver = $this->createStub(LayoutResolverInterface::class);
+        $mockProvider = $this->createStub(PageLayoutProviderInterface::class);
+        $mockProvider->method('getLayout')->willReturn(null);
+
+        $requestStack = new \Symfony\Component\HttpFoundation\RequestStack();
+        $request = new \Symfony\Component\HttpFoundation\Request();
+        $request->attributes->set('webspaceKey', 'totoglu');
+        $requestStack->push($request);
+
+        $extension = new LayoutTwigExtension($stubResolver, $mockProvider, $requestStack);
+
+        $foreignWebspaceInlineLayout = [
+            'webspace' => 'turkiye',
+            'blocks' => [
+                ['type' => 'headline', 'title' => 'Turkiye Header'],
+            ],
+        ];
+
+        $matchingWebspaceInlineLayout = [
+            'webspace' => 'totoglu',
+            'blocks' => [
+                ['type' => 'headline', 'title' => 'Totoglu Header'],
+            ],
+        ];
+
+        self::assertFalse($extension->hasLayout($foreignWebspaceInlineLayout));
+        self::assertTrue($extension->hasLayout($matchingWebspaceInlineLayout));
+    }
 }

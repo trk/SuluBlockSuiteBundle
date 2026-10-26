@@ -19,6 +19,7 @@ services:
             $mediaManager: '@?sulu_media.media_manager'
             $mediaPreviewUrlResolver: '@Totoglu\SuluBlockSuiteBundle\Preset\MediaPreviewUrlResolver'
             $referenceStore: '@?sulu_http_cache.reference_store'
+            $multiWebspaceEnabled: '%sulu_block_suite.multi_webspace.enabled%'
         tags:
             - { name: 'kernel.reset', method: 'reset' }
 
@@ -27,9 +28,29 @@ services:
             $presetProvider: '@Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
             $presetsEnabled: '%sulu_block_suite.presets.enabled%'
             $requestStack: '@?request_stack'
+            $multiWebspaceEnabled: '%sulu_block_suite.multi_webspace.enabled%'
         tags:
             - 'sulu_content.block_visitor'
             - 'sulu_block_suite.block_transformer'
+
+    Totoglu\SuluBlockSuiteBundle\Metadata\FormSelectFieldPopulator:
+        arguments:
+            $projectDirectory: '%kernel.project_dir%'
+            $translator: '@?translator'
+            $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
+            $webspaceManager: '@?sulu_core.webspace.webspace_manager'
+            $multiWebspaceEnabled: '%sulu_block_suite.multi_webspace.enabled%'
+
+    Totoglu\SuluBlockSuiteBundle\Metadata\SharedXmlSectionLoader:
+        arguments:
+            $formXmlLoader: '@?sulu_admin.form_metadata.form_xml_loader'
+
+    Totoglu\SuluBlockSuiteBundle\Metadata\PopoverOptionGroupNormalizer: ~
+
+    Totoglu\SuluBlockSuiteBundle\Metadata\DynamicSectionFormBuilder:
+        arguments:
+            $dynamicContentHydrator: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface'
+            $translator: '@?translator'
 
     Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor:
         arguments:
@@ -44,6 +65,11 @@ services:
             $previewExcludedFields: '%sulu_block_suite.preview_tags.excluded_fields%'
             $previewPrimaryTextFields: '%sulu_block_suite.preview_tags.primary_text_fields%'
             $webspaceManager: '@?sulu_core.webspace.webspace_manager'
+            $multiWebspaceEnabled: '%sulu_block_suite.multi_webspace.enabled%'
+            $selectFieldPopulator: '@Totoglu\SuluBlockSuiteBundle\Metadata\FormSelectFieldPopulator'
+            $sharedXmlSectionLoader: '@Totoglu\SuluBlockSuiteBundle\Metadata\SharedXmlSectionLoader'
+            $popoverOptionGroupNormalizer: '@Totoglu\SuluBlockSuiteBundle\Metadata\PopoverOptionGroupNormalizer'
+            $dynamicSectionFormBuilder: '@Totoglu\SuluBlockSuiteBundle\Metadata\DynamicSectionFormBuilder'
         tags:
             - { name: 'sulu_admin.form_metadata_visitor', priority: -50 }
             - { name: 'sulu_admin.typed_form_metadata_visitor', priority: -50 }
@@ -63,6 +89,7 @@ services:
             $securityChecker: '@?sulu_security.security_checker'
             $mediaPreviewUrlResolver: '@Totoglu\SuluBlockSuiteBundle\Preset\MediaPreviewUrlResolver'
             $logger: '@?logger'
+            $multiWebspaceEnabled: '%sulu_block_suite.multi_webspace.enabled%'
         tags: ['controller.service_arguments']
 
     Totoglu\SuluBlockSuiteBundle\Layout\LayoutResolverInterface:
@@ -84,10 +111,50 @@ services:
             $layoutsDirectory: '%sulu_block_suite.layout.yaml_dir%'
             $referenceStore: '@?sulu_http_cache.reference_store'
             $contentResolver: '@?sulu_content.content_resolver'
+            $requestAnalyzer: '@?sulu_core.webspace.request_analyzer'
+            $multiWebspaceEnabled: '%sulu_block_suite.multi_webspace.enabled%'
         tags:
             - { name: 'kernel.reset', method: 'reset' }
 
+    Totoglu\SuluBlockSuiteBundle\Layout\PageLayoutUniquenessDataMapper:
+        arguments:
+            $snippetRepository: '@?sulu_snippet.snippet_repository'
+            $translator: '@?translator'
+            $webspaceManager: '@?sulu_core.webspace.webspace_manager'
+            $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
+            $multiWebspaceEnabled: '%sulu_block_suite.multi_webspace.enabled%'
+        tags:
+            - { name: 'sulu_content.data_mapper', priority: -10 }
+
+    Totoglu\SuluBlockSuiteBundle\Preview\SnippetPreviewProvider:
+        arguments:
+            $metadataProviderRegistry: '@sulu_admin.metadata_provider_registry'
+            $entityManager: '@doctrine.orm.entity_manager'
+            $contentAggregator: '@sulu_content.content_aggregator'
+            $contentDataMapper: '@sulu_content.content_data_mapper'
+            $contentRichEntityClass: '%sulu.model.snippet.class%'
+            $securityContext: !php/const Sulu\Snippet\Infrastructure\Sulu\Admin\SnippetAdmin::SECURITY_CONTEXT
+            $contentNormalizer: '@?sulu_content.content_normalizer'
+        tags:
+            - { name: 'sulu.context', context: 'admin' }
+            - { name: 'sulu_preview.object_provider', 'provider-key': 'snippets' }
+
+    Totoglu\SuluBlockSuiteBundle\Controller\Website\SnippetPreviewController:
+        public: true
+        arguments:
+            $pageRepository: '@?sulu_page.page_repository'
+            $contentAggregator: '@?sulu_content.content_aggregator'
+        calls:
+            - [setContainer, ['@Psr\Container\ContainerInterface']]
+        tags:
+            - 'controller.service_arguments'
+            - 'container.service_subscriber'
+
     Totoglu\SuluBlockSuiteBundle\Twig\LayoutTwigExtension:
+        arguments:
+            $requestStack: '@?request_stack'
+            $requestAnalyzer: '@?sulu_core.webspace.request_analyzer'
+            $multiWebspaceEnabled: '%sulu_block_suite.multi_webspace.enabled%'
         tags: ['twig.extension']
 
     Totoglu\SuluBlockSuiteBundle\Content\Type\SingleReusableBlockSelectionPropertyResolver:
@@ -133,6 +200,8 @@ services:
             $requestAnalyzer: '@?sulu_core.webspace.request_analyzer'
             $referenceStore: '@?sulu_http_cache.reference_store'
 
+    Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentQueryFilterNormalizer: ~
+
     Totoglu\SuluBlockSuiteBundle\DynamicContent\PageSourceResolverInterface:
         alias: Totoglu\SuluBlockSuiteBundle\DynamicContent\SuluPageSourceResolver
 
@@ -145,6 +214,7 @@ services:
             $contentAggregator: '@?sulu_content.content_aggregator'
             $requestAnalyzer: '@?sulu_core.webspace.request_analyzer'
             $smartContentBridge: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge'
+            $queryFilterNormalizer: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentQueryFilterNormalizer'
         tags:
             - { name: 'kernel.reset', method: 'reset' }
 
@@ -163,6 +233,7 @@ services:
             $contentAggregator: '@?sulu_content.content_aggregator'
             $smartContentBridge: '@?Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge'
             $translator: '@?translator'
+            $queryFilterNormalizer: '@Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentQueryFilterNormalizer'
         tags:
             - 'sulu_block_suite.dynamic_source_provider'
             - { name: 'kernel.reset', method: 'reset' }
@@ -224,6 +295,7 @@ services:
         arguments:
             $fieldMetadataResolver: '@?Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver'
             $srcSetFormats: '%sulu_block_suite.media.srcset_formats%'
+            $requestStack: '@?request_stack'
         tags: ['sulu_block_suite.block_transformer']
 
     Totoglu\SuluBlockSuiteBundle\Transformer\FormBlockTransformer:
@@ -256,6 +328,7 @@ services:
         arguments:
             $pipeline: '@Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface'
             $blockRenderer: '@?Totoglu\SuluBlockSuiteBundle\Renderer\BlockRenderer'
+            $requestStack: '@?request_stack'
         tags: ['twig.extension']
 
     Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver:
@@ -280,3 +353,13 @@ services:
             $snippetRepository: '@?sulu_snippet.snippet_repository'
             $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
         tags: ['sulu_page.website_page_reindex_provider_enhancer']
+
+    Totoglu\SuluBlockSuiteBundle\Ai\BlockSuiteSchemaInspector:
+        arguments:
+            $metadataProviderRegistry: '@?sulu_admin.metadata_provider_registry'
+            $presetProvider: '@?Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface'
+
+    Totoglu\SuluBlockSuiteBundle\Ai\BlockSuitePayloadComposer:
+        arguments:
+            $schemaInspector: '@Totoglu\SuluBlockSuiteBundle\Ai\BlockSuiteSchemaInspector'
+

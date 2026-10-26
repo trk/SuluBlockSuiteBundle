@@ -64,6 +64,7 @@ final class FrameworkAgnosticTest extends TestCase
         'headline' => [
             'src/DynamicContent/AbstractDynamicContentSourceProvider.php',
             'src/DynamicContent/DynamicContentHydrator.php',
+            'src/DynamicContent/SuluContentDimensionExtractor.php',
             'src/DynamicContent/SuluPageSourceResolver.php',
             'src/DynamicContent/Provider/SmartContentSourceProviderAdapter.php',
             'src/DynamicContent/Provider/SuluArticleSourceProvider.php',

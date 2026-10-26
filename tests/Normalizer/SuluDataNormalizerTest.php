@@ -269,4 +269,29 @@ final class SuluDataNormalizerTest extends TestCase
         $this->assertSame('rocket', SuluDataNormalizer::resolveIcon(['name' => 'rocket']));
         $this->assertSame('heart', SuluDataNormalizer::resolveIcon(['icon' => 'heart']));
     }
+
+    public function testNormalizeBlockAndExtractSnippetUuid(): void
+    {
+        $this->assertNull(SuluDataNormalizer::normalizeBlock(null));
+        $this->assertNull(SuluDataNormalizer::normalizeBlock('invalid'));
+        $this->assertSame(['type' => 'hero'], SuluDataNormalizer::normalizeBlock(['type' => 'hero']));
+        $this->assertSame(['type' => 'hero'], SuluDataNormalizer::normalizeBlock((object) ['type' => 'hero']));
+
+        $contentObj = new class {
+            /**
+             * @return array<string, mixed>
+             */
+            public function getContent(): array
+            {
+                return ['type' => 'text', 'title' => 'Hello'];
+            }
+        };
+        $this->assertSame(['type' => 'text', 'title' => 'Hello'], SuluDataNormalizer::normalizeBlock($contentObj));
+
+        $this->assertSame('uuid-1', SuluDataNormalizer::extractSnippetUuid(['snippet' => ' uuid-1 ']));
+        $this->assertSame('uuid-2', SuluDataNormalizer::extractSnippetUuid(['reusable_snippet' => ['uuid' => 'uuid-2']]));
+        $this->assertSame('uuid-3', SuluDataNormalizer::extractSnippetUuid(['snippet' => ['content' => ['id' => 'uuid-3']]]));
+        $this->assertSame('uuid-4', SuluDataNormalizer::extractSnippetUuid(['view' => ['snippet' => ['id' => 'uuid-4']]]));
+        $this->assertNull(SuluDataNormalizer::extractSnippetUuid(['type' => 'text']));
+    }
 }

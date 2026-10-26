@@ -6,6 +6,7 @@ namespace Totoglu\SuluBlockSuiteBundle\Metadata;
 
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\ItemMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\OptionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Content\Application\ContentResolver\Value\ContentView;
 use Sulu\Content\Application\MetadataResolver\MetadataResolver;
@@ -138,6 +139,8 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
     private function applyFieldDefaults(array $flatItems, array $data): array
     {
         foreach ($flatItems as $name => $field) {
+            $this->applyInlineOptionGroupDefaults($field, $data);
+
             $currentValue = $this->readValueByPath($data, $name);
             if (null !== $currentValue) {
                 if ('block' === $field->getType() && \is_array($currentValue) && [] !== $currentValue) {
@@ -182,6 +185,45 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
         }
 
         return $data;
+    }
+
+    /**
+     * @param array<mixed> &$data
+     */
+    private function applyInlineOptionGroupDefaults(FieldMetadata $field, array &$data): void
+    {
+        foreach ($field->getOptions() as $option) {
+            if (OptionMetadata::TYPE_COLLECTION !== $option->getType()) {
+                continue;
+            }
+
+            $children = $option->getValue();
+            if (!\is_array($children)) {
+                continue;
+            }
+
+            $storageKey = null;
+            $defaultValue = null;
+            foreach ($children as $child) {
+                $childName = (string) ($child->getName() ?? '');
+                if ('_storage_key' === $childName && \is_string($child->getValue()) && '' !== \trim($child->getValue())) {
+                    $storageKey = \trim($child->getValue());
+                } elseif (\in_array($childName, ['_default', 'default_value', 'default'], true)) {
+                    $rawDefault = $child->getValue();
+                    if (\is_string($rawDefault) || \is_int($rawDefault) || \is_bool($rawDefault)) {
+                        $defaultValue = $rawDefault;
+                    }
+                }
+            }
+
+            if (null === $storageKey || null === $defaultValue) {
+                continue;
+            }
+
+            if (null === $this->readValueByPath($data, $storageKey)) {
+                $this->writeValueByPath($data, $storageKey, $defaultValue);
+            }
+        }
     }
 
     private function unwrapContentViews(mixed $value): mixed

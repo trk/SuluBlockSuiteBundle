@@ -19,9 +19,7 @@ use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
 use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
-use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydratorInterface;
-use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentSourceRegistry;
 use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
 
 /**
@@ -37,19 +35,13 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
     public const TABS_TAG = 'sulu_block_suite.tabs';
     public const TABS_SECTION_NAME = '__tabs';
 
-    private const EXCLUDED_TARGET_FIELDS = [
-        'props' => true,
-        'dynamic_source' => true,
-        'target_block' => true,
-        'reusable_snippet' => true,
-        'snippet' => true,
-    ];
-
     private const DEFAULT_PREVIEW_EXCLUDED_FIELDS = [
         'preset',
         '_preset',
         'dynamic_source',
         'dynamic_mapping',
+        'is_dynamic_template',
+        'is_template',
         'image_url',
         'video_url',
         'link_title',
@@ -70,17 +62,13 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
     private bool $isLoadingRegisteredBlocks = false;
 
-    /**
-     * @var array<string, SectionMetadata>
-     */
-    private array $sharedSectionPrototypes = [];
+    private FormSelectFieldPopulator $selectFieldPopulator;
 
-    /**
-     * @var array<string, array<string, string>>
-     */
-    private array $navigationContextsCache = [];
+    private SharedXmlSectionLoader $sharedXmlSectionLoader;
 
-    private bool $isDiscoveringNavigationContexts = false;
+    private PopoverOptionGroupNormalizer $popoverOptionGroupNormalizer;
+
+    private DynamicSectionFormBuilder $dynamicSectionFormBuilder;
 
     /**
      * @var list<string>
@@ -107,13 +95,18 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         private readonly ?string $projectDirectory = null,
         private readonly ?TranslatorInterface $translator = null,
         private readonly ?MetadataProviderRegistry $metadataProviderRegistry = null,
-        private readonly ?FormXmlLoader $formXmlLoader = null,
+        ?FormXmlLoader $formXmlLoader = null,
         private readonly ?SchemaMetadataProvider $schemaMetadataProvider = null,
-        private readonly ?DynamicContentHydratorInterface $dynamicContentHydrator = null,
+        ?DynamicContentHydratorInterface $dynamicContentHydrator = null,
         private readonly ?BlockPresetProviderInterface $presetProvider = null,
         array $previewExcludedFields = [],
         array $previewPrimaryTextFields = [],
-        private readonly ?WebspaceManagerInterface $webspaceManager = null,
+        ?WebspaceManagerInterface $webspaceManager = null,
+        bool $multiWebspaceEnabled = true,
+        ?FormSelectFieldPopulator $selectFieldPopulator = null,
+        ?SharedXmlSectionLoader $sharedXmlSectionLoader = null,
+        ?PopoverOptionGroupNormalizer $popoverOptionGroupNormalizer = null,
+        ?DynamicSectionFormBuilder $dynamicSectionFormBuilder = null,
     ) {
         $dirs = \is_array($presetDirectory) ? \array_values($presetDirectory) : [$presetDirectory];
         $this->presetDirectories = \array_values(\array_filter($dirs, static fn (string $dir): bool => '' !== \trim($dir)));
@@ -125,6 +118,19 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             \array_values(\array_unique([...self::DEFAULT_PREVIEW_PRIMARY_TEXT_FIELDS, ...$previewPrimaryTextFields])),
             true,
         );
+        $this->selectFieldPopulator = $selectFieldPopulator ?? new FormSelectFieldPopulator(
+            projectDirectory: $this->projectDirectory,
+            translator: $this->translator,
+            metadataProviderRegistry: $this->metadataProviderRegistry,
+            webspaceManager: $webspaceManager,
+            multiWebspaceEnabled: $multiWebspaceEnabled,
+        );
+        $this->sharedXmlSectionLoader = $sharedXmlSectionLoader ?? new SharedXmlSectionLoader($formXmlLoader);
+        $this->popoverOptionGroupNormalizer = $popoverOptionGroupNormalizer ?? new PopoverOptionGroupNormalizer();
+        $this->dynamicSectionFormBuilder = $dynamicSectionFormBuilder ?? new DynamicSectionFormBuilder(
+            dynamicContentHydrator: $dynamicContentHydrator,
+            translator: $this->translator,
+        );
     }
 
     /**
@@ -132,6 +138,10 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
      */
     public function visitTypedFormMetadata(TypedFormMetadata $formMetadata, string $key, string $locale, array $metadataOptions = []): void
     {
+        if ('block' !== $key) {
+            $this->selectFieldPopulator->cacheTemplateDescriptors($formMetadata, $key, $locale);
+        }
+
         if ('block' === $key) {
             $blockForms = [];
             foreach ($formMetadata->getForms() as $formKey => $form) {
@@ -167,7 +177,17 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         // 1. Recursively enhance inline block types with tabs
         $this->enhanceAutoBlocksInItems($formMetadata->getItems(), $formMetadata, $locale);
 
-        // 2. Enhance block preview tags for any block form (or container containing blocks)
+        // 2. Populate single_template_selection and template_selection options across all form items
+        $webspaceHidden = $this->selectFieldPopulator->populateSelectFieldsInItems(
+            $formMetadata->getItems(),
+            $locale,
+            fn (string $loc): array => $this->getRegisteredBlockForms($loc),
+        );
+        if ($webspaceHidden && null !== $this->schemaMetadataProvider) {
+            $formMetadata->setSchema($this->schemaMetadataProvider->getMetadata($formMetadata->getItems()));
+        }
+
+        // 3. Enhance block preview tags for any block form (or container containing blocks)
         $this->enhanceBlockPreviewTags($formMetadata);
 
         $items = $formMetadata->getItems();
@@ -296,33 +316,54 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         }
 
         // Normalize default_value types on content fields (e.g. checkbox string "true" -> bool true)
-        $this->normalizeSectionFieldDefaults($contentSection);
-        $this->populateNavigationContextFields($contentSection, $locale);
+        $this->sharedXmlSectionLoader->normalizeSectionFieldDefaults($contentSection);
+        $this->selectFieldPopulator->populateNavigationContextFields($contentSection, $locale);
+        $registeredFormsCallback = fn (string $loc): array => $this->getRegisteredBlockForms($loc);
+        $this->selectFieldPopulator->populateSelectFieldsInItems($contentSection->getItems(), $locale, $registeredFormsCallback);
+        foreach ($nonContentSections as $nonContentSection) {
+            $this->selectFieldPopulator->populateSelectFieldsInItems($nonContentSection->getItems(), $locale, $registeredFormsCallback);
+        }
+
+        $prefix = $namespaceProps ? 'props/' : '';
+        $this->popoverOptionGroupNormalizer->processInSection(
+            $contentSection,
+            $nonContentSections,
+            $prefix,
+            $locale,
+            fn (FormMetadata $subForm): bool => $this->shouldEnhanceInlineTypeWithTabs($subForm),
+        );
 
         if ($includeSharedTabs) {
-            if (!isset($excludedTabs['dynamic_content'])) {
-                $dynamicSection = $this->loadSharedSection('block_suite_dynamic', 'dynamic_content');
-                if (null !== $dynamicSection) {
-                    $this->populateDynamicSectionOptions($dynamicSection, $blockForm, $contentSection, $locale);
-                    if (isset($nonContentSections['dynamic_content'])) {
-                        $nonContentSections['dynamic_content'] = $this->mergeSections($nonContentSections['dynamic_content'], $dynamicSection);
-                    } else {
-                        $nonContentSections['dynamic_content'] = $dynamicSection;
-                    }
-                }
-            }
-
             if (!isset($excludedTabs['advanced'])) {
-                $advancedSection = $this->loadSharedSection('block_suite_advanced', 'advanced');
+                $advancedSection = $this->sharedXmlSectionLoader->loadSharedSection('block_suite_advanced', 'advanced');
                 if (null !== $advancedSection) {
                     $this->populatePresetSectionOptions($advancedSection, $blockKey, $locale);
                     if (isset($nonContentSections['advanced'])) {
-                        $nonContentSections['advanced'] = $this->mergeSections($nonContentSections['advanced'], $advancedSection);
+                        $nonContentSections['advanced'] = $this->sharedXmlSectionLoader->mergeSections($nonContentSections['advanced'], $advancedSection);
                     } else {
                         $nonContentSections['advanced'] = $advancedSection;
                     }
                 }
             }
+
+            if (!isset($excludedTabs['dynamic_content'])) {
+                $this->dynamicSectionFormBuilder->injectDynamicTemplateFieldIntoSubItems($contentSection, $locale);
+                $dynamicSection = $this->sharedXmlSectionLoader->loadSharedSection('block_suite_dynamic', 'dynamic_content');
+                if (null !== $dynamicSection) {
+                    $this->dynamicSectionFormBuilder->populateDynamicSectionOptions($dynamicSection, $contentSection, $locale);
+                    if (isset($nonContentSections['dynamic_content'])) {
+                        $nonContentSections['dynamic_content'] = $this->sharedXmlSectionLoader->mergeSections($nonContentSections['dynamic_content'], $dynamicSection);
+                    } else {
+                        $nonContentSections['dynamic_content'] = $dynamicSection;
+                    }
+                }
+            }
+        }
+
+        if (isset($nonContentSections['dynamic_content'])) {
+            $dynamicSectionItem = $nonContentSections['dynamic_content'];
+            unset($nonContentSections['dynamic_content']);
+            $nonContentSections['dynamic_content'] = $dynamicSectionItem;
         }
 
         $tabsSection = new SectionMetadata(self::TABS_SECTION_NAME);
@@ -334,13 +375,12 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             ++$tabCount;
         }
 
-        $prefix = $namespaceProps ? 'props/' : '';
         foreach ($nonContentSections as $section) {
             if ([] === $section->getItems()) {
                 continue;
             }
 
-            $namespacedSection = $this->namespaceSectionFields($section, $prefix);
+            $namespacedSection = $this->sharedXmlSectionLoader->namespaceSectionFields($section, $prefix);
             if ([] === $namespacedSection->getItems()) {
                 continue;
             }
@@ -349,7 +389,16 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             ++$tabCount;
         }
 
-        if ($tabCount <= 1) {
+        if (0 === $tabCount || (1 === $tabCount && [] !== $contentSection->getItems())) {
+            if (isset($existingItems['content']) && $existingItems['content'] instanceof SectionMetadata) {
+                $blockForm->setItems(['content' => $contentSection]);
+            } else {
+                $blockForm->setItems($contentSection->getItems());
+            }
+            if ($updateSchema && null !== $this->schemaMetadataProvider) {
+                $blockForm->setSchema($this->schemaMetadataProvider->getMetadata($blockForm->getItems()));
+            }
+
             return;
         }
 
@@ -370,744 +419,6 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         return AbstractDynamicContentSourceProvider::translateKey($key, $locale, $fallback, $this->translator);
     }
 
-    /**
-     * Recursively prefixes all FieldMetadata items inside a non-content section with `$prefix` (e.g. `props/`).
-     */
-    private function namespaceSectionFields(SectionMetadata $section, string $prefix): SectionMetadata
-    {
-        $clonedSection = new SectionMetadata($section->getName());
-        $clonedSection->setLabels($section->getLabels());
-        $clonedSection->setDescriptions($section->getDescriptions());
-        $clonedSection->setColSpan($section->getColSpan());
-        $clonedSection->setDisabledCondition($section->getDisabledCondition());
-        $clonedSection->setVisibleCondition($section->getVisibleCondition());
-
-        foreach ($section->getItems() as $item) {
-            if ($item instanceof SectionMetadata) {
-                $clonedSection->addItem($this->namespaceSectionFields($item, $prefix));
-
-                continue;
-            }
-
-            if ($item instanceof FieldMetadata) {
-                $rawName = $item->getName();
-                if ('props' === $rawName && 'preset_selection' === $this->getFieldType($item) && 'false' === $item->getVisibleCondition()) {
-                    $clonedSection->addItem($this->cloneFieldMetadata($item, 'props'));
-
-                    continue;
-                }
-
-                $namespacedName = ('' === $prefix || \str_starts_with($rawName, $prefix))
-                    ? $rawName
-                    : $prefix . $rawName;
-                $clonedField = $this->cloneFieldMetadata($item, $namespacedName);
-                $this->normalizeFieldDefaultOption($clonedField);
-                $clonedSection->addItem($clonedField);
-            }
-        }
-
-        return $clonedSection;
-    }
-
-    private function normalizeSectionFieldDefaults(SectionMetadata $section): void
-    {
-        foreach ($section->getItems() as $item) {
-            if ($item instanceof SectionMetadata) {
-                $this->normalizeSectionFieldDefaults($item);
-            } elseif ($item instanceof FieldMetadata) {
-                $this->normalizeFieldDefaultOption($item);
-            }
-        }
-    }
-
-    private function populateNavigationContextFields(SectionMetadata $section, string $locale): void
-    {
-        foreach ($section->getItems() as $item) {
-            if ($item instanceof SectionMetadata) {
-                $this->populateNavigationContextFields($item, $locale);
-            } elseif ($item instanceof FieldMetadata && 'navigation_context' === $item->getName() && 'single_select' === $this->getFieldType($item)) {
-                $this->populateNavigationContextOptions($item, $locale);
-            }
-        }
-    }
-
-    private function populateNavigationContextOptions(FieldMetadata $field, string $locale): void
-    {
-        $discoveredContexts = $this->discoverWebspaceNavigationContexts($locale);
-        if ([] === $discoveredContexts) {
-            return;
-        }
-
-        /** @var array<string, OptionMetadata> $optionsByKey */
-        $optionsByKey = [];
-        $existingValuesOption = $field->findOption('values');
-        if (null !== $existingValuesOption && \is_array($existingValuesOption->getValue())) {
-            foreach ($existingValuesOption->getValue() as $existingOpt) {
-                if (\is_string($existingOpt->getName()) && '' !== $existingOpt->getName()) {
-                    $optionsByKey[$existingOpt->getName()] = $existingOpt;
-                }
-            }
-        }
-
-        foreach ($discoveredContexts as $contextKey => $contextTitle) {
-            if (isset($optionsByKey[$contextKey])) {
-                $optionsByKey[$contextKey]->setTitle($contextTitle, $locale);
-
-                continue;
-            }
-
-            $opt = new OptionMetadata();
-            $opt->setName($contextKey);
-            $opt->setValue($contextKey);
-            $opt->setTitle($contextTitle, $locale);
-            $optionsByKey[$contextKey] = $opt;
-        }
-
-        $valuesCollection = new OptionMetadata();
-        $valuesCollection->setName('values');
-        $valuesCollection->setType(OptionMetadata::TYPE_COLLECTION);
-        $valuesCollection->setValue(\array_values($optionsByKey));
-        $field->addOption($valuesCollection);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function discoverWebspaceNavigationContexts(string $locale): array
-    {
-        if (isset($this->navigationContextsCache[$locale])) {
-            return $this->navigationContextsCache[$locale];
-        }
-
-        /** @var array<string, string> $contexts */
-        $contexts = [];
-
-        if (null !== $this->webspaceManager && !$this->isDiscoveringNavigationContexts) {
-            $this->isDiscoveringNavigationContexts = true;
-            try {
-                foreach ($this->webspaceManager->getWebspaceCollection() as $webspace) {
-                    $navigation = $webspace->getNavigation();
-                    foreach ($navigation->getContexts() as $navContext) {
-                        $key = \trim($navContext->getKey());
-                        if ('' === $key) {
-                            continue;
-                        }
-                        $title = $navContext->getTitle($locale) ?? \ucfirst(\str_replace(['_', '-'], ' ', $key));
-                        $contexts[$key] ??= $title;
-                    }
-                }
-            } catch (\Throwable) {
-                // Fallback to XML scan below
-            } finally {
-                $this->isDiscoveringNavigationContexts = false;
-            }
-        }
-
-        if (null !== $this->projectDirectory) {
-            $webspacesDir = \rtrim($this->projectDirectory, '/') . '/config/webspaces';
-            if (\is_dir($webspacesDir)) {
-                $files = \glob($webspacesDir . '/*.xml');
-                if (false !== $files) {
-                    foreach ($files as $file) {
-                        $xml = @\simplexml_load_file($file);
-                        if (false === $xml) {
-                            continue;
-                        }
-                        $nodes = $xml->xpath('//*[local-name()="navigation"]/*[local-name()="contexts"]/*[local-name()="context"]') ?: [];
-                        foreach ($nodes as $node) {
-                            $key = \trim((string) ($node['key'] ?? ''));
-                            if ('' === $key) {
-                                continue;
-                            }
-                            $titles = $this->extractXmlTitles($node->meta ?? null);
-                            $title = $titles[$locale] ?? $titles['en'] ?? \ucfirst(\str_replace(['_', '-'], ' ', $key));
-                            $contexts[$key] ??= $title;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!$this->isDiscoveringNavigationContexts) {
-            $this->navigationContextsCache[$locale] = $contexts;
-        }
-
-        return $contexts;
-    }
-
-    private function normalizeFieldDefaultOption(FieldMetadata $field): void
-    {
-        $defaultOption = $field->findOption('default_value');
-        if (null === $defaultOption || OptionMetadata::TYPE_EXPRESSION === $defaultOption->getType()) {
-            return;
-        }
-
-        $rawValue = $defaultOption->getValue();
-        $fieldType = $this->getFieldType($field);
-
-        if ('checkbox' === $fieldType) {
-            if (\is_bool($rawValue)) {
-                $defaultOption->setType(OptionMetadata::TYPE_STRING);
-
-                return;
-            }
-            if (\is_string($rawValue)) {
-                $lower = \strtolower(\trim($rawValue));
-                if ('true' === $lower || '1' === $lower) {
-                    $defaultOption->setValue(true);
-                    $defaultOption->setType(OptionMetadata::TYPE_STRING);
-                } elseif ('false' === $lower || '0' === $lower) {
-                    $defaultOption->setValue(false);
-                    $defaultOption->setType(OptionMetadata::TYPE_STRING);
-                }
-            }
-        } elseif ('number' === $fieldType && \is_string($rawValue) && \is_numeric($rawValue)) {
-            $defaultOption->setValue(\str_contains($rawValue, '.') ? $rawValue : (int) $rawValue);
-            $defaultOption->setType(OptionMetadata::TYPE_STRING);
-        }
-    }
-
-    private function cloneFieldMetadata(FieldMetadata $source, string $newName): FieldMetadata
-    {
-        $cloned = new FieldMetadata($newName);
-        $type = $this->getFieldType($source);
-        if (null !== $type) {
-            $cloned->setType($type);
-        }
-        $cloned->setLabels($source->getLabels());
-        $cloned->setDescriptions($source->getDescriptions());
-        $cloned->setDisabledCondition($source->getDisabledCondition());
-        $cloned->setVisibleCondition($source->getVisibleCondition());
-        $cloned->setColSpan($source->getColSpan());
-        $cloned->setDefaultType($source->getDefaultType());
-        $cloned->setRequired($source->isRequired());
-        try {
-            $cloned->setMultilingual($source->isMultilingual());
-        } catch (\TypeError) {
-            $cloned->setMultilingual(false);
-        }
-        $cloned->setSpaceAfter($source->getSpaceAfter());
-        $cloned->setMinOccurs($source->getMinOccurs());
-        $cloned->setMaxOccurs($source->getMaxOccurs());
-        $cloned->setOnInvalid($source->getOnInvalid());
-
-        $clonedTags = [];
-        foreach ($source->getTags() as $tag) {
-            $clonedTags[] = clone $tag;
-        }
-        $cloned->setTags($clonedTags);
-
-        foreach ($source->getOptions() as $option) {
-            $cloned->addOption($this->cloneOptionMetadata($option));
-        }
-
-        foreach ($source->getTypes() as $typeForm) {
-            $cloned->addType($this->cloneFormMetadata($typeForm));
-        }
-
-        return $cloned;
-    }
-
-    private function cloneFormMetadata(FormMetadata $source): FormMetadata
-    {
-        $cloned = new FormMetadata();
-        $cloned->setKey($source->getKey());
-        $cloned->setTitles($source->getTitles());
-
-        $clonedTags = [];
-        foreach ($source->getTags() as $tag) {
-            $clonedTags[] = clone $tag;
-        }
-        $cloned->setTags($clonedTags);
-
-        foreach ($source->getItems() as $item) {
-            if ($item instanceof SectionMetadata) {
-                $cloned->addItem($this->cloneSectionDeep($item));
-            } elseif ($item instanceof FieldMetadata) {
-                $cloned->addItem($this->cloneFieldMetadata($item, $item->getName()));
-            }
-        }
-
-        return $cloned;
-    }
-
-    private function cloneOptionMetadata(OptionMetadata $option): OptionMetadata
-    {
-        $cloned = clone $option;
-        if (OptionMetadata::TYPE_COLLECTION === $option->getType() && \is_array($option->getValue())) {
-            $clonedChildren = [];
-            foreach ($option->getValue() as $key => $childOption) {
-                $clonedChildren[$key] = $this->cloneOptionMetadata($childOption);
-            }
-            $cloned->setValue($clonedChildren);
-        }
-
-        return $cloned;
-    }
-
-    private function mergeSections(SectionMetadata $primary, SectionMetadata $secondary): SectionMetadata
-    {
-        $merged = new SectionMetadata($primary->getName());
-        $merged->setLabels([] !== $primary->getLabels() ? $primary->getLabels() : $secondary->getLabels());
-        $merged->setDescriptions([] !== $primary->getDescriptions() ? $primary->getDescriptions() : $secondary->getDescriptions());
-        $merged->setColSpan($primary->getColSpan());
-        $merged->setDisabledCondition($primary->getDisabledCondition() ?? $secondary->getDisabledCondition());
-        $merged->setVisibleCondition($primary->getVisibleCondition() ?? $secondary->getVisibleCondition());
-
-        foreach ($primary->getItems() as $item) {
-            $merged->addItem($item);
-        }
-        foreach ($secondary->getItems() as $key => $item) {
-            if (!isset($merged->getItems()[$key])) {
-                $merged->addItem($item);
-            }
-        }
-
-        return $merged;
-    }
-
-    private function loadSharedSection(string $formKey, string $sectionName): ?SectionMetadata
-    {
-        if (isset($this->sharedSectionPrototypes[$formKey])) {
-            return $this->cloneSectionDeep($this->sharedSectionPrototypes[$formKey]);
-        }
-
-        $xmlPath = \dirname(__DIR__, 2) . '/config/forms/' . $formKey . '.xml';
-        if (!\is_file($xmlPath)) {
-            return null;
-        }
-
-        if (null !== $this->formXmlLoader) {
-            try {
-                $formMetadata = $this->formXmlLoader->load($xmlPath);
-                $section = $formMetadata->getItems()[$sectionName] ?? null;
-                if ($section instanceof SectionMetadata) {
-                    $this->sharedSectionPrototypes[$formKey] = $section;
-
-                    return $this->cloneSectionDeep($section);
-                }
-            } catch (\Throwable) {
-                // Fallback to SimpleXML loader below
-            }
-        }
-
-        $section = $this->parseSectionFromXmlFile($xmlPath, $sectionName);
-        if (null !== $section) {
-            $this->sharedSectionPrototypes[$formKey] = $section;
-
-            return $this->cloneSectionDeep($section);
-        }
-
-        return null;
-    }
-
-    private function cloneSectionDeep(SectionMetadata $section): SectionMetadata
-    {
-        $cloned = new SectionMetadata($section->getName());
-        $cloned->setLabels($section->getLabels());
-        $cloned->setDescriptions($section->getDescriptions());
-        $cloned->setColSpan($section->getColSpan());
-        $cloned->setDisabledCondition($section->getDisabledCondition());
-        $cloned->setVisibleCondition($section->getVisibleCondition());
-
-        foreach ($section->getItems() as $item) {
-            if ($item instanceof SectionMetadata) {
-                $cloned->addItem($this->cloneSectionDeep($item));
-            } elseif ($item instanceof FieldMetadata) {
-                $cloned->addItem($this->cloneFieldMetadata($item, $item->getName()));
-            }
-        }
-
-        return $cloned;
-    }
-
-    /**
-     * Lightweight SimpleXML parser for shared `config/forms/block_suite_*.xml` files when `FormXmlLoader`
-     * is not injected (e.g. in standalone unit tests).
-     */
-    private function parseSectionFromXmlFile(string $xmlPath, string $sectionName): ?SectionMetadata
-    {
-        $dom = new \DOMDocument();
-        if (false === @$dom->load($xmlPath)) {
-            return null;
-        }
-        @$dom->xinclude();
-        $xml = \simplexml_import_dom($dom);
-        if (null === $xml || !isset($xml->properties)) {
-            return null;
-        }
-
-        foreach ($xml->properties->section as $sectionNode) {
-            $name = (string) ($sectionNode['name'] ?? '');
-            if ($name !== $sectionName) {
-                continue;
-            }
-
-            $section = new SectionMetadata($name);
-            $section->setLabels($this->extractXmlTitles($sectionNode->meta ?? null));
-
-            if (isset($sectionNode->properties)) {
-                foreach ($sectionNode->properties->children() as $childNode) {
-                    $tagName = $childNode->getName();
-                    if ('property' === $tagName || 'block' === $tagName) {
-                        $field = $this->parseXmlFieldNode($childNode, 'block' === $tagName);
-                        if (null !== $field) {
-                            $section->addItem($field);
-                        }
-                    }
-                }
-            }
-
-            return $section;
-        }
-
-        return null;
-    }
-
-    private function parseXmlFieldNode(\SimpleXMLElement $node, bool $isBlock): ?FieldMetadata
-    {
-        $name = (string) ($node['name'] ?? '');
-        if ('' === $name) {
-            return null;
-        }
-
-        $field = new FieldMetadata($name);
-        $field->setType($isBlock ? 'block' : (string) ($node['type'] ?? 'text_line'));
-        $field->setLabels($this->extractXmlTitles($node->meta ?? null));
-        $field->setDescriptions($this->extractXmlInfoTexts($node->meta ?? null));
-
-        if (isset($node['colspan'])) {
-            $field->setColSpan((int) $node['colspan']);
-        }
-        $field->setRequired('true' === (string) ($node['mandatory'] ?? 'false'));
-        $field->setMultilingual('false' !== (string) ($node['multilingual'] ?? 'true'));
-
-        if (isset($node['default-type'])) {
-            $field->setDefaultType((string) $node['default-type']);
-        }
-        if (isset($node['minOccurs'])) {
-            $field->setMinOccurs((int) $node['minOccurs']);
-        }
-        if (isset($node['maxOccurs'])) {
-            $field->setMaxOccurs((int) $node['maxOccurs']);
-        }
-        if (isset($node['onInvalid'])) {
-            $field->setOnInvalid((string) $node['onInvalid']);
-        }
-        if (isset($node['visibleCondition'])) {
-            $field->setVisibleCondition((string) $node['visibleCondition']);
-        }
-        if (isset($node['disabledCondition'])) {
-            $field->setDisabledCondition((string) $node['disabledCondition']);
-        }
-
-        if (isset($node->tag)) {
-            foreach ($node->tag as $tagNode) {
-                $field->addTag($this->parseXmlTagNode($tagNode));
-            }
-        }
-
-        if (isset($node->params)) {
-            foreach ($node->params->param as $paramNode) {
-                $field->addOption($this->parseXmlParamNode($paramNode));
-            }
-        }
-
-        if (isset($node->types)) {
-            foreach ($node->types->type as $typeNode) {
-                $typeName = (string) ($typeNode['name'] ?? '');
-                if ('' === $typeName) {
-                    continue;
-                }
-                $typeForm = new FormMetadata();
-                $typeForm->setKey($typeName);
-                $typeForm->setTitles($this->extractXmlTitles($typeNode->meta ?? null));
-                if (isset($typeNode->tag)) {
-                    foreach ($typeNode->tag as $tagNode) {
-                        $typeForm->addTag($this->parseXmlTagNode($tagNode));
-                    }
-                }
-                if (isset($typeNode->properties)) {
-                    foreach ($typeNode->properties->children() as $subNode) {
-                        $subTag = $subNode->getName();
-                        if ('property' === $subTag || 'block' === $subTag) {
-                            $subField = $this->parseXmlFieldNode($subNode, 'block' === $subTag);
-                            if (null !== $subField) {
-                                $typeForm->addItem($subField);
-                            }
-                        }
-                    }
-                }
-                $field->addType($typeForm);
-            }
-        }
-
-        return $field;
-    }
-
-    private function parseXmlTagNode(\SimpleXMLElement $tagNode): TagMetadata
-    {
-        $tag = new TagMetadata();
-        $tag->setName((string) ($tagNode['name'] ?? ''));
-        if (isset($tagNode['priority'])) {
-            $tag->setPriority((int) $tagNode['priority']);
-        }
-
-        $attributes = [];
-        foreach ($tagNode->attributes() as $attrName => $attrVal) {
-            if ('name' === $attrName || 'priority' === $attrName) {
-                continue;
-            }
-            $attributes[$attrName] = (string) $attrVal;
-        }
-        $tag->setAttributes($attributes);
-
-        return $tag;
-    }
-
-    private function parseXmlParamNode(\SimpleXMLElement $paramNode): OptionMetadata
-    {
-        $option = new OptionMetadata();
-        $option->setName((string) ($paramNode['name'] ?? ''));
-        $type = (string) ($paramNode['type'] ?? OptionMetadata::TYPE_STRING);
-        $option->setType($type);
-        $option->setTitles($this->extractXmlTitles($paramNode->meta ?? null));
-
-        if (OptionMetadata::TYPE_COLLECTION === $type) {
-            $children = [];
-            foreach ($paramNode->param as $childParam) {
-                $children[] = $this->parseXmlParamNode($childParam);
-            }
-            $option->setValue($children);
-        } else {
-            $option->setValue(isset($paramNode['value']) ? (string) $paramNode['value'] : null);
-        }
-
-        return $option;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function extractXmlTitles(?\SimpleXMLElement $metaNode): array
-    {
-        if (null === $metaNode || !isset($metaNode->title)) {
-            return [];
-        }
-
-        $titles = [];
-        foreach ($metaNode->title as $titleNode) {
-            $lang = (string) ($titleNode['lang'] ?? 'en');
-            $titles[$lang] = (string) $titleNode;
-        }
-
-        return $titles;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function extractXmlInfoTexts(?\SimpleXMLElement $metaNode): array
-    {
-        if (null === $metaNode || !isset($metaNode->info_text)) {
-            return [];
-        }
-
-        $texts = [];
-        foreach ($metaNode->info_text as $infoNode) {
-            $lang = (string) ($infoNode['lang'] ?? 'en');
-            $texts[$lang] = (string) $infoNode;
-        }
-
-        return $texts;
-    }
-
-    /**
-     * Injects compile-time options into `dynamic_source`, `dynamic_mapping`, and `dynamic_condition_field`.
-     */
-    private function populateDynamicSectionOptions(
-        SectionMetadata $dynamicSection,
-        FormMetadata $blockForm,
-        SectionMetadata $contentSection,
-        string $locale,
-    ): void {
-        $items = $dynamicSection->getItems();
-        $isMultipleBlock = $this->isMultipleBlock($contentSection);
-        $registry = $this->dynamicContentHydrator instanceof DynamicContentHydrator
-            ? $this->dynamicContentHydrator->getRegistry()
-            : new DynamicContentSourceRegistry(translator: $this->translator);
-        // 1. Populate dynamic_source options
-        $sourceField = $items['dynamic_source'] ?? null;
-        if ($sourceField instanceof FieldMetadata) {
-            $sourceOptions = $registry->getSourceDescriptors($locale);
-            $values = [];
-            foreach ($sourceOptions as $src) {
-                if ('none' !== $src['key'] && $src['multi_item'] !== $isMultipleBlock) {
-                    continue;
-                }
-                $opt = new OptionMetadata();
-                $opt->setName($src['key']);
-                $opt->setValue($src['key']);
-                $opt->setTitle($src['label'], $locale);
-                $values[] = $opt;
-            }
-            $valuesCollection = new OptionMetadata();
-            $valuesCollection->setName('values');
-            $valuesCollection->setType(OptionMetadata::TYPE_COLLECTION);
-            $valuesCollection->setValue($values);
-            $sourceField->addOption($valuesCollection);
-        }
-
-        // 2. Discover target fields for this block and source fields from registry
-        $targetFields = $this->discoverBlockTargetFields($contentSection, $locale);
-        $sourceFields = $this->discoverAllSourceFields($registry, $locale);
-
-        // 3. Populate dynamic_mapping -> field_map -> target_field and source_field
-        $mappingBlock = $items['dynamic_mapping'] ?? null;
-        if ($mappingBlock instanceof FieldMetadata) {
-            $fieldMapType = $mappingBlock->getTypes()['field_map'] ?? null;
-            if ($fieldMapType instanceof FormMetadata) {
-                $mapItems = $fieldMapType->getItems();
-                $targetSelect = $mapItems['target_field'] ?? null;
-                if ($targetSelect instanceof FieldMetadata) {
-                    $targetOpts = [];
-                    foreach ($targetFields as $tf) {
-                        $opt = new OptionMetadata();
-                        $opt->setName($tf['name']);
-                        $opt->setValue($tf['name']);
-                        $opt->setTitle($tf['label'], $locale);
-                        $targetOpts[] = $opt;
-                    }
-                    $targetCollection = new OptionMetadata();
-                    $targetCollection->setName('values');
-                    $targetCollection->setType(OptionMetadata::TYPE_COLLECTION);
-                    $targetCollection->setValue($targetOpts);
-                    $targetSelect->addOption($targetCollection);
-
-                    if (isset($targetFields[0])) {
-                        $defaultTarget = new OptionMetadata();
-                        $defaultTarget->setName('default_value');
-                        $defaultTarget->setValue($targetFields[0]['name']);
-                        $targetSelect->addOption($defaultTarget);
-                    }
-                }
-
-                $sourceSelect = $mapItems['source_field'] ?? null;
-                if ($sourceSelect instanceof FieldMetadata) {
-                    $sourceOpts = [];
-                    foreach ($sourceFields as $sf) {
-                        $opt = new OptionMetadata();
-                        $opt->setName($sf['name']);
-                        $opt->setValue($sf['name']);
-                        $opt->setTitle($sf['label'], $locale);
-                        $sourceOpts[] = $opt;
-                    }
-                    $sourceCollection = new OptionMetadata();
-                    $sourceCollection->setName('values');
-                    $sourceCollection->setType(OptionMetadata::TYPE_COLLECTION);
-                    $sourceCollection->setValue($sourceOpts);
-                    $sourceSelect->addOption($sourceCollection);
-
-                    if (isset($sourceFields[0])) {
-                        $defaultSource = new OptionMetadata();
-                        $defaultSource->setName('default_value');
-                        $defaultSource->setValue($sourceFields[0]['name']);
-                        $sourceSelect->addOption($defaultSource);
-                    }
-                }
-            }
-        }
-
-        // 4. Populate dynamic_condition_field options
-        $conditionField = $items['dynamic_condition_field'] ?? null;
-        if ($conditionField instanceof FieldMetadata) {
-            $condOpts = [];
-            foreach ($sourceFields as $sf) {
-                $opt = new OptionMetadata();
-                $opt->setName($sf['name']);
-                $opt->setValue($sf['name']);
-                $opt->setTitle($sf['label'], $locale);
-                $condOpts[] = $opt;
-            }
-            $condCollection = new OptionMetadata();
-            $condCollection->setName('values');
-            $condCollection->setType(OptionMetadata::TYPE_COLLECTION);
-            $condCollection->setValue($condOpts);
-            $conditionField->addOption($condCollection);
-        }
-
-        // 5. Dynamically extend visibleCondition on pagination/sort/filter fields for registered multi-item sources
-        $descriptors = $registry->getSourceDescriptors($locale);
-        $limitSourceKeys = [];
-        $sortSourceKeys = [];
-        $templateFilterSourceKeys = [];
-        $tagFilterSourceKeys = [];
-        $categoryFilterSourceKeys = [];
-
-        foreach ($descriptors as $desc) {
-            if (!$desc['multi_item'] || 'none' === $desc['key']) {
-                continue;
-            }
-
-            $key = $desc['key'];
-            $fieldNames = \array_column($desc['config_fields'], 'name');
-            $limitSourceKeys[] = $key;
-
-            if (\in_array('sort_by', $fieldNames, true) || \in_array($key, ['page_selection', 'page_children', 'sibling_pages', 'custom_query', 'sulu_articles'], true)) {
-                $sortSourceKeys[] = $key;
-            }
-            if (\in_array('template_keys', $fieldNames, true) || \in_array($key, ['page_children', 'sibling_pages', 'custom_query', 'sulu_articles'], true)) {
-                $templateFilterSourceKeys[] = $key;
-            }
-            if (\in_array('tag_names', $fieldNames, true) || \in_array($key, ['page_children', 'sibling_pages', 'custom_query', 'sulu_articles'], true)) {
-                $tagFilterSourceKeys[] = $key;
-            }
-            if (\in_array('category_keys', $fieldNames, true) || \in_array($key, ['page_children', 'sibling_pages', 'custom_query', 'sulu_articles'], true)) {
-                $categoryFilterSourceKeys[] = $key;
-            }
-        }
-
-        $buildSourceVisibleCondition = static function (array $keys): ?string {
-            $clauses = [];
-            foreach ($keys as $k) {
-                if (\is_string($k) && '' !== $k) {
-                    $clauses[$k] = "__parent.dynamic_source == '{$k}'";
-                }
-            }
-            if ([] === $clauses) {
-                return null;
-            }
-
-            return \implode(' or ', \array_values($clauses));
-        };
-
-        $limitVisibleCondition = $buildSourceVisibleCondition($limitSourceKeys);
-
-        $conditionMap = [
-            'dynamic_limit' => $limitVisibleCondition,
-            'dynamic_offset' => $limitVisibleCondition,
-            'dynamic_pagination' => $limitVisibleCondition,
-            'dynamic_per_page' => null !== $limitVisibleCondition
-                ? "({$limitVisibleCondition}) and (__parent.dynamic_pagination == 'numbers' or __parent.dynamic_pagination == 'prev_next')"
-                : null,
-            'dynamic_sort_by' => $buildSourceVisibleCondition($sortSourceKeys),
-            'dynamic_sort_order' => $buildSourceVisibleCondition($sortSourceKeys),
-            'dynamic_template_keys' => $buildSourceVisibleCondition($templateFilterSourceKeys),
-            'dynamic_tag_names' => $buildSourceVisibleCondition($tagFilterSourceKeys),
-            'dynamic_category_keys' => $buildSourceVisibleCondition($categoryFilterSourceKeys),
-        ];
-
-        foreach ($conditionMap as $fieldName => $conditionExpr) {
-            if (null === $conditionExpr) {
-                continue;
-            }
-            $fieldMeta = $items[$fieldName] ?? null;
-            if ($fieldMeta instanceof FieldMetadata) {
-                $fieldMeta->setVisibleCondition($conditionExpr);
-            }
-        }
-    }
-
     private function populatePresetSectionOptions(SectionMetadata $advancedSection, string $blockKey, string $locale = 'en'): void
     {
         $presetField = $advancedSection->getItems()['preset'] ?? null;
@@ -1120,7 +431,7 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
         $typeOption->setValue($blockKey);
         $presetField->addOption($typeOption);
 
-        $presetsJson = null;
+        $previewPresetsJson = null;
         if (null !== $this->presetProvider) {
             $presets = $this->presetProvider->getPresets($blockKey, $locale);
             $presetsJson = \json_encode($presets, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE);
@@ -1128,6 +439,15 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $presetsJsonOption->setName('presets_json');
             $presetsJsonOption->setValue($presetsJson);
             $presetField->addOption($presetsJsonOption);
+
+            $previewPresets = \array_map(
+                static fn (array $preset): array => [
+                    'id' => $preset['id'],
+                    'title' => $preset['title'],
+                ],
+                $presets,
+            );
+            $previewPresetsJson = \json_encode($previewPresets, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
         // Add a hidden 'props' preview field so Sulu's FieldBlocks (which looks up value[schemaKey] directly)
@@ -1153,126 +473,15 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
             $previewTypeOption->setValue($blockKey);
             $propsPreviewField->addOption($previewTypeOption);
 
-            if (null !== $presetsJson) {
+            if (null !== $previewPresetsJson) {
                 $previewPresetsOption = new OptionMetadata();
                 $previewPresetsOption->setName('presets_json');
-                $previewPresetsOption->setValue($presetsJson);
+                $previewPresetsOption->setValue($previewPresetsJson);
                 $propsPreviewField->addOption($previewPresetsOption);
             }
 
             $advancedSection->addItem($propsPreviewField);
         }
-    }
-
-    private function isMultipleBlock(SectionMetadata $contentSection): bool
-    {
-        foreach ($contentSection->getItems() as $item) {
-            if ($item instanceof FieldMetadata && 'items' === $item->getName() && 'block' === $this->getFieldType($item)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @return list<array{name: string, label: string}>
-     */
-    private function discoverBlockTargetFields(SectionMetadata $contentSection, string $locale): array
-    {
-        /** @var array<string, array{name: string, label: string}> $fieldsByName */
-        $fieldsByName = [];
-
-        foreach ($this->collectContentFieldMetadata($contentSection->getItems()) as $field) {
-            $fieldName = $field->getName();
-            $fieldType = $this->getFieldType($field);
-
-            if ('items' === $fieldName && 'block' === $fieldType) {
-                foreach ($field->getTypes() as $childForm) {
-                    foreach ($this->collectContentFieldMetadata($childForm->getItems()) as $childField) {
-                        $childName = $childField->getName();
-                        $childType = $this->getFieldType($childField);
-                        if (isset(self::EXCLUDED_TARGET_FIELDS[$childName]) || 'block' === $childType || \str_starts_with($childName, 'props/')) {
-                            continue;
-                        }
-                        $label = $childField->getLabel($locale)
-                            ?? AbstractDynamicContentSourceProvider::translateSourceFieldLabel($childName, $locale, $this->translator);
-                        $fieldsByName[$childName] ??= [
-                            'name' => $childName,
-                            'label' => $label,
-                        ];
-                    }
-                }
-
-                continue;
-            }
-
-            if (isset(self::EXCLUDED_TARGET_FIELDS[$fieldName]) || 'block' === $fieldType || \str_starts_with($fieldName, 'props/')) {
-                continue;
-            }
-
-            $label = $field->getLabel($locale)
-                ?? AbstractDynamicContentSourceProvider::translateSourceFieldLabel($fieldName, $locale, $this->translator);
-            $fieldsByName[$fieldName] = [
-                'name' => $fieldName,
-                'label' => $label,
-            ];
-        }
-
-        return \array_values($fieldsByName);
-    }
-
-    /**
-     * Collects FieldMetadata items exclusively from root fields and `content`/`media` sections
-     * (including `__tabs -> content`), skipping `settings`, `style`, `layout`, `general`, `dynamic_content`, and `advanced`.
-     *
-     * @param array<array-key, ItemMetadata> $items
-     *
-     * @return list<FieldMetadata>
-     */
-    private function collectContentFieldMetadata(array $items): array
-    {
-        if (isset($items[self::TABS_SECTION_NAME]) && $items[self::TABS_SECTION_NAME] instanceof SectionMetadata) {
-            $contentTab = $items[self::TABS_SECTION_NAME]->getItems()['content'] ?? null;
-
-            return $contentTab instanceof SectionMetadata
-                ? $this->collectContentFieldMetadata($contentTab->getItems())
-                : [];
-        }
-
-        $fields = [];
-        foreach ($items as $item) {
-            if ($item instanceof FieldMetadata) {
-                $fields[] = $item;
-            } elseif ($item instanceof SectionMetadata && \in_array($item->getName(), ['content', 'media'], true)) {
-                foreach ($this->collectContentFieldMetadata($item->getItems()) as $subField) {
-                    $fields[] = $subField;
-                }
-            }
-        }
-
-        return $fields;
-    }
-
-    /**
-     * @return list<array{name: string, label: string}>
-     */
-    private function discoverAllSourceFields(DynamicContentSourceRegistry $registry, string $locale): array
-    {
-        /** @var array<string, array{name: string, label: string}> $fieldsByName */
-        $fieldsByName = [];
-
-        foreach ($registry->getProviders() as $provider) {
-            foreach ($provider->getSourceFields($locale) as $field) {
-                $name = $field['name'];
-                $fieldsByName[$name] ??= [
-                    'name' => $name,
-                    'label' => $field['label'],
-                ];
-            }
-        }
-
-        return \array_values($fieldsByName);
     }
 
     /**
@@ -1324,6 +533,13 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
                             includeSharedTabs: $includeShared,
                             namespaceProps: $namespaceProps,
                             updateSchema: false,
+                        );
+                    } else {
+                        $this->popoverOptionGroupNormalizer->processInForm(
+                            $typeForm,
+                            '',
+                            $locale,
+                            fn (FormMetadata $subForm): bool => $this->shouldEnhanceInlineTypeWithTabs($subForm),
                         );
                     }
 
@@ -1427,7 +643,11 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
         foreach ($fields as $field) {
             $name = $field->getName();
-            if (isset($this->previewExcludedFieldMap[$name]) || \str_starts_with($name, 'props/')) {
+            if (
+                isset($this->previewExcludedFieldMap[$name])
+                || \str_starts_with($name, 'props/')
+                || 'false' === $field->getVisibleCondition()
+            ) {
                 continue;
             }
 

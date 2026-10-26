@@ -63,6 +63,28 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
         return String(rawLoc).toLowerCase().split('_')[0];
     }
 
+    get currentWebspace(): ?string {
+        const {formInspector} = this.props;
+        if (!formInspector) {
+            return null;
+        }
+
+        if (formInspector.options && typeof formInspector.options.webspace === 'string' && formInspector.options.webspace.trim() !== '') {
+            return formInspector.options.webspace.trim();
+        }
+
+        try {
+            const fieldWebspace = formInspector.getValueByPath('/webspace');
+            if (typeof fieldWebspace === 'string' && fieldWebspace.trim() !== '') {
+                return fieldWebspace.trim();
+            }
+        } catch (e) {
+            // ignore if path does not exist
+        }
+
+        return null;
+    }
+
     @computed get t(): Object {
         const tr = (key: string, fallback: string): string => {
             const val = translate(key);
@@ -120,7 +142,9 @@ export default class SingleReusableBlockSelection extends React.Component<Props>
         action(() => {
             this.blocksLoading = true;
         })();
-        Requester.get(`/admin/api/snippets?templateKeys=reusable_block&locale=${encodeURIComponent(this.currentLocale)}&limit=100`)
+        const webspace = this.currentWebspace;
+        const webspaceQuery = webspace ? `&webspace=${encodeURIComponent(webspace)}` : '';
+        Requester.get(`/admin/api/reusable-blocks?locale=${encodeURIComponent(this.currentLocale)}${webspaceQuery}`)
             .then(action((data) => {
                 const items = (data && data._embedded && data._embedded.snippets) || (data && data.snippets) || [];
                 this.availableBlocks = items;

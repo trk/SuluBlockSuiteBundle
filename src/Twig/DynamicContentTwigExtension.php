@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Twig;
 
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 use Totoglu\SuluBlockSuiteBundle\Renderer\BlockRenderer;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface;
 use Twig\Extension\AbstractExtension;
@@ -15,6 +18,7 @@ final class DynamicContentTwigExtension extends AbstractExtension
     public function __construct(
         private readonly BlockTransformPipelineInterface $pipeline,
         private readonly ?BlockRenderer $blockRenderer = null,
+        private readonly ?RequestStack $requestStack = null,
     ) {
     }
 
@@ -30,6 +34,8 @@ final class DynamicContentTwigExtension extends AbstractExtension
             new TwigFunction('sulu_blocks_render', [$this, 'renderBlocks'], ['is_safe' => ['html']]),
             new TwigFunction('blocks_render', [$this, 'renderBlocks'], ['is_safe' => ['html']]),
             new TwigFunction('hydrate_block_tree', [$this, 'hydrateBlockTree']),
+            new TwigFunction('sulu_user_loggedin_and_preview', [$this, 'isUserLoggedInAndPreview']),
+            new TwigFunction('sulu_preview_block_focus_script', [$this, 'renderPreviewBlockFocusScript'], ['is_safe' => ['html']]),
         ];
     }
 
@@ -216,6 +222,40 @@ final class DynamicContentTwigExtension extends AbstractExtension
     }
 
     /**
+     * Checks whether the current request is rendered inside the Sulu Admin Live Preview iframe.
+     * Drop-in compatible with `alengodev/SuluPreviewBlockFocusBundle`'s `sulu_user_loggedin_and_preview()`.
+     */
+    public function isUserLoggedInAndPreview(?Request $request = null): bool
+    {
+        $activeRequest = $request ?? $this->requestStack?->getCurrentRequest();
+        if (null === $activeRequest) {
+            return false;
+        }
+
+        $isPreview = (bool) ($activeRequest->attributes->get('preview') ?? false);
+        if (!$isPreview) {
+            return false;
+        }
+
+        if ($activeRequest->headers->has('referer')) {
+            $refererHeader = (string) $activeRequest->headers->get('referer', '');
+            $refererPath = '' !== $refererHeader ? (string) (\parse_url($refererHeader, \PHP_URL_PATH) ?? '') : '';
+
+            return '/admin' === $refererPath || \str_starts_with($refererPath, '/admin/');
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns the Sulu Live Preview Block Focus `<script>` tag.
+     */
+    public function renderPreviewBlockFocusScript(): string
+    {
+        return BlockRenderer::getPreviewBlockFocusScript();
+    }
+
+    /**
      * @param array<string, mixed>|object|null $context
      *
      * @return array<string, mixed>
@@ -248,29 +288,6 @@ final class DynamicContentTwigExtension extends AbstractExtension
      */
     private function normalizeBlock(mixed $block): ?array
     {
-        if (!\is_array($block) && !\is_object($block)) {
-            return null;
-        }
-
-        if (\is_object($block)) {
-            if (\method_exists($block, 'getContent')) {
-                /** @var mixed $block */
-                $block = $block->getContent();
-            } elseif (\method_exists($block, 'toArray')) {
-                /** @var mixed $block */
-                $block = $block->toArray();
-            } elseif ($block instanceof \stdClass) {
-                $block = (array) $block;
-            } else {
-                return null;
-            }
-        }
-
-        if (!\is_array($block)) {
-            return null;
-        }
-
-        /** @var array<string, mixed> $block */
-        return $block;
+        return SuluDataNormalizer::normalizeBlock($block);
     }
 }

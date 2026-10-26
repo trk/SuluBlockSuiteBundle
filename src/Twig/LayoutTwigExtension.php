@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Twig;
 
+use Sulu\Component\Webspace\Analyzer\RequestAnalyzerInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Totoglu\SuluBlockSuiteBundle\Layout\LayoutResolverInterface;
 use Totoglu\SuluBlockSuiteBundle\Layout\PageLayoutProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\Snippet\SnippetScopeResolver;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
@@ -16,6 +19,9 @@ final class LayoutTwigExtension extends AbstractExtension
     public function __construct(
         private readonly LayoutResolverInterface $layoutResolver,
         private readonly ?PageLayoutProviderInterface $layoutProvider = null,
+        private readonly ?RequestStack $requestStack = null,
+        private readonly ?RequestAnalyzerInterface $requestAnalyzer = null,
+        private readonly bool $multiWebspaceEnabled = true,
     ) {
     }
 
@@ -50,37 +56,37 @@ final class LayoutTwigExtension extends AbstractExtension
      * @param string|array<string, mixed>|null $layout
      * @param array<string, mixed> $context
      */
-    public function renderLayout(string|array|null $layout, array $context = [], ?string $locale = null): string
+    public function renderLayout(string|array|null $layout, array $context = [], ?string $locale = null, ?string $webspaceKey = null): string
     {
         if (null === $this->layoutProvider) {
             return '';
         }
 
-        return $this->layoutProvider->renderLayout($layout, $context, $locale);
+        return $this->layoutProvider->renderLayout($layout, $context, $locale, $webspaceKey);
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    public function loadLayout(string $identifier, ?string $locale = null): ?array
+    public function loadLayout(string $identifier, ?string $locale = null, ?string $webspaceKey = null): ?array
     {
         if (null === $this->layoutProvider) {
             return null;
         }
 
-        return $this->layoutProvider->getLayout($identifier, $locale);
+        return $this->layoutProvider->getLayout($identifier, $locale, $webspaceKey);
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    public function loadReusableBlock(string $identifier, ?string $locale = null): ?array
+    public function loadReusableBlock(string $identifier, ?string $locale = null, ?string $webspaceKey = null): ?array
     {
         if (null === $this->layoutProvider) {
             return null;
         }
 
-        return $this->layoutProvider->getReusableBlock($identifier, $locale);
+        return $this->layoutProvider->getReusableBlock($identifier, $locale, $webspaceKey);
     }
 
     /**
@@ -92,8 +98,9 @@ final class LayoutTwigExtension extends AbstractExtension
         string|array|null $layout,
         ?string $defaultLayout = null,
         ?string $locale = null,
+        ?string $webspaceKey = null,
     ): bool {
-        return null !== $this->resolveLayoutData($layout, $defaultLayout, $locale);
+        return null !== $this->resolveLayoutData($layout, $defaultLayout, $locale, $webspaceKey);
     }
 
     /**
@@ -106,12 +113,20 @@ final class LayoutTwigExtension extends AbstractExtension
         string $blockType,
         ?string $defaultLayout = null,
         ?string $locale = null,
+        ?string $webspaceKey = null,
     ): bool {
         if ('' === \trim($blockType)) {
             return false;
         }
 
-        $layoutData = $this->resolveLayoutData($layout, $defaultLayout, $locale);
+        $resolvedWebspace = SnippetScopeResolver::resolveActiveWebspace(
+            $webspaceKey,
+            [],
+            $this->requestStack,
+            $this->requestAnalyzer,
+            $this->multiWebspaceEnabled,
+        );
+        $layoutData = $this->resolveLayoutData($layout, $defaultLayout, $locale, $resolvedWebspace);
 
         if (!\is_array($layoutData)) {
             return false;
@@ -123,7 +138,7 @@ final class LayoutTwigExtension extends AbstractExtension
             return false;
         }
 
-        return $this->blocksContainType($rawBlocks, $blockType, $locale);
+        return $this->blocksContainType($rawBlocks, $blockType, $locale, $resolvedWebspace);
     }
 
     /**
@@ -135,28 +150,24 @@ final class LayoutTwigExtension extends AbstractExtension
         string|array|null $layout,
         ?string $defaultLayout = null,
         ?string $locale = null,
+        ?string $webspaceKey = null,
     ): ?array {
-        $layoutData = null;
-        if (\is_string($layout) && '' !== \trim($layout)) {
-            $layoutData = $this->loadLayout($layout, $locale);
-        } elseif (\is_array($layout)) {
-            $inner = isset($layout['content']) && \is_array($layout['content']) ? $layout['content'] : $layout;
-            if (isset($inner['blocks']) && \is_array($inner['blocks'])) {
-                /** @var array<string, mixed> $inner */
-                $layoutData = $inner;
-            } else {
-                $layoutId = $inner['id'] ?? ($inner['uuid'] ?? null);
-                if (\is_string($layoutId) && '' !== \trim($layoutId)) {
-                    $layoutData = $this->loadLayout($layoutId, $locale);
-                }
-            }
-        }
+        $resolvedWebspace = SnippetScopeResolver::resolveActiveWebspace(
+            $webspaceKey,
+            [],
+            $this->requestStack,
+            $this->requestAnalyzer,
+            $this->multiWebspaceEnabled,
+        );
 
-        if (null === $layoutData && null !== $defaultLayout && '' !== \trim($defaultLayout)) {
-            $layoutData = $this->loadLayout($defaultLayout, $locale);
-        }
-
-        return \is_array($layoutData) ? $layoutData : null;
+        return SnippetScopeResolver::resolveLayoutCandidate(
+            $layout,
+            $defaultLayout,
+            $locale,
+            $resolvedWebspace,
+            $this->multiWebspaceEnabled,
+            $this->loadLayout(...),
+        );
     }
 
     /**
@@ -167,6 +178,7 @@ final class LayoutTwigExtension extends AbstractExtension
         array $blocks,
         string $blockType,
         ?string $locale = null,
+        ?string $webspaceKey = null,
         array &$visited = [],
         int $depth = 0,
     ): bool {
@@ -194,7 +206,7 @@ final class LayoutTwigExtension extends AbstractExtension
                     }
                     $visited[$snippetId] = true;
 
-                    $reusable = $this->loadReusableBlock($snippetId, $locale);
+                    $reusable = $this->loadReusableBlock($snippetId, $locale, $webspaceKey);
                     $snippetBlocks = \is_array($reusable['blocks'] ?? null) ? $reusable['blocks'] : null;
                 } elseif (\is_array($block['snippet'])) {
                     $rawId = $block['snippet']['id'] ?? ($block['snippet']['uuid'] ?? null);
@@ -211,7 +223,7 @@ final class LayoutTwigExtension extends AbstractExtension
                     }
                 }
 
-                if (null !== $snippetBlocks && $this->blocksContainType($snippetBlocks, $blockType, $locale, $visited, $depth + 1)) {
+                if (null !== $snippetBlocks && $this->blocksContainType($snippetBlocks, $blockType, $locale, $webspaceKey, $visited, $depth + 1)) {
                     return true;
                 }
             }
@@ -226,7 +238,7 @@ final class LayoutTwigExtension extends AbstractExtension
                             if (!\is_array($column) || !isset($column['blocks']) || !\is_array($column['blocks'])) {
                                 continue;
                             }
-                            if ($this->blocksContainType($column['blocks'], $blockType, $locale, $visited, $depth + 1)) {
+                            if ($this->blocksContainType($column['blocks'], $blockType, $locale, $webspaceKey, $visited, $depth + 1)) {
                                 return true;
                             }
                         }
@@ -234,7 +246,7 @@ final class LayoutTwigExtension extends AbstractExtension
                 }
 
                 if (isset($block['blocks']) && \is_array($block['blocks'])) {
-                    if ($this->blocksContainType($block['blocks'], $blockType, $locale, $visited, $depth + 1)) {
+                    if ($this->blocksContainType($block['blocks'], $blockType, $locale, $webspaceKey, $visited, $depth + 1)) {
                         return true;
                     }
                 }

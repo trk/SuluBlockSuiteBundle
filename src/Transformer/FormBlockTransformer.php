@@ -22,11 +22,6 @@ final class FormBlockTransformer implements BlockTransformerInterface
 {
     public const FORM_RESOURCE_KEY = 'forms';
 
-    /**
-     * @var array<string, array<string, string>>
-     */
-    private array $metadataFieldTypesCache = [];
-
     public function __construct(
         private readonly ?BlockTargetFieldMetadataResolver $fieldMetadataResolver = null,
         private readonly ?object $formBuilder = null,
@@ -374,20 +369,8 @@ final class FormBlockTransformer implements BlockTransformerInterface
      */
     private function getMetadataFieldTypes(string $blockType): array
     {
-        $cleanType = \strtolower(\trim($blockType));
-        if ('' === $cleanType || null === $this->fieldMetadataResolver) {
-            return [];
-        }
-
-        if (isset($this->metadataFieldTypesCache[$cleanType])) {
-            return $this->metadataFieldTypesCache[$cleanType];
-        }
-
-        $types = [];
-        foreach ($this->fieldMetadataResolver->resolveTargetFields($cleanType) as $fieldMeta) {
-            $types[$fieldMeta['name']] = $fieldMeta['type'];
-        }
-
-        return $this->metadataFieldTypesCache[$cleanType] = $types;
+        return null !== $this->fieldMetadataResolver
+            ? $this->fieldMetadataResolver->resolveFieldTypeMap($blockType)
+            : [];
     }
 }

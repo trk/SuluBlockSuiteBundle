@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Totoglu\SuluBlockSuiteBundle\Layout;
 
 use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Component\Webspace\Analyzer\RequestAnalyzerInterface;
 use Sulu\Content\Application\ContentResolver\ContentResolverInterface;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface;
@@ -14,6 +15,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use Symfony\Contracts\Service\ResetInterface;
+use Totoglu\SuluBlockSuiteBundle\Snippet\SnippetScopeResolver;
 use Totoglu\SuluBlockSuiteBundle\Template\TemplateKeys;
 use Twig\Environment;
 
@@ -58,6 +60,8 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
         string|array $layoutsDirectory = '',
         private readonly ?ReferenceStoreInterface $referenceStore = null,
         private readonly ?ContentResolverInterface $contentResolver = null,
+        private readonly ?RequestAnalyzerInterface $requestAnalyzer = null,
+        private readonly bool $multiWebspaceEnabled = true,
     ) {
         $dirs = \is_array($layoutsDirectory) ? \array_values($layoutsDirectory) : [$layoutsDirectory];
         $this->layoutsDirectories = \array_values(\array_filter($dirs, static fn (string $dir): bool => '' !== \trim($dir)));
@@ -72,8 +76,10 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
         $this->resolvingIds = [];
     }
 
-    public function getLayout(string $identifier, ?string $locale = null): ?array
+    public function getLayout(string $identifier, ?string $locale = null, ?string $webspaceKey = null): ?array
     {
+        $resolvedWebspace = $this->resolveWebspaceKey($webspaceKey);
+
         if (\str_contains($identifier, '|')) {
             foreach (\explode('|', $identifier) as $candidate) {
                 $candidate = \trim($candidate);
@@ -81,7 +87,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
                     continue;
                 }
 
-                $resolved = $this->getLayout($candidate, $locale);
+                $resolved = $this->getLayout($candidate, $locale, $resolvedWebspace);
                 if (null !== $resolved) {
                     return $resolved;
                 }
@@ -103,7 +109,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
             return null;
         }
 
-        $cacheKey = $resolvedLocale . ':' . $normalizedId;
+        $cacheKey = $resolvedLocale . ':' . ($resolvedWebspace ?? '') . ':' . $normalizedId;
 
         if (\array_key_exists($cacheKey, $this->cache)) {
             $cached = $this->cache[$cacheKey];
@@ -139,39 +145,91 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
                     $this->liveSnippetsByLocale[$resolvedLocale] = $list;
                 }
 
+                /** @var array{snippet: SnippetInterface, content: SnippetDimensionContentInterface}|null $exactTemplateMatch */
+                $exactTemplateMatch = null;
+                /** @var array{snippet: SnippetInterface, content: SnippetDimensionContentInterface}|null $exactKeyMatch */
+                $exactKeyMatch = null;
+                /** @var array{snippet: SnippetInterface, content: SnippetDimensionContentInterface}|null $fallbackTemplateMatch */
+                $fallbackTemplateMatch = null;
+                /** @var array{snippet: SnippetInterface, content: SnippetDimensionContentInterface}|null $fallbackKeyMatch */
+                $fallbackKeyMatch = null;
+
                 foreach ($this->liveSnippetsByLocale[$resolvedLocale] as $snippet) {
+                    $targetContent = $this->findLiveDimensionContent($snippet, TemplateKeys::PAGE_LAYOUT, $resolvedLocale);
+                    if (null === $targetContent) {
+                        continue;
+                    }
+
+                    $templateData = $this->getMergedLiveTemplateData($snippet, $targetContent);
+                    $snippetWebspace = SnippetScopeResolver::extractWebspace($templateData, '');
+
                     $uuid = $snippet->getUuid();
                     if ($uuid === $trimId) {
-                        $matched = $this->extractSnippetData($snippet, null, $resolvedLocale);
+                        if (!SnippetScopeResolver::matchesWebspace($snippetWebspace, $resolvedWebspace, $this->multiWebspaceEnabled)) {
+                            continue;
+                        }
+
+                        $matched = $this->extractSnippetData($snippet, $targetContent, $resolvedLocale);
                         if (null !== $matched) {
                             return $this->cache[$cacheKey] = $matched;
                         }
                     }
 
-                    $targetContent = $this->findLiveDimensionContent($snippet, TemplateKeys::PAGE_LAYOUT, $resolvedLocale);
+                    if (!SnippetScopeResolver::matchesWebspace($snippetWebspace, $resolvedWebspace, $this->multiWebspaceEnabled)) {
+                        continue;
+                    }
 
-                    if (null !== $targetContent) {
-                        /** @var array<string, mixed> $templateData */
-                        $templateData = $targetContent->getTemplateData();
+                    $targetTemplate = isset($templateData['target_template']) && \is_scalar($templateData['target_template'])
+                        ? \strtolower(\trim((string) $templateData['target_template']))
+                        : (isset($templateData['page_template']) && \is_scalar($templateData['page_template'])
+                            ? \strtolower(\trim((string) $templateData['page_template']))
+                            : null);
 
-                        $key = isset($templateData['key']) && \is_scalar($templateData['key'])
-                            ? \strtolower(\trim((string) $templateData['key']))
-                            : null;
-                        $title = $targetContent->getTitle();
-                        $titleNorm = null !== $title ? \strtolower(\trim($title)) : null;
-                        $titleSlug = null !== $titleNorm ? \str_replace([' ', '-'], '_', $titleNorm) : null;
+                    $key = isset($templateData['key']) && \is_scalar($templateData['key'])
+                        ? \strtolower(\trim((string) $templateData['key']))
+                        : null;
+                    $title = $targetContent->getTitle();
+                    $titleNorm = null !== $title ? \strtolower(\trim($title)) : null;
+                    $titleSlug = null !== $titleNorm ? \str_replace([' ', '-'], '_', $titleNorm) : null;
 
-                        if (
-                            $key === $normalizedId
-                            || $key === $sluggedId
-                            || $titleNorm === $normalizedId
-                            || $titleSlug === $sluggedId
-                        ) {
-                            $matched = $this->extractSnippetData($snippet, $targetContent, $resolvedLocale);
-                            if (null !== $matched) {
-                                return $this->cache[$cacheKey] = $matched;
-                            }
-                        }
+                    $matchesTemplate = null !== $targetTemplate && '' !== $targetTemplate
+                        && ($targetTemplate === $normalizedId || $targetTemplate === $sluggedId);
+                    $matchesKeyOrTitle = $key === $normalizedId
+                        || $key === $sluggedId
+                        || (null === $targetTemplate || '' === $targetTemplate)
+                        && ($titleNorm === $normalizedId || $titleSlug === $sluggedId);
+
+                    if (!$matchesTemplate && !$matchesKeyOrTitle) {
+                        continue;
+                    }
+
+                    $isExactWebspace = null !== $resolvedWebspace && $snippetWebspace === $resolvedWebspace;
+
+                    if ($isExactWebspace && $matchesTemplate) {
+                        $exactTemplateMatch ??= ['snippet' => $snippet, 'content' => $targetContent];
+                        break;
+                    }
+
+                    if ($isExactWebspace) {
+                        $exactKeyMatch ??= ['snippet' => $snippet, 'content' => $targetContent];
+
+                        continue;
+                    }
+
+                    if ($matchesTemplate) {
+                        $fallbackTemplateMatch ??= ['snippet' => $snippet, 'content' => $targetContent];
+
+                        continue;
+                    }
+
+                    $fallbackKeyMatch ??= ['snippet' => $snippet, 'content' => $targetContent];
+                }
+
+                $winner = $exactTemplateMatch ?? $exactKeyMatch ?? $fallbackTemplateMatch ?? $fallbackKeyMatch;
+                if (null !== $winner) {
+                    $matched = $this->extractSnippetData($winner['snippet'], $winner['content'], $resolvedLocale);
+                    if (null !== $matched) {
+                        return $this->cache[$cacheKey] = $matched;
                     }
                 }
             } catch (\Throwable) {
@@ -206,39 +264,26 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
         return $this->cache[$cacheKey] = null;
     }
 
-    public function renderLayout(string|array|null $layout, array $context = [], ?string $locale = null): string
+    public function renderLayout(string|array|null $layout, array $context = [], ?string $locale = null, ?string $webspaceKey = null): string
     {
         if (null === $layout || '' === $layout || [] === $layout || $this->renderDepth >= self::MAX_RENDER_DEPTH) {
             return '';
         }
 
         $resolvedLocale = $this->resolveLocale($locale);
+        $resolvedWebspace = $this->resolveWebspaceKey($webspaceKey, $context);
+        $defaultLayout = isset($context['default_layout']) && \is_string($context['default_layout'])
+            ? $context['default_layout']
+            : null;
 
-        /** @var array<string, mixed>|null $layoutData */
-        $layoutData = null;
-        if (\is_string($layout)) {
-            $layoutData = $this->getLayout($layout, $resolvedLocale);
-        } elseif (\is_array($layout)) {
-            if (isset($layout['content']) && \is_array($layout['content'])) {
-                /** @var array<string, mixed> $layoutData */
-                $layoutData = $layout['content'];
-            } else {
-                $layoutData = $layout;
-            }
-
-            if (!isset($layoutData['blocks'])) {
-                $layoutId = $layoutData['id'] ?? ($layoutData['uuid'] ?? null);
-                if (\is_string($layoutId) && '' !== $layoutId) {
-                    $layoutData = $this->getLayout($layoutId, $resolvedLocale);
-                } else {
-                    $layoutData = null;
-                }
-            }
-
-            if (null === $layoutData && isset($context['default_layout']) && \is_string($context['default_layout']) && '' !== $context['default_layout']) {
-                $layoutData = $this->getLayout($context['default_layout'], $resolvedLocale);
-            }
-        }
+        $layoutData = SnippetScopeResolver::resolveLayoutCandidate(
+            $layout,
+            $defaultLayout,
+            $resolvedLocale,
+            $resolvedWebspace,
+            $this->multiWebspaceEnabled,
+            $this->getLayout(...),
+        );
 
         if (null === $layoutData || null === $this->twig) {
             return '';
@@ -272,7 +317,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
             $blocks = \is_array($rawBlocks) ? \array_values($rawBlocks) : [];
             foreach ($blocks as &$blockItem) {
                 if (isset($blockItem['type']) && 'reusable' === $blockItem['type'] && isset($blockItem['snippet']) && \is_string($blockItem['snippet'])) {
-                    $reusableData = $this->getReusableBlock($blockItem['snippet'], $resolvedLocale);
+                    $reusableData = $this->getReusableBlock($blockItem['snippet'], $resolvedLocale, $resolvedWebspace);
                     if (null !== $reusableData) {
                         $blockItem['snippet'] = $reusableData;
                     }
@@ -290,6 +335,8 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
                 ? $context['page']
                 : ($context['content'] ?? null);
 
+            $isLayoutPreview = (bool) ($context['_is_page_layout_preview'] ?? false);
+
             return $this->twig->render(
                 $template,
                 \array_merge($context, [
@@ -297,6 +344,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
                     'content' => $layoutData,
                     'layout' => $layoutData,
                     'blocks' => $blocks,
+                    '_in_page_layout' => !$isLayoutPreview,
                 ]),
             );
         } finally {
@@ -307,7 +355,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
         }
     }
 
-    public function getReusableBlock(string $identifier, ?string $locale = null): ?array
+    public function getReusableBlock(string $identifier, ?string $locale = null, ?string $webspaceKey = null): ?array
     {
         $trimId = \trim($identifier);
         if ('' === $trimId || null === $this->snippetRepository) {
@@ -315,7 +363,8 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
         }
 
         $resolvedLocale = $this->resolveLocale($locale);
-        $cacheKey = 'reusable:' . $resolvedLocale . ':' . $trimId;
+        $resolvedWebspace = $this->resolveWebspaceKey($webspaceKey);
+        $cacheKey = 'reusable:' . $resolvedLocale . ':' . ($resolvedWebspace ?? '') . ':' . $trimId;
 
         if (\array_key_exists($cacheKey, $this->cache)) {
             $cached = $this->cache[$cacheKey];
@@ -341,7 +390,14 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
 
             $content = $this->findLiveDimensionContent($snippet, TemplateKeys::REUSABLE_BLOCK, $resolvedLocale);
             if (null !== $content) {
-                $templateData = $this->resolveSnippetContentData($content, $cacheKey);
+                $mergedRaw = $this->getMergedLiveTemplateData($snippet, $content);
+                $snippetWebspace = SnippetScopeResolver::extractWebspace($mergedRaw);
+
+                if (!SnippetScopeResolver::matchesWebspace($snippetWebspace, $resolvedWebspace, $this->multiWebspaceEnabled)) {
+                    return $this->cache[$cacheKey] = null;
+                }
+
+                $templateData = \array_replace($mergedRaw, $this->resolveSnippetContentData($content, $cacheKey));
                 $title = $content->getTitle();
 
                 $this->referenceStore?->add($snippet->getUuid(), SnippetInterface::RESOURCE_KEY);
@@ -350,6 +406,7 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
                     'id' => $snippet->getUuid(),
                     'uuid' => $snippet->getUuid(),
                     'title' => $title ?? $snippet->getUuid(),
+                    'webspace' => $snippetWebspace,
                     'blocks' => isset($templateData['blocks']) && \is_array($templateData['blocks'])
                         ? $templateData['blocks']
                         : [],
@@ -383,9 +440,12 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
 
         $this->referenceStore?->add($snippet->getUuid(), SnippetInterface::RESOURCE_KEY);
 
-        $templateData = $this->resolveSnippetContentData(
-            $targetContent,
-            'layout:' . $resolvedLocale . ':' . $snippet->getUuid(),
+        $templateData = \array_replace(
+            $this->getMergedLiveTemplateData($snippet, $targetContent),
+            $this->resolveSnippetContentData(
+                $targetContent,
+                'layout:' . $resolvedLocale . ':' . $snippet->getUuid(),
+            ),
         );
         $title = $targetContent->getTitle();
 
@@ -397,6 +457,20 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
             : [];
 
         return $templateData;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function getMergedLiveTemplateData(
+        SnippetInterface $snippet,
+        SnippetDimensionContentInterface $targetContent,
+    ): array {
+        return SnippetScopeResolver::getMergedTemplateData(
+            $snippet,
+            $targetContent,
+            DimensionContentInterface::STAGE_LIVE,
+        );
     }
 
     /**
@@ -432,41 +506,12 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
         string $templateKey,
         string $locale,
     ): ?SnippetDimensionContentInterface {
-        /** @var iterable<SnippetDimensionContentInterface> $dimensionContents */
-        $dimensionContents = $snippet->getDimensionContents();
-
-        foreach ($dimensionContents as $content) {
-            if (
-                $templateKey !== $content->getTemplateKey()
-                || DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()
-                || $content->getLocale() !== $locale
-            ) {
-                continue;
-            }
-            $stage = $content->getStage();
-            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
-                return $content;
-            }
-        }
-
-        foreach ($dimensionContents as $content) {
-            if (
-                $templateKey !== $content->getTemplateKey()
-                || DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()
-            ) {
-                continue;
-            }
-            $contentLocale = $content->getLocale();
-            if (null !== $contentLocale && '' !== $contentLocale) {
-                continue;
-            }
-            $stage = $content->getStage();
-            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
-                return $content;
-            }
-        }
-
-        return null;
+        return SnippetScopeResolver::findDimensionContent(
+            $snippet,
+            $templateKey,
+            $locale,
+            DimensionContentInterface::STAGE_LIVE,
+        );
     }
 
     private function resolveLocale(?string $locale): string
@@ -483,5 +528,19 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
         }
 
         return 'en';
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function resolveWebspaceKey(?string $webspaceKey = null, array $context = []): ?string
+    {
+        return SnippetScopeResolver::resolveActiveWebspace(
+            $webspaceKey,
+            $context,
+            $this->requestStack,
+            $this->requestAnalyzer,
+            $this->multiWebspaceEnabled,
+        );
     }
 }

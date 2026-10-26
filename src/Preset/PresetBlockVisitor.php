@@ -8,6 +8,7 @@ use Sulu\Content\Application\PropertyResolver\BlockVisitor\BlockVisitorInterface
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
+use Totoglu\SuluBlockSuiteBundle\Snippet\SnippetScopeResolver;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformerInterface;
 
 /**
@@ -20,6 +21,7 @@ final readonly class PresetBlockVisitor implements BlockVisitorInterface, BlockT
         private BlockPresetProviderInterface $presetProvider,
         private bool $presetsEnabled = true,
         private ?RequestStack $requestStack = null,
+        private bool $multiWebspaceEnabled = true,
     ) {
     }
 
@@ -36,6 +38,12 @@ final readonly class PresetBlockVisitor implements BlockVisitorInterface, BlockT
     public function transform(array $block, array $context): array
     {
         $locale = isset($context['locale']) && \is_string($context['locale']) ? $context['locale'] : null;
+        if (!isset($block['_webspace'])) {
+            $ctxWebspace = $context['webspaceKey'] ?? ($context['webspace'] ?? null);
+            if (\is_string($ctxWebspace) && '' !== \trim($ctxWebspace)) {
+                $block['_webspace'] = \trim($ctxWebspace);
+            }
+        }
 
         return $this->visit($block, $locale);
     }
@@ -57,6 +65,7 @@ final readonly class PresetBlockVisitor implements BlockVisitorInterface, BlockT
         }
 
         $resolvedLocale = $this->resolveLocale($locale, $block);
+        $resolvedWebspace = $this->resolveWebspace($block);
 
         $props = SuluDataNormalizer::extractProps($block);
         if (isset($block['props']) && \is_array($block['props'])) {
@@ -66,14 +75,20 @@ final readonly class PresetBlockVisitor implements BlockVisitorInterface, BlockT
             ?? ($props['_preset'] ?? ($block['props/preset'] ?? ($block['preset'] ?? null)));
         if (\is_string($rawPresetId) && '' !== \trim($rawPresetId)) {
             $presetId = \trim($rawPresetId);
-            $preset = $this->findPreset($blockType, $presetId, $resolvedLocale);
+            $preset = $this->findPreset($blockType, $presetId, $resolvedLocale, $resolvedWebspace);
             if (null !== $preset) {
                 if (isset($preset['props']) && \is_array($preset['props'])) {
                     foreach ($preset['props'] as $propKey => $presetPropVal) {
                         if (!\is_string($propKey)) {
                             continue;
                         }
-                        if (!\array_key_exists($propKey, $props) || null === $props[$propKey] || '' === $props[$propKey]) {
+                        if (
+                            !\array_key_exists($propKey, $props)
+                            || null === $props[$propKey]
+                            || '' === $props[$propKey]
+                            || 'default' === $props[$propKey]
+                            || 'inherit' === $props[$propKey]
+                        ) {
                             $props[$propKey] = $presetPropVal;
                         }
                     }
@@ -122,6 +137,26 @@ final readonly class PresetBlockVisitor implements BlockVisitorInterface, BlockT
 
         if ('section' === $blockType && isset($block['rows']) && \is_array($block['rows'])) {
             $block['rows'] = $this->visitSectionRows($block['rows'], $resolvedLocale);
+        } elseif ('row' === $blockType) {
+            if (isset($block['blocks']) && \is_array($block['blocks'])) {
+                foreach ($block['blocks'] as $blockIndex => $childBlock) {
+                    if (!\is_array($childBlock)) {
+                        continue;
+                    }
+                    /** @var array<string, mixed> $typedChildBlock */
+                    $typedChildBlock = [];
+                    foreach ($childBlock as $k => $v) {
+                        $typedChildBlock[(string) $k] = $v;
+                    }
+                    if ('column_break' === ($typedChildBlock['type'] ?? null)) {
+                        continue;
+                    }
+                    $block['blocks'][$blockIndex] = $this->visit($typedChildBlock, $resolvedLocale);
+                }
+            }
+            if (isset($block['columns']) && \is_array($block['columns'])) {
+                $block['columns'] = $this->visitRowColumns($block['columns'], $resolvedLocale);
+            }
         }
 
         return $block;
@@ -139,28 +174,7 @@ final readonly class PresetBlockVisitor implements BlockVisitorInterface, BlockT
                 continue;
             }
 
-            foreach ($row['columns'] as $colIndex => $column) {
-                if (!\is_array($column) || !isset($column['blocks']) || !\is_array($column['blocks'])) {
-                    continue;
-                }
-
-                foreach ($column['blocks'] as $blockIndex => $childBlock) {
-                    if (!\is_array($childBlock)) {
-                        continue;
-                    }
-
-                    /** @var array<string, mixed> $typedChildBlock */
-                    $typedChildBlock = [];
-                    foreach ($childBlock as $k => $v) {
-                        $typedChildBlock[(string) $k] = $v;
-                    }
-
-                    $column['blocks'][$blockIndex] = $this->visit($typedChildBlock, $locale);
-                }
-
-                $row['columns'][$colIndex] = $column;
-            }
-
+            $row['columns'] = $this->visitRowColumns($row['columns'], $locale);
             $rows[$rowIndex] = $row;
         }
 
@@ -168,17 +182,63 @@ final readonly class PresetBlockVisitor implements BlockVisitorInterface, BlockT
     }
 
     /**
+     * @param array<array-key, mixed> $columns
+     *
+     * @return array<array-key, mixed>
+     */
+    private function visitRowColumns(array $columns, string $locale): array
+    {
+        foreach ($columns as $colIndex => $column) {
+            if (!\is_array($column) || !isset($column['blocks']) || !\is_array($column['blocks'])) {
+                continue;
+            }
+
+            foreach ($column['blocks'] as $blockIndex => $childBlock) {
+                if (!\is_array($childBlock)) {
+                    continue;
+                }
+
+                /** @var array<string, mixed> $typedChildBlock */
+                $typedChildBlock = [];
+                foreach ($childBlock as $k => $v) {
+                    $typedChildBlock[(string) $k] = $v;
+                }
+
+                $column['blocks'][$blockIndex] = $this->visit($typedChildBlock, $locale);
+            }
+
+            $columns[$colIndex] = $column;
+        }
+
+        return $columns;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
-    private function findPreset(string $blockType, string $presetId, string $locale): ?array
+    private function findPreset(string $blockType, string $presetId, string $locale, ?string $webspace = null): ?array
     {
-        foreach ($this->presetProvider->getPresets($blockType, $locale) as $preset) {
+        foreach ($this->presetProvider->getPresets($blockType, $locale, $webspace) as $preset) {
             if ($preset['id'] === $presetId) {
                 return $preset;
             }
         }
 
         return null;
+    }
+
+    /**
+     * @param array<string, mixed> $block
+     */
+    private function resolveWebspace(array $block): ?string
+    {
+        return SnippetScopeResolver::resolveActiveWebspace(
+            null,
+            $block,
+            $this->requestStack,
+            null,
+            $this->multiWebspaceEnabled,
+        );
     }
 
     /**

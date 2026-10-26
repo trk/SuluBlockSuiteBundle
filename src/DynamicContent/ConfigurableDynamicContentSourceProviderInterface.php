@@ -76,4 +76,15 @@ interface ConfigurableDynamicContentSourceProviderInterface extends DynamicConte
      * @return list<array{name: string, label: string, type: string}>
      */
     public function resolveSourceFields(string $locale = 'en', array $context = []): array;
+
+    /**
+     * Resolves collection metadata (total counts before/after filtering and active filter state)
+     * for result summary bars and empty state handling.
+     *
+     * @param array<string, mixed> $config
+     * @param string|object|array<mixed, mixed>|null $contextPage
+     *
+     * @return array{unfiltered_total?: int|null, filtered_total?: int|null, is_filtered?: bool}
+     */
+    public function resolveCollectionMeta(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array;
 }

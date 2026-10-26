@@ -28,6 +28,7 @@ export default class PresetSelection extends React.Component<Props> {
 
     lastLoadedPresetType: ?string = null;
     lastLoadedPresetLocale: ?string = null;
+    lastLoadedPresetWebspace: ?string = null;
 
     constructor(props: Props) {
         super(props);
@@ -43,7 +44,11 @@ export default class PresetSelection extends React.Component<Props> {
     }
 
     componentDidUpdate() {
-        if (this.componentType !== this.lastLoadedPresetType || this.currentLocale !== this.lastLoadedPresetLocale) {
+        if (
+            this.componentType !== this.lastLoadedPresetType
+            || this.currentLocale !== this.lastLoadedPresetLocale
+            || this.currentWebspace !== this.lastLoadedPresetWebspace
+        ) {
             this.loadPresets();
         }
     }
@@ -75,6 +80,28 @@ export default class PresetSelection extends React.Component<Props> {
 
         const rawLoc = userStore.contentLocale || (userStore.user ? userStore.user.locale : null) || 'en';
         return String(rawLoc).toLowerCase().split('_')[0];
+    }
+
+    get currentWebspace(): ?string {
+        const {formInspector} = this.props;
+        if (!formInspector) {
+            return null;
+        }
+
+        if (formInspector.options && typeof formInspector.options.webspace === 'string' && formInspector.options.webspace.trim() !== '') {
+            return formInspector.options.webspace.trim();
+        }
+
+        try {
+            const fieldWebspace = formInspector.getValueByPath('/webspace');
+            if (typeof fieldWebspace === 'string' && fieldWebspace.trim() !== '') {
+                return fieldWebspace.trim();
+            }
+        } catch (e) {
+            // ignore if path does not exist
+        }
+
+        return null;
     }
 
     get componentType(): string {
@@ -164,21 +191,24 @@ export default class PresetSelection extends React.Component<Props> {
     @action loadPresets = (force: boolean = false) => {
         const type = this.componentType;
         const locale = this.currentLocale;
+        const webspace = this.currentWebspace;
 
         if (!type || type === 'general') {
             this.presetsLoading = false;
             this.lastLoadedPresetType = type;
             this.lastLoadedPresetLocale = locale;
+            this.lastLoadedPresetWebspace = webspace;
             return;
         }
 
-        const cacheKey = `${type}_${locale}`;
+        const cacheKey = `${type}_${locale}_${webspace || ''}`;
 
         if (!force && PresetSelection.presetsCache.has(cacheKey)) {
             this.presets = PresetSelection.presetsCache.get(cacheKey) || [];
             this.presetsLoading = false;
             this.lastLoadedPresetType = type;
             this.lastLoadedPresetLocale = locale;
+            this.lastLoadedPresetWebspace = webspace;
             return;
         }
 
@@ -187,9 +217,10 @@ export default class PresetSelection extends React.Component<Props> {
             const promise = PresetSelection.presetsPromises.get(cacheKey);
             if (promise) {
                 promise.then(action((presets) => {
-                    if (this.componentType === type && this.currentLocale === locale) {
+                    if (this.componentType === type && this.currentLocale === locale && this.currentWebspace === webspace) {
                         this.lastLoadedPresetType = type;
                         this.lastLoadedPresetLocale = locale;
+                        this.lastLoadedPresetWebspace = webspace;
                         this.presets = presets;
                         this.presetsLoading = false;
                     }
@@ -202,7 +233,8 @@ export default class PresetSelection extends React.Component<Props> {
 
         this.presetsLoading = true;
 
-        const url = `/admin/api/block-presets/${encodeURIComponent(type)}?locale=${encodeURIComponent(locale)}`;
+        const webspaceQuery = webspace ? `&webspace=${encodeURIComponent(webspace)}` : '';
+        const url = `/admin/api/block-presets/${encodeURIComponent(type)}?locale=${encodeURIComponent(locale)}${webspaceQuery}`;
         const fetchPromise = Requester.get(url)
             .then((data) => {
                 const list = (data && Array.isArray(data.presets)) ? data.presets : [];
@@ -219,9 +251,10 @@ export default class PresetSelection extends React.Component<Props> {
 
         fetchPromise.then(action((presets) => {
             this.presetsLoading = false;
-            if (this.componentType === type && this.currentLocale === locale) {
+            if (this.componentType === type && this.currentLocale === locale && this.currentWebspace === webspace) {
                 this.lastLoadedPresetType = type;
                 this.lastLoadedPresetLocale = locale;
+                this.lastLoadedPresetWebspace = webspace;
                 this.presets = presets;
             }
         }));
@@ -328,7 +361,7 @@ export default class PresetSelection extends React.Component<Props> {
         if (!exists) {
             this.presets = [...this.presets, createdPreset];
         }
-        const cacheKey = `${this.componentType}_${this.currentLocale}`;
+        const cacheKey = `${this.componentType}_${this.currentLocale}_${this.currentWebspace || ''}`;
         PresetSelection.presetsCache.set(cacheKey, this.presets);
         this.handleSelectPreset(createdPreset.id, createdPreset);
     };
@@ -468,6 +501,7 @@ export default class PresetSelection extends React.Component<Props> {
                     onSuccess={this.handleSavePresetSuccess}
                     open={this.savePresetOpen}
                     propsValues={this.blockPropsValues}
+                    webspace={this.currentWebspace}
                 />
 
                 <Preset.Gallery
@@ -487,6 +521,7 @@ export default class PresetSelection extends React.Component<Props> {
                     onSuccess={this.handleSaveReusableSuccess}
                     open={this.saveReusableOpen}
                     propsValues={this.blockPropsValues}
+                    webspace={this.currentWebspace}
                 />
             </div>
         );

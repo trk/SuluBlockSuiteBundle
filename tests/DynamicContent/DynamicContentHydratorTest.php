@@ -1349,4 +1349,517 @@ final class DynamicContentHydratorTest extends TestCase
         self::assertSame('root-card-2', $result[1]['id']);
         self::assertSame('root-card-3', $result[2]['id']);
     }
+
+    public function testMultiItemBlockExpandsMarkedTemplateItemInPlaceAndPreservesStaticItemsBeforeAndAfter(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $sourceResolver->expects(self::once())
+            ->method('resolveChildren')
+            ->with('services-root', null, 10)
+            ->willReturn([
+                ['title' => 'Dynamic Service 1', 'summary' => 'Dynamic Summary 1', 'url' => '/services/1'],
+                ['title' => 'Dynamic Service 2', 'summary' => 'Dynamic Summary 2', 'url' => '/services/2'],
+            ]);
+
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $gridBlock = [
+            'type' => 'fixture_grid',
+            'items' => [
+                [
+                    'type' => 'fixture_card',
+                    'title' => 'Static Intro Card 1',
+                    'summary' => 'Fixed intro description 1',
+                    'is_dynamic_template' => false,
+                ],
+                [
+                    'type' => 'fixture_card',
+                    'title' => 'Static Intro Card 2',
+                    'summary' => 'Fixed intro description 2',
+                ],
+                [
+                    'type' => 'fixture_card',
+                    'title' => 'Template Card Placeholder',
+                    'button_text' => 'Explore Service',
+                    'is_dynamic_template' => true,
+                    'props' => [
+                        'panel_style' => 'bordered',
+                    ],
+                ],
+                [
+                    'type' => 'fixture_card',
+                    'title' => 'Static Outro CTA Card',
+                    'summary' => 'View all services',
+                    'is_dynamic_template' => false,
+                ],
+            ],
+            'props' => [
+                'columns' => '3',
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_children',
+                    'parent_id' => 'services-root',
+                    'limit' => 10,
+                    'mapping' => [
+                        'title' => 'title',
+                        'summary' => 'summary',
+                        'link' => 'url',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($gridBlock);
+
+        self::assertCount(1, $result);
+        self::assertIsArray($result[0]['items']);
+        /** @var list<array<string, mixed>> $items */
+        $items = $result[0]['items'];
+        self::assertCount(5, $items);
+
+        // 1 & 2: Static items before template
+        self::assertSame('Static Intro Card 1', $items[0]['title']);
+        self::assertSame('Fixed intro description 1', $items[0]['summary']);
+        self::assertSame('Static Intro Card 2', $items[1]['title']);
+        self::assertSame('Fixed intro description 2', $items[1]['summary']);
+
+        // 3 & 4: Hydrated items expanded in-place from the marked template item
+        self::assertSame('Dynamic Service 1', $items[2]['title']);
+        self::assertSame('Dynamic Summary 1', $items[2]['summary']);
+        self::assertSame('/services/1', $items[2]['link']);
+        self::assertSame('Explore Service', $items[2]['button_text']);
+        self::assertFalse($items[2]['is_dynamic_template'] ?? false);
+        self::assertIsArray($items[2]['props']);
+        self::assertSame('bordered', $items[2]['props']['panel_style']);
+
+        self::assertSame('Dynamic Service 2', $items[3]['title']);
+        self::assertSame('Dynamic Summary 2', $items[3]['summary']);
+        self::assertSame('/services/2', $items[3]['link']);
+        self::assertSame('Explore Service', $items[3]['button_text']);
+        self::assertFalse($items[3]['is_dynamic_template'] ?? false);
+        self::assertIsArray($items[3]['props']);
+        self::assertSame('bordered', $items[3]['props']['panel_style']);
+
+        // 5: Static item after template
+        self::assertSame('Static Outro CTA Card', $items[4]['title']);
+        self::assertSame('View all services', $items[4]['summary']);
+    }
+
+    public function testMultiItemBlockWithStaticAndTemplateItemsPreservesStaticItemsWhenDynamicSourceReturnsEmpty(): void
+    {
+        $sourceResolver = $this->createMock(PageSourceResolverInterface::class);
+        $sourceResolver->expects(self::once())
+            ->method('resolveChildren')
+            ->with('empty-root', null, 10)
+            ->willReturn([]);
+
+        $hydrator = new DynamicContentHydrator($sourceResolver);
+
+        $gridBlock = [
+            'type' => 'fixture_grid',
+            'items' => [
+                [
+                    'type' => 'fixture_card',
+                    'title' => 'StaticBefore',
+                    'is_dynamic_template' => false,
+                ],
+                [
+                    'type' => 'fixture_card',
+                    'title' => 'TemplatePlaceholder',
+                    'is_dynamic_template' => true,
+                ],
+                [
+                    'type' => 'fixture_card',
+                    'title' => 'StaticAfter',
+                ],
+            ],
+            'props' => [
+                '_dynamic' => [
+                    'enabled' => true,
+                    'source_type' => 'page_children',
+                    'parent_id' => 'empty-root',
+                    'limit' => 10,
+                    'hide_if_empty' => false,
+                    'mapping' => [
+                        'title' => 'title',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($gridBlock);
+
+        self::assertCount(1, $result);
+        self::assertIsArray($result[0]['items']);
+        /** @var list<array<string, mixed>> $items */
+        $items = $result[0]['items'];
+        self::assertCount(2, $items);
+        self::assertSame('StaticBefore', $items[0]['title']);
+        self::assertSame('StaticAfter', $items[1]['title']);
+    }
+
+    public function testProviderCustomOutputsSubBlockCollectionMappingAndTokenInterpolation(): void
+    {
+        $charterProvider = new class extends \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider {
+            public function getKey(): string
+            {
+                return 'charter_yachts';
+            }
+
+            public function getLabel(string $locale = 'en'): string
+            {
+                return 'Charter Yachts';
+            }
+
+            public function getSourceFields(string $locale = 'en'): array
+            {
+                return [
+                    ['name' => 'title', 'label' => 'Yacht Name', 'type' => 'string'],
+                    ['name' => 'destination', 'label' => 'Destination', 'type' => 'string'],
+                    ['name' => 'formatted_length', 'label' => 'Length', 'type' => 'string'],
+                    ['name' => 'built_year', 'label' => 'Built Year', 'type' => 'int'],
+                    ['name' => 'guests', 'label' => 'Guests', 'type' => 'int'],
+                    ['name' => 'cabins', 'label' => 'Cabins', 'type' => 'int'],
+                    ['name' => 'price', 'label' => 'Weekly Rate', 'type' => 'string'],
+                    ['name' => 'url', 'label' => 'Detail URL', 'type' => 'url'],
+                ];
+            }
+
+            protected function getCustomOutputs(string $locale = 'en'): array
+            {
+                return [
+                    'short_spec' => [
+                        'label' => 'Short Specifications',
+                        'type' => 'string',
+                        'resolve' => static function (array $item): string {
+                            $parts = [];
+                            if (isset($item['formatted_length']) && \is_scalar($item['formatted_length']) && '' !== (string) $item['formatted_length']) {
+                                $parts[] = (string) $item['formatted_length'];
+                            }
+                            if (isset($item['built_year']) && \is_scalar($item['built_year']) && '' !== (string) $item['built_year']) {
+                                $parts[] = (string) $item['built_year'];
+                            }
+                            if (isset($item['guests']) && \is_scalar($item['guests']) && '' !== (string) $item['guests']) {
+                                $parts[] = $item['guests'] . ' guests';
+                            }
+                            if (isset($item['cabins']) && \is_scalar($item['cabins']) && '' !== (string) $item['cabins']) {
+                                $parts[] = $item['cabins'] . ' cabins';
+                            }
+
+                            return \implode(' | ', $parts);
+                        },
+                    ],
+                    'overlay_badges' => [
+                        'label' => 'Overlay Badges',
+                        'type' => 'collection',
+                        'resolve' => static fn (array $item): array => isset($item['raw_badges']) && \is_array($item['raw_badges']) ? $item['raw_badges'] : [],
+                    ],
+                    'spec_elements' => [
+                        'label' => 'Spec Elements',
+                        'type' => 'collection',
+                        'resolve' => static fn (array $item): array => [
+                            [
+                                'type' => 'badge',
+                                'title' => 'Destination: ' . (isset($item['destination']) && \is_scalar($item['destination']) ? (string) $item['destination'] : ''),
+                                'icon' => 'lucide-map-pin',
+                            ],
+                            [
+                                'type' => 'badge',
+                                'title' => 'Guests: ' . (isset($item['guests']) && \is_scalar($item['guests']) ? (string) $item['guests'] : ''),
+                                'icon' => 'lucide-users',
+                            ],
+                        ],
+                    ],
+                ];
+            }
+
+            public function resolveCollection(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
+            {
+                $rawItems = [
+                    [
+                        'title' => 'CORAL OCEAN',
+                        'destination' => 'Italy, France, Greece',
+                        'formatted_length' => '73-m',
+                        'built_year' => 2022,
+                        'guests' => 12,
+                        'cabins' => 7,
+                        'price' => 'From € 495.000 per week',
+                        'url' => '/charter/coral-ocean',
+                        'raw_badges' => ['LUXURY MOTOR SAILER', 'BASED IN GREECE'],
+                    ],
+                    [
+                        'title' => 'DAIMA',
+                        'destination' => 'Greece',
+                        'formatted_length' => '42-m',
+                        'built_year' => null,
+                        'guests' => 10,
+                        'cabins' => 5,
+                        'price' => '€ 78,000 - € 88,000',
+                        'url' => '/charter/daima',
+                        'raw_badges' => [
+                            ['type' => 'badge', 'title' => 'WITH WOW WATER SPORTS'],
+                        ],
+                    ],
+                ];
+
+                return $this->applyCustomOutputsToCollection($rawItems, $locale ?? 'en');
+            }
+        };
+
+        $resolvedFields = $charterProvider->resolveSourceFields('en');
+        $fieldNames = \array_column($resolvedFields, 'name');
+        self::assertContains('short_spec', $fieldNames);
+        self::assertContains('overlay_badges', $fieldNames);
+        self::assertContains('spec_elements', $fieldNames);
+
+        $hydrator = new DynamicContentHydrator(null, [$charterProvider]);
+
+        $gridBlock = [
+            'type' => 'fixture_grid',
+            'items' => [
+                [
+                    'type' => 'card',
+                    'is_dynamic_template' => true,
+                    'title' => '{{title}}',
+                    'subtitle' => '{{destination}}',
+                    'meta' => '{{formatted_length}} | {{built_year}} | {{guests}} guests | {{cabins}} cabins',
+                    'content' => '<p>{{price}}</p>',
+                    'buttons' => [
+                        ['type' => 'button', 'title' => 'Inquire {{title}}', 'url' => '{{url}}'],
+                    ],
+                ],
+            ],
+            'props' => [
+                'dynamic_source' => 'charter_yachts',
+                'dynamic_mapping' => [
+                    ['type' => 'field_map', 'target_field' => 'badges', 'source_field' => 'overlay_badges'],
+                    ['type' => 'field_map', 'target_field' => 'elements', 'source_field' => 'spec_elements'],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($gridBlock);
+        self::assertCount(1, $result);
+        /** @var list<array<string, mixed>> $items */
+        $items = $result[0]['items'];
+        self::assertCount(2, $items);
+
+        // First yacht: all tokens present + string badges coerced to badge objects + spec_elements mapped + button interpolated
+        self::assertSame('CORAL OCEAN', $items[0]['title']);
+        self::assertSame('Italy, France, Greece', $items[0]['subtitle']);
+        self::assertSame('73-m | 2022 | 12 guests | 7 cabins', $items[0]['meta']);
+        self::assertSame('<p>From € 495.000 per week</p>', $items[0]['content']);
+        self::assertSame([
+            ['type' => 'badge', 'title' => 'LUXURY MOTOR SAILER'],
+            ['type' => 'badge', 'title' => 'BASED IN GREECE'],
+        ], $items[0]['badges']);
+        self::assertSame([
+            ['type' => 'badge', 'title' => 'Destination: Italy, France, Greece', 'icon' => 'lucide-map-pin'],
+            ['type' => 'badge', 'title' => 'Guests: 12', 'icon' => 'lucide-users'],
+        ], $items[0]['elements']);
+        /** @var list<array<string, mixed>> $buttons */
+        $buttons = $items[0]['buttons'];
+        self::assertSame('Inquire CORAL OCEAN', $buttons[0]['title']);
+        self::assertSame('/charter/coral-ocean', $buttons[0]['url']);
+
+        // Second yacht: built_year is null -> dangling separator around empty token is cleaned up!
+        self::assertSame('DAIMA', $items[1]['title']);
+        self::assertSame('42-m | 10 guests | 5 cabins', $items[1]['meta']);
+    }
+
+    public function testDynamicSummaryAndEmptyStateSupportWithCollectionMeta(): void
+    {
+        $filteredItems = [
+            ['title' => 'Yacht 1', 'url' => '/y-1'],
+            ['title' => 'Yacht 2', 'url' => '/y-2'],
+        ];
+        $isZeroResultMode = false;
+
+        $searchProvider = new class($filteredItems, $isZeroResultMode) extends \Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider {
+            /**
+             * @param list<array<string, mixed>> $items
+             */
+            public function __construct(
+                private array $items,
+                public bool &$zeroResultMode,
+            ) {
+            }
+
+            public function getKey(): string
+            {
+                return 'charter_search';
+            }
+
+            public function getLabel(string $locale = 'en'): string
+            {
+                return 'Charter Search';
+            }
+
+            public function getSourceFields(string $locale = 'en'): array
+            {
+                return [
+                    ['name' => 'title', 'label' => 'Title', 'type' => 'string'],
+                ];
+            }
+
+            public function resolveCollection(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
+            {
+                return $this->zeroResultMode ? [] : $this->items;
+            }
+
+            public function resolveCollectionMeta(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
+            {
+                if ($this->zeroResultMode) {
+                    return [
+                        'unfiltered_total' => 500,
+                        'filtered_total' => 0,
+                        'is_filtered' => true,
+                    ];
+                }
+
+                return [
+                    'unfiltered_total' => 500,
+                    'filtered_total' => 200,
+                    'is_filtered' => true,
+                ];
+            }
+        };
+
+        $hydrator = new DynamicContentHydrator(null, [$searchProvider]);
+
+        $gridBlock = [
+            'type' => 'fixture_grid',
+            'title' => 'Available Yachts (%count% of %total%)',
+            'description' => 'Showing %showing% yachts on this page',
+            'items' => [
+                [
+                    'type' => 'card',
+                    'is_dynamic_template' => true,
+                    'title' => '{{title}}',
+                ],
+            ],
+            'props' => [
+                'dynamic_source' => 'charter_search',
+                'dynamic_show_summary' => 'top',
+                'dynamic_summary_text' => 'Showing %showing% of %total% yachts',
+                'dynamic_filtered_summary_text' => 'Found %count% yachts matching your criteria (showing %showing% of %total%)',
+                'dynamic_empty_message' => 'No yachts found matching your search criteria.',
+                'dynamic_hide_if_empty' => false,
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($gridBlock);
+        self::assertCount(1, $result);
+        $hydrated = $result[0];
+
+        self::assertSame('Available Yachts (200 of 500)', $hydrated['title']);
+        self::assertSame('Showing 2 yachts on this page', $hydrated['description']);
+        self::assertIsArray($hydrated['_summary'] ?? null);
+        self::assertSame(500, $hydrated['_summary']['unfiltered_total']);
+        self::assertSame(200, $hydrated['_summary']['total_items']);
+        self::assertSame(2, $hydrated['_summary']['showing_count']);
+        self::assertTrue($hydrated['_summary']['is_filtered']);
+        self::assertSame('top', $hydrated['_summary']['position']);
+        self::assertSame(
+            'Found 200 yachts matching your criteria (showing 2 of 500)',
+            $hydrated['_summary']['formatted_summary'],
+        );
+
+        // Now switch to 0 results: block must NOT disappear, must populate _empty_state
+        $isZeroResultMode = true;
+        $emptyResult = $hydrator->hydrateBlock($gridBlock);
+        self::assertCount(1, $emptyResult);
+        $emptyHydrated = $emptyResult[0];
+        self::assertSame([], $emptyHydrated['items']);
+        self::assertSame('Available Yachts (0 of 500)', $emptyHydrated['title']);
+        self::assertIsArray($emptyHydrated['_empty_state'] ?? null);
+        self::assertSame('No yachts found matching your search criteria.', $emptyHydrated['_empty_state']['message']);
+        self::assertTrue($emptyHydrated['_empty_state']['is_filtered']);
+    }
+
+    public function testRegisterCustomOutputOverridesAndAddsOutputsWithoutExtendingProvider(): void
+    {
+        $sourceResolver = $this->createStub(PageSourceResolverInterface::class);
+        $sourceResolver->method('resolveQuery')->willReturn([
+            [
+                'title' => 'BLUE DREAM',
+                'length' => 54,
+                'guests' => 12,
+                'cabins' => 6,
+            ],
+        ]);
+
+        $pageProvider = new \Totoglu\SuluBlockSuiteBundle\DynamicContent\Provider\SuluPageSourceProvider($sourceResolver);
+        $pageProvider
+            ->registerCustomOutput(
+                name: 'short_spec',
+                resolve: static fn (array $item): string => \sprintf(
+                    '%dm • %d Guests • %d Cabins',
+                    \is_numeric($item['length'] ?? null) ? (int) $item['length'] : 0,
+                    \is_numeric($item['guests'] ?? null) ? (int) $item['guests'] : 0,
+                    \is_numeric($item['cabins'] ?? null) ? (int) $item['cabins'] : 0,
+                ),
+                label: 'Custom Spec Output',
+                type: 'string',
+            )
+            ->registerCustomOutput(
+                name: 'vip_badges',
+                resolve: static fn (array $item): array => ((\is_numeric($item['length'] ?? null) ? (int) $item['length'] : 0) >= 50)
+                    ? ['MEGA YACHT']
+                    : [],
+                label: 'VIP Badges',
+                type: 'collection',
+            );
+
+        // Override `short_spec` dynamically from project configuration
+        $pageProvider->registerCustomOutput(
+            name: 'short_spec',
+            resolve: static fn (array $item): string => \sprintf(
+                'PROJECT OVERRIDE: %dm / %d Pax',
+                \is_numeric($item['length'] ?? null) ? (int) $item['length'] : 0,
+                \is_numeric($item['guests'] ?? null) ? (int) $item['guests'] : 0,
+            ),
+            label: 'Project Spec Override',
+            type: 'string',
+        );
+
+        $fields = $pageProvider->resolveSourceFields('en');
+        $fieldsByName = \array_column($fields, null, 'name');
+        self::assertArrayHasKey('short_spec', $fieldsByName);
+        self::assertSame('Project Spec Override', $fieldsByName['short_spec']['label']);
+        self::assertArrayHasKey('vip_badges', $fieldsByName);
+        self::assertSame('collection', $fieldsByName['vip_badges']['type']);
+
+        $hydrator = new DynamicContentHydrator($sourceResolver, [$pageProvider]);
+
+        $gridBlock = [
+            'type' => 'fixture_grid',
+            'items' => [
+                [
+                    'type' => 'card',
+                    'is_dynamic_template' => true,
+                    'title' => '{{title}}',
+                    'meta' => '{{short_spec}}',
+                ],
+            ],
+            'props' => [
+                'dynamic_source' => 'page_children',
+                'dynamic_page_id' => 'root-uuid',
+                'dynamic_mapping' => [
+                    ['type' => 'field_map', 'target_field' => 'badges', 'source_field' => 'vip_badges'],
+                ],
+            ],
+        ];
+
+        $result = $hydrator->hydrateBlock($gridBlock);
+        self::assertCount(1, $result);
+        /** @var list<array<string, mixed>> $items */
+        $items = $result[0]['items'];
+        self::assertCount(1, $items);
+        self::assertSame('BLUE DREAM', $items[0]['title']);
+        self::assertSame('PROJECT OVERRIDE: 54m / 12 Pax', $items[0]['meta']);
+        self::assertSame([
+            ['type' => 'badge', 'title' => 'MEGA YACHT'],
+        ], $items[0]['badges']);
+    }
 }

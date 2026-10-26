@@ -147,7 +147,7 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
 
     public function resolveSourceFields(string $locale = 'en', array $context = []): array
     {
-        $fields = $this->getSourceFields($locale);
+        $fields = parent::resolveSourceFields($locale, $context);
 
         $pageId = $context['page_id'] ?? ($context['id'] ?? null);
         if (\is_string($pageId) && '' !== \trim($pageId) && null !== $this->sourceResolver) {

@@ -7,23 +7,73 @@ namespace Totoglu\SuluBlockSuiteBundle\Metadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\ItemMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\OptionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
 
 /**
- * Discovers mappable target content fields for any registered Sulu CMS block
- * by inspecting Sulu FormMetadata (including fields nested inside sections/tabs).
+ * Discovers mappable target content fields, section partitions, and inline option groups
+ * for any registered Sulu CMS block by inspecting Sulu FormMetadata.
  */
 final class BlockTargetFieldMetadataResolver
 {
+    public const RESERVED_OPTION_NAMES = [
+        'values' => true,
+        'default_values' => true,
+        'displayOptions' => true,
+        'types' => true,
+        'template_type' => true,
+        'resource_key' => true,
+        'groups' => true,
+        'group' => true,
+        'excluded_types' => true,
+        'excluded_templates' => true,
+        'exclude' => true,
+        'include_global' => true,
+        'permission_filtered' => true,
+        'auto_default' => true,
+        'attributes' => true,
+        'properties' => true,
+        'request_parameters' => true,
+        'resource_store_properties_to_request' => true,
+    ];
+
+    public const INLINE_OPTION_META_NAMES = [
+        '_icon' => true,
+        'icon' => true,
+        '_default' => true,
+        'default_value' => true,
+        'default' => true,
+        '_target' => true,
+        'target' => true,
+        '_title' => true,
+        '_storage_key' => true,
+    ];
+
     private const EXCLUDED_FIELDS = [
         'props',
         'dynamic_source',
+        'is_dynamic_template',
+        'is_template',
         'target_block',
         'reusable_snippet',
         'snippet',
     ];
+
+    public const MAPPABLE_SUB_BLOCK_FIELDS = [
+        'elements',
+        'badges',
+        'buttons',
+        'specs',
+        'features',
+        'tags',
+    ];
+
+    /**
+     * @var array<string, array<string, string>>
+     */
+    private array $fieldTypeMapCache = [];
 
     public function __construct(
         private readonly ?MetadataProviderRegistry $metadataProviderRegistry = null,
@@ -36,6 +86,213 @@ final class BlockTargetFieldMetadataResolver
     public function resolveTargetFields(string $blockType, string $locale = 'en'): array
     {
         return $this->resolveBlockMetadata($blockType, $locale)['fields'];
+    }
+
+    /**
+     * Memoized map of target field name => normalized type (`string`, `text`, `media`, `link`, `form`, etc.).
+     *
+     * @return array<string, string>
+     */
+    public function resolveFieldTypeMap(string $blockType, string $locale = 'en'): array
+    {
+        $cleanType = \strtolower(\trim($blockType));
+        if ('' === $cleanType) {
+            return [];
+        }
+
+        $cacheKey = $cleanType . ':' . $locale;
+        if (isset($this->fieldTypeMapCache[$cacheKey])) {
+            return $this->fieldTypeMapCache[$cacheKey];
+        }
+
+        $types = [];
+        foreach ($this->resolveTargetFields($cleanType, $locale) as $fieldMeta) {
+            $types[$fieldMeta['name']] = $fieldMeta['type'];
+        }
+
+        return $this->fieldTypeMapCache[$cacheKey] = $types;
+    }
+
+    /**
+     * Partitions a block FormMetadata into its `content` items, custom `settings` sections,
+     * `advanced` section, and `dynamic_content` section.
+     *
+     * @return array{
+     *     content: array<array-key, ItemMetadata>,
+     *     settings: list<SectionMetadata>,
+     *     advanced: ?SectionMetadata,
+     *     dynamic_content: ?SectionMetadata
+     * }
+     */
+    public static function partitionBlockSections(FormMetadata $form): array
+    {
+        $items = $form->getItems();
+        if (isset($items[BlockSuiteFormMetadataVisitor::TABS_SECTION_NAME]) && $items[BlockSuiteFormMetadataVisitor::TABS_SECTION_NAME] instanceof SectionMetadata) {
+            $tabItems = $items[BlockSuiteFormMetadataVisitor::TABS_SECTION_NAME]->getItems();
+            $contentItems = isset($tabItems['content']) && $tabItems['content'] instanceof SectionMetadata
+                ? $tabItems['content']->getItems()
+                : [];
+            $settingsSections = [];
+            $advancedSection = null;
+            $dynamicSection = null;
+
+            foreach ($tabItems as $tabKey => $tabSection) {
+                if (!$tabSection instanceof SectionMetadata || 'content' === $tabKey) {
+                    continue;
+                }
+                if ('advanced' === $tabKey) {
+                    $advancedSection = $tabSection;
+                } elseif ('dynamic_content' === $tabKey) {
+                    $dynamicSection = $tabSection;
+                } else {
+                    $settingsSections[] = $tabSection;
+                }
+            }
+
+            return [
+                'content' => $contentItems,
+                'settings' => $settingsSections,
+                'advanced' => $advancedSection,
+                'dynamic_content' => $dynamicSection,
+            ];
+        }
+
+        return [
+            'content' => $items,
+            'settings' => [],
+            'advanced' => null,
+            'dynamic_content' => null,
+        ];
+    }
+
+    public static function isPopoverOptionCollection(OptionMetadata $option): bool
+    {
+        if (OptionMetadata::TYPE_COLLECTION !== $option->getType()) {
+            return false;
+        }
+
+        $name = (string) $option->getName();
+        if ('' === $name || isset(self::RESERVED_OPTION_NAMES[$name])) {
+            return false;
+        }
+
+        $children = $option->getValue();
+        if (!\is_array($children) || [] === $children) {
+            return false;
+        }
+
+        $hasMetaKey = false;
+        $hasSelectableItem = false;
+
+        foreach ($children as $child) {
+            $childName = (string) ($child->getName() ?? '');
+            if (isset(self::INLINE_OPTION_META_NAMES[$childName])) {
+                $hasMetaKey = true;
+
+                continue;
+            }
+
+            if ('' !== $childName || \is_scalar($child->getValue())) {
+                $hasSelectableItem = true;
+            }
+        }
+
+        return $hasSelectableItem && ($hasMetaKey || !self::isBooleanFlagCollection($children));
+    }
+
+    /**
+     * Extracts inline ArrowMenu `<param type="collection">` option groups from a FieldMetadata,
+     * excluding reserved Sulu options and boolean-flag feature collections.
+     *
+     * @return list<array{
+     *     name: string,
+     *     storage_key: string,
+     *     default: string|int|bool|null,
+     *     values: list<array{value: string, label: string}>
+     * }>
+     */
+    public static function extractFieldOptionGroups(FieldMetadata $field, string $locale = 'en', string $prefix = 'props/'): array
+    {
+        $groups = [];
+        foreach ($field->getOptions() as $option) {
+            if (!self::isPopoverOptionCollection($option)) {
+                continue;
+            }
+
+            $optName = (string) $option->getName();
+            $children = $option->getValue();
+            if (!\is_array($children)) {
+                continue;
+            }
+
+            $targetName = $optName;
+            $storageKey = null;
+            /** @var string|int|bool|null $default */
+            $default = null;
+            /** @var list<array{value: string, label: string}> $values */
+            $values = [];
+
+            foreach ($children as $child) {
+                $childName = (string) ($child->getName() ?? '');
+                if (isset(self::INLINE_OPTION_META_NAMES[$childName])) {
+                    $val = $child->getValue();
+                    if (('_target' === $childName || 'target' === $childName) && \is_string($val) && '' !== \trim($val)) {
+                        $targetName = \trim($val);
+                    } elseif ('_storage_key' === $childName && \is_string($val) && '' !== \trim($val)) {
+                        $storageKey = \trim($val);
+                    } elseif (\in_array($childName, ['_default', 'default_value', 'default'], true) && (\is_string($val) || \is_int($val) || \is_bool($val))) {
+                        $default = $val;
+                    }
+
+                    continue;
+                }
+
+                $rawVal = $child->getValue();
+                $optVal = '' !== $childName ? $childName : (\is_scalar($rawVal) ? (string) $rawVal : '');
+                if ('' === $optVal) {
+                    continue;
+                }
+
+                $label = \trim((string) ($child->getTitle($locale) ?? $child->getTitle('en') ?? ''));
+                if ('' === $label) {
+                    $label = \is_scalar($rawVal) && '' !== \trim((string) $rawVal) ? \trim((string) $rawVal) : $optVal;
+                }
+
+                $values[] = [
+                    'value' => $optVal,
+                    'label' => $label,
+                ];
+            }
+
+            if ([] === $values) {
+                continue;
+            }
+
+            $resolvedStorageKey = $storageKey ?? ('' === $prefix || \str_starts_with($targetName, $prefix) ? $targetName : $prefix . $targetName);
+            $groups[] = [
+                'name' => $optName,
+                'storage_key' => $resolvedStorageKey,
+                'default' => $default ?? $values[0]['value'],
+                'values' => $values,
+            ];
+        }
+
+        return $groups;
+    }
+
+    /**
+     * @param array<array-key, OptionMetadata> $children
+     */
+    private static function isBooleanFlagCollection(array $children): bool
+    {
+        foreach ($children as $child) {
+            $val = $child->getValue();
+            if (!\is_bool($val) && 'true' !== $val && 'false' !== $val) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -85,7 +342,7 @@ final class BlockTargetFieldMetadataResolver
                             if (
                                 \str_starts_with($childFieldName, 'props/')
                                 || \in_array($childFieldName, self::EXCLUDED_FIELDS, true)
-                                || 'block' === $childFieldType
+                                || ('block' === $childFieldType && !\in_array($childFieldName, self::MAPPABLE_SUB_BLOCK_FIELDS, true))
                             ) {
                                 continue;
                             }
@@ -100,13 +357,20 @@ final class BlockTargetFieldMetadataResolver
                                 'label' => $this->formatFieldLabel($humanChildLabel, $childFieldName),
                                 'type' => $this->mapSuluFieldType($childFieldType),
                             ];
+
+                            if ('elements' === $childFieldName && 'block' === $childFieldType) {
+                                $this->appendVirtualElementTargets($childItem, $locale, $fieldsByName);
+                            }
                         }
                     }
 
                     continue;
                 }
 
-                if (\in_array($fieldName, self::EXCLUDED_FIELDS, true) || 'block' === $fieldType) {
+                if (
+                    \in_array($fieldName, self::EXCLUDED_FIELDS, true)
+                    || ('block' === $fieldType && !\in_array($fieldName, self::MAPPABLE_SUB_BLOCK_FIELDS, true))
+                ) {
                     continue;
                 }
 
@@ -120,6 +384,10 @@ final class BlockTargetFieldMetadataResolver
                     'label' => $this->formatFieldLabel($humanLabel, $fieldName),
                     'type' => $this->mapSuluFieldType($fieldType),
                 ];
+
+                if ('elements' === $fieldName && 'block' === $fieldType) {
+                    $this->appendVirtualElementTargets($item, $locale, $fieldsByName);
+                }
             }
         }
 
@@ -184,24 +452,62 @@ final class BlockTargetFieldMetadataResolver
         return null;
     }
 
+    /**
+     * @param array<string, array{name: string, label: string, type: string}> $fieldsByName
+     */
+    private function appendVirtualElementTargets(FieldMetadata $elementsField, string $locale, array &$fieldsByName): void
+    {
+        $types = $elementsField->getTypes();
+        if (isset($types['button'])) {
+            $rawBtn = $types['button']->getTitle($locale);
+            if ('' === \trim($rawBtn)) {
+                $rawBtn = $types['button']->getTitle('en');
+            }
+            $btnLabel = '' !== \trim($rawBtn) ? $rawBtn : 'Buttons';
+            $fieldsByName['buttons'] ??= [
+                'name' => 'buttons',
+                'label' => $this->formatFieldLabel($btnLabel, 'buttons'),
+                'type' => 'collection',
+            ];
+        }
+        if (isset($types['badge'])) {
+            $rawBadge = $types['badge']->getTitle($locale);
+            if ('' === \trim($rawBadge)) {
+                $rawBadge = $types['badge']->getTitle('en');
+            }
+            $badgeLabel = '' !== \trim($rawBadge) ? $rawBadge : 'Badges';
+            $fieldsByName['badges'] ??= [
+                'name' => 'badges',
+                'label' => $this->formatFieldLabel($badgeLabel, 'badges'),
+                'type' => 'collection',
+            ];
+        }
+    }
+
     private function formatFieldLabel(string $label, string $name): string
     {
         return '' !== \trim($label) ? \trim($label) : $name;
     }
 
-    private function mapSuluFieldType(string $suluType): string
+    public static function normalizeFieldType(string $suluType): string
     {
-        return match ($suluType) {
-            'text_area', 'text_editor' => 'text',
-            'single_media_selection', 'media_selection' => 'media',
-            'link' => 'link',
+        return match (\strtolower(\trim($suluType))) {
+            'text_area', 'text_editor', 'text', 'html', 'richtext' => 'text',
+            'single_media_selection', 'media_selection', 'media', 'image' => 'media',
+            'link', 'url', 'page_link' => 'link',
             'single_icon_selection', 'icon' => 'icon',
-            'single_form_selection' => 'form',
-            'checkbox' => 'boolean',
-            'single_select', 'select' => 'select',
+            'single_form_selection', 'form' => 'form',
+            'checkbox', 'bool', 'boolean' => 'boolean',
+            'single_select', 'select', 'single_template_selection', 'template_selection', 'single_webspace_select', 'webspace_select' => 'select',
             'date', 'datetime', 'time' => 'date',
-            'number' => 'number',
+            'number', 'int', 'integer', 'float', 'double', 'price' => 'number',
+            'block', 'collection', 'array', 'badges', 'buttons', 'elements', 'list' => 'collection',
             default => 'string',
         };
+    }
+
+    private function mapSuluFieldType(string $suluType): string
+    {
+        return self::normalizeFieldType($suluType);
     }
 }

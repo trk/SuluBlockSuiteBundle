@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Sulu\Bundle\AdminBundle\Admin\Navigation\NavigationItemCollection;
 use Sulu\Bundle\AdminBundle\Admin\View\FormViewBuilderInterface;
 use Sulu\Bundle\AdminBundle\Admin\View\ListViewBuilderInterface;
+use Sulu\Bundle\AdminBundle\Admin\View\PreviewFormViewBuilderInterface;
 use Sulu\Bundle\AdminBundle\Admin\View\ResourceTabViewBuilderInterface;
 use Sulu\Bundle\AdminBundle\Admin\View\ViewBuilderFactoryInterface;
 use Sulu\Bundle\AdminBundle\Admin\View\ViewCollection;
@@ -133,6 +134,22 @@ final class BlockSuiteAdminTest extends TestCase
                 return $builder;
             });
 
+        $viewBuilderFactory
+            ->method('createPreviewFormViewBuilder')
+            ->willReturnCallback(function (string $name): PreviewFormViewBuilderInterface {
+                $builder = $this->createStub(PreviewFormViewBuilderInterface::class);
+                $builder->method('getName')->willReturn($name);
+                $builder->method('setResourceKey')->willReturnSelf();
+                $builder->method('setFormKey')->willReturnSelf();
+                $builder->method('setTabTitle')->willReturnSelf();
+                $builder->method('setEditView')->willReturnSelf();
+                $builder->method('addToolbarActions')->willReturnSelf();
+                $builder->method('addMetadataRequestParameters')->willReturnSelf();
+                $builder->method('setParent')->willReturnSelf();
+
+                return $builder;
+            });
+
         $admin = new BlockSuiteAdmin($viewBuilderFactory, $securityChecker, $localizationManager);
 
         $viewCollection = new ViewCollection();
@@ -188,6 +205,20 @@ final class BlockSuiteAdminTest extends TestCase
 
         $viewBuilderFactory->method('createFormViewBuilder')->willReturnCallback(function (string $name): FormViewBuilderInterface {
             $builder = $this->createStub(FormViewBuilderInterface::class);
+            $builder->method('getName')->willReturn($name);
+            $builder->method('setResourceKey')->willReturnSelf();
+            $builder->method('setFormKey')->willReturnSelf();
+            $builder->method('setTabTitle')->willReturnSelf();
+            $builder->method('setEditView')->willReturnSelf();
+            $builder->method('addToolbarActions')->willReturnSelf();
+            $builder->method('addMetadataRequestParameters')->willReturnSelf();
+            $builder->method('setParent')->willReturnSelf();
+
+            return $builder;
+        });
+
+        $viewBuilderFactory->method('createPreviewFormViewBuilder')->willReturnCallback(function (string $name): PreviewFormViewBuilderInterface {
+            $builder = $this->createStub(PreviewFormViewBuilderInterface::class);
             $builder->method('getName')->willReturn($name);
             $builder->method('setResourceKey')->willReturnSelf();
             $builder->method('setFormKey')->willReturnSelf();

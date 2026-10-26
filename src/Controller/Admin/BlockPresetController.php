@@ -28,6 +28,7 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockSuiteFormMetadataVisitor;
 use Totoglu\SuluBlockSuiteBundle\Preset\BlockPresetProviderInterface;
 use Totoglu\SuluBlockSuiteBundle\Preset\MediaPreviewUrlResolver;
+use Totoglu\SuluBlockSuiteBundle\Snippet\SnippetScopeResolver;
 use Totoglu\SuluBlockSuiteBundle\Template\TemplateKeys;
 
 final class BlockPresetController extends AbstractController
@@ -45,6 +46,7 @@ final class BlockPresetController extends AbstractController
         private readonly ?SecurityCheckerInterface $securityChecker = null,
         ?MediaPreviewUrlResolver $mediaPreviewUrlResolver = null,
         private readonly ?LoggerInterface $logger = null,
+        private readonly bool $multiWebspaceEnabled = true,
     ) {
         if (null !== $messageBus) {
             $this->messageBus = $messageBus;
@@ -77,11 +79,13 @@ final class BlockPresetController extends AbstractController
         }
 
         $types = $this->formMetadataVisitor->discoverAvailableBlockTypes($locale);
+        $rawWebspace = $request->query->getString('webspace');
+        $webspace = $this->multiWebspaceEnabled && '' !== \trim($rawWebspace) ? \trim($rawWebspace) : null;
 
         /** @var list<array{type: string, title: string, presets_count: int}> $result */
         $result = [];
         foreach ($types as $type) {
-            $presets = $this->presetProvider->getPresets($type, $locale);
+            $presets = $this->presetProvider->getPresets($type, $locale, $webspace);
             $title = $this->formMetadataVisitor->resolveBlockTitle($type, $locale);
 
             $result[] = [
@@ -110,11 +114,15 @@ final class BlockPresetController extends AbstractController
 
         $this->requirePermission($locale, PermissionTypes::VIEW);
 
-        $presets = $this->presetProvider->getPresets($blockType, $locale);
+        $rawWebspace = $request->query->getString('webspace');
+        $webspace = $this->multiWebspaceEnabled && '' !== \trim($rawWebspace) ? \trim($rawWebspace) : null;
+
+        $presets = $this->presetProvider->getPresets($blockType, $locale, $webspace);
 
         return new JsonResponse([
             'block_type' => $blockType,
             'locale' => $locale,
+            'webspace' => $webspace,
             'presets' => $presets,
         ]);
     }
@@ -186,12 +194,17 @@ final class BlockPresetController extends AbstractController
             ],
         );
 
+        $webspace = $this->multiWebspaceEnabled && isset($data['webspace']) && \is_string($data['webspace']) && '' !== \trim($data['webspace'])
+            ? \trim($data['webspace'])
+            : '_global';
+
         /** @var array<string, mixed> $snippetData */
         $snippetData = [
             'template' => TemplateKeys::BLOCK_PRESET,
             'locale' => $locale,
             'title' => $title,
             'description' => $description,
+            'webspace' => $webspace,
             'block' => [$blockEntry],
         ];
 
@@ -233,10 +246,63 @@ final class BlockPresetController extends AbstractController
             'id' => 'snippet_' . $uuid,
             'title' => $title,
             'description' => $description,
+            'webspace' => $webspace,
             'preview_image' => null,
             'props' => $props,
             'values' => $blockEntry,
         ], JsonResponse::HTTP_CREATED);
+    }
+
+    #[Route('/admin/api/reusable-blocks', name: 'sulu_block_suite_reusable_blocks_list', methods: ['GET'])]
+    public function reusableBlocks(Request $request): JsonResponse
+    {
+        $locale = $request->query->getString('locale', $request->getLocale());
+        if (!$this->isValidLocale($locale)) {
+            return new JsonResponse(['error' => 'Invalid locale format.'], JsonResponse::HTTP_BAD_REQUEST);
+        }
+
+        $this->requirePermission($locale, PermissionTypes::VIEW);
+
+        if (null === $this->snippetRepository) {
+            return new JsonResponse(['_embedded' => ['snippets' => []], 'total' => 0]);
+        }
+
+        $rawWebspace = $request->query->getString('webspace');
+        $webspace = $this->multiWebspaceEnabled && '' !== \trim($rawWebspace) ? \trim($rawWebspace) : null;
+
+        try {
+            $snippets = $this->snippetRepository->findBy(
+                [
+                    'templateKeys' => [TemplateKeys::REUSABLE_BLOCK],
+                    'locale' => $locale,
+                ],
+                ['title' => 'asc'],
+                [SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => []],
+            );
+
+            $items = [];
+            foreach ($snippets as $snippet) {
+                $info = $this->extractReusableBlockSummary($snippet, $locale);
+                if (null === $info) {
+                    continue;
+                }
+
+                if (!SnippetScopeResolver::matchesWebspace($info['webspace'], $webspace, $this->multiWebspaceEnabled)) {
+                    continue;
+                }
+
+                $items[] = $info;
+            }
+
+            return new JsonResponse([
+                '_embedded' => [
+                    'snippets' => $items,
+                ],
+                'total' => \count($items),
+            ]);
+        } catch (\Throwable) {
+            return new JsonResponse(['_embedded' => ['snippets' => []], 'total' => 0]);
+        }
     }
 
     #[Route('/admin/api/reusable-blocks', name: 'sulu_block_suite_save_reusable_block', methods: ['POST'])]
@@ -293,12 +359,17 @@ final class BlockPresetController extends AbstractController
             unset($block['props']['_preset'], $block['props']['preset']);
         }
 
+        $webspace = $this->multiWebspaceEnabled && isset($data['webspace']) && \is_string($data['webspace']) && '' !== \trim($data['webspace'])
+            ? \trim($data['webspace'])
+            : '_global';
+
         /** @var array<string, mixed> $snippetData */
         $snippetData = [
             'template' => TemplateKeys::REUSABLE_BLOCK,
             'locale' => $locale,
             'title' => $title,
             'description' => $description,
+            'webspace' => $webspace,
             'blocks' => [$block],
         ];
 
@@ -337,6 +408,7 @@ final class BlockPresetController extends AbstractController
             'id' => $uuid,
             'title' => $title,
             'description' => $description,
+            'webspace' => $webspace,
             'block_count' => 1,
         ], JsonResponse::HTTP_CREATED);
     }
@@ -366,52 +438,66 @@ final class BlockPresetController extends AbstractController
                 [SnippetRepositoryInterface::SELECT_SNIPPET_CONTENT => []],
             );
 
-            $title = null;
-            $description = null;
-            $previewImage = null;
-            $blockCount = 0;
-
-            $matchedContent = null;
-            foreach ($snippet->getDimensionContents() as $content) {
-                if (TemplateKeys::REUSABLE_BLOCK !== $content->getTemplateKey()) {
-                    continue;
-                }
-                if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()) {
-                    continue;
-                }
-                if ($content->getLocale() === $locale) {
-                    if (DimensionContentInterface::STAGE_DRAFT === $content->getStage() || null === $matchedContent) {
-                        $matchedContent = $content;
-                    }
-                } elseif (null === $content->getLocale() && null === $matchedContent) {
-                    $matchedContent = $content;
-                }
+            $summary = $this->extractReusableBlockSummary($snippet, $locale);
+            if (null === $summary) {
+                return new JsonResponse([
+                    'id' => $snippet->getUuid(),
+                    'title' => $snippet->getUuid(),
+                    'description' => null,
+                    'webspace' => '_global',
+                    'preview_image' => null,
+                    'block_count' => 0,
+                ]);
             }
 
-            if (null !== $matchedContent) {
-                $title = $matchedContent->getTitle();
-                $templateData = $matchedContent->getTemplateData();
-                $description = isset($templateData['description']) && \is_string($templateData['description'])
-                    ? $templateData['description']
-                    : null;
-
-                $previewImage = $this->getMediaPreviewUrlResolver()->resolve($templateData['preview_image'] ?? null, $locale);
-
-                if (isset($templateData['blocks']) && \is_array($templateData['blocks'])) {
-                    $blockCount = \count($templateData['blocks']);
-                }
-            }
-
-            return new JsonResponse([
-                'id' => $snippet->getUuid(),
-                'title' => $title ?? $snippet->getUuid(),
-                'description' => $description,
-                'preview_image' => $previewImage,
-                'block_count' => $blockCount,
-            ]);
+            return new JsonResponse($summary);
         } catch (\Throwable) {
             return new JsonResponse(['error' => 'Not found'], JsonResponse::HTTP_NOT_FOUND);
         }
+    }
+
+    /**
+     * @return array{id: string, title: string, description: ?string, webspace: string, preview_image: ?string, block_count: int}|null
+     */
+    private function extractReusableBlockSummary(SnippetInterface $snippet, string $locale): ?array
+    {
+        $matchedContent = SnippetScopeResolver::findDimensionContent(
+            $snippet,
+            TemplateKeys::REUSABLE_BLOCK,
+            $locale,
+            DimensionContentInterface::STAGE_DRAFT,
+            allowStageFallback: true,
+        );
+
+        if (null === $matchedContent) {
+            return null;
+        }
+
+        $title = $matchedContent->getTitle();
+        $templateData = SnippetScopeResolver::getMergedTemplateData(
+            $snippet,
+            $matchedContent,
+            DimensionContentInterface::STAGE_DRAFT,
+        );
+
+        $description = isset($templateData['description']) && \is_string($templateData['description'])
+            ? $templateData['description']
+            : null;
+        $webspace = SnippetScopeResolver::extractWebspace($templateData);
+
+        $previewImage = $this->getMediaPreviewUrlResolver()->resolve($templateData['preview_image'] ?? null, $locale);
+        $blockCount = isset($templateData['blocks']) && \is_array($templateData['blocks'])
+            ? \count($templateData['blocks'])
+            : 0;
+
+        return [
+            'id' => $snippet->getUuid(),
+            'title' => $title ?? $snippet->getUuid(),
+            'description' => $description,
+            'webspace' => $webspace,
+            'preview_image' => $previewImage,
+            'block_count' => $blockCount,
+        ];
     }
 
     private function requirePermission(string $locale, string $permission): SecurityCondition

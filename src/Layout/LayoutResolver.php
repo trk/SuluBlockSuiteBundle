@@ -8,7 +8,7 @@ final class LayoutResolver implements LayoutResolverInterface
 {
     public const DEFAULT_MAPPINGS = [];
 
-    private const STRUCTURAL_KEYS = ['blocks', 'title', 'id', 'uuid', 'description', 'key'];
+    private const STRUCTURAL_KEYS = ['blocks', 'title', 'id', 'uuid', 'description', 'key', 'webspace', 'target_template', 'page_template'];
 
     /**
      * @var array<string, array<string, string>>

@@ -58,6 +58,15 @@ abstract class AbstractDynamicContentSourceProvider implements ConfigurableDynam
 
     protected ?TranslatorInterface $translator = null;
 
+    /**
+     * @var array<string, array{
+     *     label?: string,
+     *     type?: string,
+     *     resolve: callable(array<string, mixed>, string): mixed
+     * }>
+     */
+    private array $registeredCustomOutputs = [];
+
     public function setTranslator(?TranslatorInterface $translator): void
     {
         $this->translator = $translator;
@@ -121,7 +130,140 @@ abstract class AbstractDynamicContentSourceProvider implements ConfigurableDynam
 
     public function resolveSourceFields(string $locale = 'en', array $context = []): array
     {
-        return $this->getSourceFields($locale);
+        $fields = $this->getSourceFields($locale);
+        /** @var array<string, int> $indexByName */
+        $indexByName = [];
+        foreach ($fields as $idx => $field) {
+            $indexByName[$field['name']] = $idx;
+        }
+
+        foreach ($this->getAllCustomOutputs($locale) as $outputName => $definition) {
+            if ('' === $outputName) {
+                continue;
+            }
+            $label = isset($definition['label']) && '' !== \trim($definition['label'])
+                ? \trim($definition['label'])
+                : $this->translateFieldLabel($outputName, $locale);
+            $type = isset($definition['type']) && '' !== \trim($definition['type'])
+                ? \trim($definition['type'])
+                : 'string';
+
+            $entry = [
+                'name' => $outputName,
+                'label' => $label,
+                'type' => $type,
+            ];
+
+            if (isset($indexByName[$outputName])) {
+                $fields[$indexByName[$outputName]] = $entry;
+            } else {
+                $indexByName[$outputName] = \count($fields);
+                $fields[] = $entry;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Registers or overrides a custom/computed output on this provider without requiring subclassing.
+     *
+     * @param callable(array<string, mixed>, string): mixed $resolve
+     */
+    public function registerCustomOutput(
+        string $name,
+        callable $resolve,
+        ?string $label = null,
+        string $type = 'string',
+    ): static {
+        $cleanName = \trim($name);
+        if ('' !== $cleanName) {
+            $definition = [
+                'type' => '' !== \trim($type) ? \trim($type) : 'string',
+                'resolve' => $resolve,
+            ];
+            if (null !== $label && '' !== \trim($label)) {
+                $definition['label'] = \trim($label);
+            }
+            $this->registeredCustomOutputs[$cleanName] = $definition;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Defines custom/computed virtual outputs that do not need to exist as raw entity columns.
+     *
+     * @return array<string, array{
+     *     label?: string,
+     *     type?: string,
+     *     resolve: callable(array<string, mixed>, string): mixed
+     * }>
+     */
+    protected function getCustomOutputs(string $locale = 'en'): array
+    {
+        return [];
+    }
+
+    /**
+     * @return array<string, array{
+     *     label?: string,
+     *     type?: string,
+     *     resolve: callable(array<string, mixed>, string): mixed
+     * }>
+     */
+    private function getAllCustomOutputs(string $locale = 'en'): array
+    {
+        return \array_replace($this->getCustomOutputs($locale), $this->registeredCustomOutputs);
+    }
+
+    /**
+     * Evaluates and merges all registered custom outputs (`getCustomOutputs()` and `registerCustomOutput()`) into a single item.
+     *
+     * @param array<string, mixed> $item
+     *
+     * @return array<string, mixed>
+     */
+    public function applyCustomOutputs(array $item, string $locale = 'en'): array
+    {
+        foreach ($this->getAllCustomOutputs($locale) as $outputName => $definition) {
+            if ('' === $outputName) {
+                continue;
+            }
+            $resolver = $definition['resolve'];
+            $item[$outputName] = $resolver($item, $locale);
+        }
+
+        return $item;
+    }
+
+    /**
+     * Evaluates and merges all registered custom outputs (`getCustomOutputs()` and `registerCustomOutput()`) across a collection of items.
+     *
+     * @param list<array<string, mixed>> $items
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function applyCustomOutputsToCollection(array $items, string $locale = 'en'): array
+    {
+        $customOutputs = $this->getAllCustomOutputs($locale);
+        if ([] === $customOutputs) {
+            return $items;
+        }
+
+        $enriched = [];
+        foreach ($items as $item) {
+            foreach ($customOutputs as $outputName => $definition) {
+                if ('' === $outputName) {
+                    continue;
+                }
+                $resolver = $definition['resolve'];
+                $item[$outputName] = $resolver($item, $locale);
+            }
+            $enriched[] = $item;
+        }
+
+        return $enriched;
     }
 
     public function resolveSingle(array $config, string|object|array|null $contextPage = null, ?string $locale = null): ?array
@@ -130,6 +272,11 @@ abstract class AbstractDynamicContentSourceProvider implements ConfigurableDynam
     }
 
     public function resolveCollection(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
+    {
+        return [];
+    }
+
+    public function resolveCollectionMeta(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
     {
         return [];
     }

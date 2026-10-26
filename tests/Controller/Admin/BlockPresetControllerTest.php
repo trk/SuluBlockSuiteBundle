@@ -501,4 +501,72 @@ final class BlockPresetControllerTest extends TestCase
         ])));
         $this->assertSame(JsonResponse::HTTP_UNPROCESSABLE_ENTITY, $reusableInvalidTypeResponse->getStatusCode());
     }
+
+    public function testReusableBlocksListFiltersByWebspace(): void
+    {
+        $totogluSnippet = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetInterface::class);
+        $totogluSnippet->method('getUuid')->willReturn('reusable-totoglu');
+
+        $totogluUnloc = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface::class);
+        $totogluUnloc->method('getVersion')->willReturn(0);
+        $totogluUnloc->method('getLocale')->willReturn(null);
+        $totogluUnloc->method('getStage')->willReturn('draft');
+        $totogluUnloc->method('getTemplateKey')->willReturn('reusable_block');
+        $totogluUnloc->method('getTemplateData')->willReturn(['webspace' => 'totoglu']);
+
+        $totogluLoc = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface::class);
+        $totogluLoc->method('getVersion')->willReturn(0);
+        $totogluLoc->method('getLocale')->willReturn('en');
+        $totogluLoc->method('getStage')->willReturn('draft');
+        $totogluLoc->method('getTemplateKey')->willReturn('reusable_block');
+        $totogluLoc->method('getTitle')->willReturn('Totoglu Reusable CTA');
+        $totogluLoc->method('getTemplateData')->willReturn([
+            'blocks' => [['type' => 'cta']],
+        ]);
+        $totogluSnippet->method('getDimensionContents')->willReturn(
+            new \Doctrine\Common\Collections\ArrayCollection([$totogluUnloc, $totogluLoc]),
+        );
+
+        $globalSnippet = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetInterface::class);
+        $globalSnippet->method('getUuid')->willReturn('reusable-global');
+
+        $globalLoc = $this->createStub(\Sulu\Snippet\Domain\Model\SnippetDimensionContentInterface::class);
+        $globalLoc->method('getVersion')->willReturn(0);
+        $globalLoc->method('getLocale')->willReturn('en');
+        $globalLoc->method('getStage')->willReturn('draft');
+        $globalLoc->method('getTemplateKey')->willReturn('reusable_block');
+        $globalLoc->method('getTitle')->willReturn('Global Reusable CTA');
+        $globalLoc->method('getTemplateData')->willReturn([
+            'blocks' => [['type' => 'cta']],
+        ]);
+        $globalSnippet->method('getDimensionContents')->willReturn(
+            new \Doctrine\Common\Collections\ArrayCollection([$globalLoc]),
+        );
+
+        $repo = $this->createStub(\Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface::class);
+        $repo->method('findBy')->willReturn([$totogluSnippet, $globalSnippet]);
+
+        $mockProvider = $this->createStub(BlockPresetProviderInterface::class);
+        $controller = new BlockPresetController(
+            $mockProvider,
+            $repo,
+            null,
+            null,
+            null,
+            $this->createAllowingSecurityChecker(),
+        );
+
+        $totogluResponse = $controller->reusableBlocks(new Request(['locale' => 'en', 'webspace' => 'totoglu']));
+        $this->assertSame(JsonResponse::HTTP_OK, $totogluResponse->getStatusCode());
+        /** @var array{_embedded: array{snippets: list<array{id: string}>}, total: int} $totogluBody */
+        $totogluBody = \json_decode((string) $totogluResponse->getContent(), true);
+        $this->assertSame(2, $totogluBody['total']);
+
+        $turkiyeResponse = $controller->reusableBlocks(new Request(['locale' => 'en', 'webspace' => 'turkiye']));
+        $this->assertSame(JsonResponse::HTTP_OK, $turkiyeResponse->getStatusCode());
+        /** @var array{_embedded: array{snippets: list<array{id: string}>}, total: int} $turkiyeBody */
+        $turkiyeBody = \json_decode((string) $turkiyeResponse->getContent(), true);
+        $this->assertSame(1, $turkiyeBody['total']);
+        $this->assertSame('reusable-global', $turkiyeBody['_embedded']['snippets'][0]['id']);
+    }
 }

@@ -54,6 +54,13 @@ abstract class AbstractBlockComponent
         'settings',
         '_dynamic_hydrated',
         '_props',
+        '_sulu_block_id',
+        '_attributes',
+        '_attributes_string',
+        '_scoped_css',
+        '_classes',
+        '_class',
+        '_pipeline_processed',
     ];
 
     /**
@@ -116,6 +123,7 @@ abstract class AbstractBlockComponent
         if (isset($input['block']) && \is_array($input['block'])) {
             /** @var array<string, mixed> $block */
             $block = $input['block'];
+            $this->copyPreviewBlockIdAttribute($block, $htmlAttributes);
             $this->ingestBlockArray($block);
             unset($input['block']);
         }
@@ -123,8 +131,13 @@ abstract class AbstractBlockComponent
         if (isset($input['data']) && \is_array($input['data'])) {
             /** @var array<string, mixed> $data */
             $data = $input['data'];
+            $this->copyPreviewBlockIdAttribute($data, $htmlAttributes);
             foreach ($data as $k => $v) {
-                $this->data[self::toSnakeCase($k)] = $v;
+                $normKey = self::toSnakeCase($k);
+                if (\in_array($normKey, self::IGNORED_BLOCK_META_KEYS, true)) {
+                    continue;
+                }
+                $this->data[$normKey] = $v;
             }
             unset($input['data']);
         }
@@ -132,6 +145,7 @@ abstract class AbstractBlockComponent
         if (isset($input['props']) && \is_array($input['props'])) {
             /** @var array<string, mixed> $props */
             $props = $input['props'];
+            $this->copyPreviewBlockIdAttribute($props, $htmlAttributes);
             $this->ingestPropsArray($props);
             unset($input['props']);
         }
@@ -157,6 +171,23 @@ abstract class AbstractBlockComponent
         }
 
         return $htmlAttributes;
+    }
+
+    /**
+     * @param array<string, mixed> $source
+     * @param array<string, mixed> $htmlAttributes
+     */
+    private function copyPreviewBlockIdAttribute(array $source, array &$htmlAttributes): void
+    {
+        if (
+            isset($source['_attributes'])
+            && \is_array($source['_attributes'])
+            && isset($source['_attributes']['data-block-id'])
+            && \is_string($source['_attributes']['data-block-id'])
+            && '' !== $source['_attributes']['data-block-id']
+        ) {
+            $htmlAttributes['data-block-id'] = $source['_attributes']['data-block-id'];
+        }
     }
 
     /**
@@ -1093,6 +1124,10 @@ abstract class AbstractBlockComponent
             $this->ingestPropsArray($extractedProps);
         }
 
+        if (isset($block['_attributes']) && \is_array($block['_attributes'])) {
+            $this->props['_attributes'] = $block['_attributes'];
+        }
+
         if (isset($block['props']) && \is_array($block['props'])) {
             /** @var array<string, mixed> $nestedProps */
             $nestedProps = $block['props'];
@@ -1116,6 +1151,10 @@ abstract class AbstractBlockComponent
             $nested = $props['props'];
             $this->ingestPropsArray($nested);
             unset($props['props']);
+        }
+
+        if (isset($props['_attributes']) && \is_array($props['_attributes'])) {
+            $this->props['_attributes'] = $props['_attributes'];
         }
 
         $extracted = SuluDataNormalizer::extractProps($props);

@@ -482,6 +482,117 @@
                     </params>
                 </property>
 
+                <property name="dynamic_empty_message" type="text_line" colspan="12" mandatory="false"
+                          visibleCondition="__parent.dynamic_source != null and __parent.dynamic_source != 'none' and __parent.dynamic_source != '' and __parent.dynamic_hide_if_empty != true">
+                    <meta>
+                        <title lang="en">Empty State Message</title>
+                        <title lang="tr">Boş Sonuç Mesajı</title>
+                        <title lang="de">Meldung bei keinen Ergebnissen</title>
+                        <title lang="ru">Сообщение при отсутствии результатов</title>
+                        <title lang="es">Mensaje de Estado Vacío</title>
+                        <title lang="fr">Message d'État Vide</title>
+                        <info_text lang="en">Displayed instead of hiding the block when the collection returns 0 items (supports %total% and %count% tokens).</info_text>
+                        <info_text lang="tr">Koleksiyon 0 sonuç döndürdüğünde bloğu gizlemek yerine gösterilecek mesaj (%total% ve %count% yer tutucularını destekler).</info_text>
+                        <info_text lang="de">Wird angezeigt, wenn die Sammlung 0 Elemente zurückgibt (%total% und %count% Platzhalter werden unterstützt).</info_text>
+                        <info_text lang="ru">Отображается вместо скрытия блока, когда коллекция возвращает 0 элементов (поддерживает токены %total% и %count%).</info_text>
+                        <info_text lang="es">Se muestra en lugar de ocultar el bloque cuando la colección devuelve 0 elementos (admite los tokens %total% y %count%).</info_text>
+                        <info_text lang="fr">Affiché au lieu de masquer le bloc lorsque la collection renvoie 0 élément (prend en charge les jetons %total% et %count%).</info_text>
+                    </meta>
+                </property>
+
+                <property name="dynamic_show_summary" type="single_select" colspan="4" mandatory="false"
+                          visibleCondition="__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection' or __parent.dynamic_source == 'search_results'">
+                    <meta>
+                        <title lang="en">Result Count Summary</title>
+                        <title lang="tr">Sonuç Sayısı Özeti</title>
+                        <title lang="de">Ergebnisanzahl-Zusammenfassung</title>
+                        <title lang="ru">Сводка количества результатов</title>
+                        <title lang="es">Resumen de Cantidad de Resultados</title>
+                        <title lang="fr">Résumé du Nombre de Résultats</title>
+                    </meta>
+                    <params>
+                        <param name="default_value" value="none"/>
+                        <param name="values" type="collection">
+                            <param name="none">
+                                <meta>
+                                    <title lang="en">Hidden</title>
+                                    <title lang="tr">Gizli</title>
+                                    <title lang="de">Ausgeblendet</title>
+                                    <title lang="ru">Скрыто</title>
+                                    <title lang="es">Oculto</title>
+                                    <title lang="fr">Masqué</title>
+                                </meta>
+                            </param>
+                            <param name="top">
+                                <meta>
+                                    <title lang="en">Above Items</title>
+                                    <title lang="tr">Öğelerin Üstünde</title>
+                                    <title lang="de">Oberhalb der Elemente</title>
+                                    <title lang="ru">Над элементами</title>
+                                    <title lang="es">Encima de los Elementos</title>
+                                    <title lang="fr">Au-dessus des Éléments</title>
+                                </meta>
+                            </param>
+                            <param name="bottom">
+                                <meta>
+                                    <title lang="en">Below Items</title>
+                                    <title lang="tr">Öğelerin Altında</title>
+                                    <title lang="de">Unterhalb der Elemente</title>
+                                    <title lang="ru">Под элементами</title>
+                                    <title lang="es">Debajo de los Elementos</title>
+                                    <title lang="fr">En dessous des Éléments</title>
+                                </meta>
+                            </param>
+                            <param name="both">
+                                <meta>
+                                    <title lang="en">Above &amp; Below</title>
+                                    <title lang="tr">Üstte ve Altta</title>
+                                    <title lang="de">Oben &amp; Unten</title>
+                                    <title lang="ru">Сверху и снизу</title>
+                                    <title lang="es">Arriba y Abajo</title>
+                                    <title lang="fr">Au-dessus et En dessous</title>
+                                </meta>
+                            </param>
+                        </param>
+                    </params>
+                </property>
+
+                <property name="dynamic_summary_text" type="text_line" colspan="4" mandatory="false"
+                          visibleCondition="(__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection' or __parent.dynamic_source == 'search_results') and (__parent.dynamic_show_summary == 'top' or __parent.dynamic_show_summary == 'bottom' or __parent.dynamic_show_summary == 'both')">
+                    <meta>
+                        <title lang="en">Summary Template</title>
+                        <title lang="tr">Özet Metin Şablonu</title>
+                        <title lang="de">Zusammenfassungsvorlage</title>
+                        <title lang="ru">Шаблон сводки</title>
+                        <title lang="es">Plantilla de Resumen</title>
+                        <title lang="fr">Modèle de Résumé</title>
+                        <info_text lang="en">Tokens: %total%, %count%, %showing%, %from%, %to%, %page%, %pages%.</info_text>
+                        <info_text lang="tr">Desteklenen yer tutucular: %total%, %count%, %showing%, %from%, %to%, %page%, %pages%.</info_text>
+                        <info_text lang="de">Platzhalter: %total%, %count%, %showing%, %from%, %to%, %page%, %pages%.</info_text>
+                        <info_text lang="ru">Токены: %total%, %count%, %showing%, %from%, %to%, %page%, %pages%.</info_text>
+                        <info_text lang="es">Tokens: %total%, %count%, %showing%, %from%, %to%, %page%, %pages%.</info_text>
+                        <info_text lang="fr">Jetons : %total%, %count%, %showing%, %from%, %to%, %page%, %pages%.</info_text>
+                    </meta>
+                </property>
+
+                <property name="dynamic_filtered_summary_text" type="text_line" colspan="4" mandatory="false"
+                          visibleCondition="(__parent.dynamic_source == 'page_selection' or __parent.dynamic_source == 'page_children' or __parent.dynamic_source == 'sibling_pages' or __parent.dynamic_source == 'custom_query' or __parent.dynamic_source == 'sulu_articles' or __parent.dynamic_source == 'sulu_categories' or __parent.dynamic_source == 'sulu_media_collection' or __parent.dynamic_source == 'search_results') and (__parent.dynamic_show_summary == 'top' or __parent.dynamic_show_summary == 'bottom' or __parent.dynamic_show_summary == 'both')">
+                    <meta>
+                        <title lang="en">Filtered Summary Template</title>
+                        <title lang="tr">Filtreli Özet Şablonu</title>
+                        <title lang="de">Gefilterte Zusammenfassungsvorlage</title>
+                        <title lang="ru">Шаблон отфильтрованной сводки</title>
+                        <title lang="es">Plantilla de Resumen Filtrado</title>
+                        <title lang="fr">Modèle de Résumé Filtré</title>
+                        <info_text lang="en">Optional override used when active search/query filters are applied (%count% matched of %total% total).</info_text>
+                        <info_text lang="tr">Aktif arama/filtre varken kullanılacak şablon (%total% toplam içinden %count% eşleşen).</info_text>
+                        <info_text lang="de">Optionale Vorlage bei aktiven Such-/Abfragefiltern (%count% Treffer von %total% gesamt).</info_text>
+                        <info_text lang="ru">Необязательный шаблон при активных фильтрах поиска (%count% найдено из %total%).</info_text>
+                        <info_text lang="es">Plantilla opcional cuando hay filtros de búsqueda activos (%count% coincidencias de %total%).</info_text>
+                        <info_text lang="fr">Modèle optionnel lorsque des filtres de recherche sont actifs (%count% résultats sur %total%).</info_text>
+                    </meta>
+                </property>
+
                 <property name="dynamic_condition_enabled" type="checkbox" colspan="12" mandatory="false"
                           visibleCondition="__parent.dynamic_source != null and __parent.dynamic_source != 'none' and __parent.dynamic_source != ''">
                     <meta>

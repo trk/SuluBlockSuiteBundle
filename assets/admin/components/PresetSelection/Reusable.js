@@ -85,6 +85,7 @@ type SaveReusableDialogProps = {
     onSuccess: (createdSnippet: Object, convertBlock: boolean) => void,
     open: boolean,
     propsValues: Object,
+    webspace?: ?string,
 };
 
 @observer
@@ -128,7 +129,7 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
             return;
         }
 
-        const {blockData, componentType, locale, onSuccess, propsValues} = this.props;
+        const {blockData, componentType, locale, onSuccess, propsValues, webspace} = this.props;
         if (!componentType || componentType === 'general') {
             return;
         }
@@ -149,6 +150,7 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
             title,
             description: this.description.trim() || null,
             locale,
+            webspace: webspace || '_global',
             block: payloadBlockData,
         };
 

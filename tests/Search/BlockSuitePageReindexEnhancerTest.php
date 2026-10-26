@@ -225,6 +225,44 @@ final class BlockSuitePageReindexEnhancerTest extends TestCase
         self::assertNotContains('Unpublished Draft Headline', $content);
     }
 
+    public function testEnhanceDocumentSkipsSubItemsMarkedAsDynamicTemplateWhileIndexingStaticSiblingItems(): void
+    {
+        $enhancer = new BlockSuitePageReindexEnhancer(null, $this->createFixtureMetadataRegistry());
+
+        $enhanced = $enhancer->enhanceDocument([
+            'locale' => 'en',
+            'templateKey' => 'fixture_page',
+            'templateData' => [
+                'layout_blocks' => [
+                    [
+                        'type' => 'fixture_accordion',
+                        'entries' => [
+                            [
+                                'type' => 'fixture_accordion_entry',
+                                'question_text' => 'Static FAQ Question',
+                                'answer_html' => '<p>Static FAQ Answer</p>',
+                                'is_dynamic_template' => false,
+                            ],
+                            [
+                                'type' => 'fixture_accordion_entry',
+                                'question_text' => 'Template Placeholder Question Should Not Be Indexed',
+                                'answer_html' => '<p>Template Placeholder Answer Should Not Be Indexed</p>',
+                                'is_dynamic_template' => true,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ], ['id' => 'page-1', 'content' => []]);
+
+        /** @var list<string> $content */
+        $content = $enhanced['content'];
+        self::assertContains('Static FAQ Question', $content);
+        self::assertContains('Static FAQ Answer', $content);
+        self::assertNotContains('Template Placeholder Question Should Not Be Indexed', $content);
+        self::assertNotContains('Template Placeholder Answer Should Not Be Indexed', $content);
+    }
+
     private function createFixtureMetadataRegistry(): MetadataProviderRegistry
     {
         // Page form metadata

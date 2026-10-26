@@ -1,0 +1,37 @@
+@import 'sulu-admin-bundle/containers/Application/colors.scss';
+
+.container {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.fieldControl {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    & > div:first-child,
+    & > textarea:first-child {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    :global(.ck.ck-editor .ck.ck-toolbar) {
+        border-top-right-radius: 0;
+    }
+}
+
+.optionGroupBar {
+    display: inline-flex;
+    align-items: stretch;
+    flex-shrink: 0;
+    height: 30px;
+    margin-left: -1px;
+    border: 1px solid $silver;
+    border-left: 0;
+    border-radius: 0 3px 3px 0;
+    background-color: $white;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+}

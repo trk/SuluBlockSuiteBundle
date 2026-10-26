@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Transformer;
 
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 use Totoglu\SuluBlockSuiteBundle\Security\AttributeSanitizer;
@@ -33,16 +35,12 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
     ];
 
     /**
-     * @var array<string, array<string, string>>
-     */
-    private array $metadataFieldTypesCache = [];
-
-    /**
      * @param array<string, int>|null $srcSetFormats
      */
     public function __construct(
         private readonly ?BlockTargetFieldMetadataResolver $fieldMetadataResolver = null,
         private readonly ?array $srcSetFormats = null,
+        private readonly ?RequestStack $requestStack = null,
     ) {
         if (null !== $this->srcSetFormats && [] !== $this->srcSetFormats) {
             SuluDataNormalizer::setDefaultSrcSetFormats($this->srcSetFormats);
@@ -61,6 +59,13 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
 
     public function transform(array $block, array $context): array
     {
+        $suluBlockId = isset($block['_sulu_block_id']) && \is_string($block['_sulu_block_id']) && '' !== \trim($block['_sulu_block_id'])
+            ? \trim($block['_sulu_block_id'])
+            : (isset($block['_id']) && \is_string($block['_id']) && '' !== \trim($block['_id']) ? \trim($block['_id']) : null);
+        if (null !== $suluBlockId) {
+            $block['_sulu_block_id'] = $suluBlockId;
+        }
+
         $props = SuluDataNormalizer::extractProps($block);
         if ([] !== $props) {
             foreach ($props as $propKey => $propVal) {
@@ -93,9 +98,13 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
         $rawClass = $props['class'] ?? ($props['custom_class'] ?? ($block['class'] ?? null));
         $classes = ClassList::tokens(\is_string($rawClass) ? $rawClass : null);
 
-        // 5. Custom Attributes (key=value multi-line)
+        // 5. Custom Attributes (key=value multi-line or pre-supplied array)
         $rawAttrs = $props['attributes'] ?? ($block['attributes'] ?? null);
-        $attributes = \is_string($rawAttrs) ? AttributeSanitizer::parse($rawAttrs) : [];
+        $preAttrs = $props['_attributes'] ?? ($block['_attributes'] ?? null);
+        $attributes = \is_array($preAttrs) ? AttributeSanitizer::sanitize($preAttrs) : [];
+        if (\is_string($rawAttrs)) {
+            $attributes = \array_merge($attributes, AttributeSanitizer::parse($rawAttrs));
+        }
 
         // 6. Custom Scoped CSS
         $blockType = isset($block['type']) && \is_scalar($block['type']) ? (string) $block['type'] : '';
@@ -120,6 +129,15 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
             $block['_props'] = $props;
         }
 
+        // Sulu Live Preview Block Focus: attach original Sulu block `_id` as `data-block-id` in preview mode
+        $isPreview = $this->isPreviewMode($context);
+        if ($isPreview) {
+            if (null !== $suluBlockId && !isset($attributes['data-block-id'])) {
+                $attributes['data-block-id'] = $suluBlockId;
+            }
+            $block = $this->propagatePreviewBlockIds($block);
+        }
+
         $block['_classes'] = $classes;
         $block['_class'] = \implode(' ', $classes);
         $block['_attributes'] = $attributes;
@@ -131,6 +149,79 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
 
         // 7. Generic Sulu CMS Data Normalization (Media & Links)
         return $this->normalizeMediaAndLinkFields($block, $blockType);
+    }
+
+    /**
+     * Recursively attaches `_sulu_block_id` and preview `data-block-id` attributes
+     * to nested Sulu block/item collections (`items`, `rows`, `columns`, `blocks`).
+     *
+     * @param array<string, mixed> $node
+     *
+     * @return array<string, mixed>
+     */
+    private function propagatePreviewBlockIds(array $node): array
+    {
+        if (isset($node['_reusable_parent_block_id']) && \is_string($node['_reusable_parent_block_id']) && '' !== $node['_reusable_parent_block_id']) {
+            return $node;
+        }
+
+        foreach (['items', 'rows', 'columns', 'blocks'] as $collectionKey) {
+            if (!isset($node[$collectionKey]) || !\is_array($node[$collectionKey])) {
+                continue;
+            }
+
+            foreach ($node[$collectionKey] as $idx => $subItem) {
+                if (!\is_array($subItem)) {
+                    continue;
+                }
+
+                /** @var array<string, mixed> $subItem */
+                $subBlockId = isset($subItem['_sulu_block_id']) && \is_string($subItem['_sulu_block_id']) && '' !== \trim($subItem['_sulu_block_id'])
+                    ? \trim($subItem['_sulu_block_id'])
+                    : (isset($subItem['_id']) && \is_string($subItem['_id']) && '' !== \trim($subItem['_id']) ? \trim($subItem['_id']) : null);
+
+                if (null !== $subBlockId) {
+                    $subItem['_sulu_block_id'] = $subBlockId;
+                    $subAttrs = isset($subItem['_attributes']) && \is_array($subItem['_attributes']) ? $subItem['_attributes'] : [];
+                    if (!isset($subAttrs['data-block-id'])) {
+                        $subAttrs['data-block-id'] = $subBlockId;
+                    }
+                    $subItem['_attributes'] = $subAttrs;
+                }
+
+                $node[$collectionKey][$idx] = $this->propagatePreviewBlockIds($subItem);
+            }
+        }
+
+        return $node;
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    public function isPreviewMode(array $context = [], ?Request $request = null): bool
+    {
+        if (true === ($context['_in_page_layout'] ?? false)) {
+            return false;
+        }
+
+        if (true === ($context['preview'] ?? false)) {
+            return true;
+        }
+
+        $activeRequest = $request ?? $this->requestStack?->getCurrentRequest();
+        if (null === $activeRequest) {
+            return false;
+        }
+
+        if ((bool) ($activeRequest->attributes->get('preview') ?? false)) {
+            return true;
+        }
+
+        $rawRequestUri = $activeRequest->server->get('REQUEST_URI');
+        $requestUri = \is_string($rawRequestUri) ? $rawRequestUri : '';
+
+        return \str_ends_with($requestUri, '/_sulu_preview');
     }
 
     /**
@@ -250,21 +341,9 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
      */
     private function getMetadataFieldTypes(string $blockType): array
     {
-        $cleanType = \strtolower(\trim($blockType));
-        if ('' === $cleanType || null === $this->fieldMetadataResolver) {
-            return [];
-        }
-
-        if (isset($this->metadataFieldTypesCache[$cleanType])) {
-            return $this->metadataFieldTypesCache[$cleanType];
-        }
-
-        $types = [];
-        foreach ($this->fieldMetadataResolver->resolveTargetFields($cleanType) as $fieldMeta) {
-            $types[$fieldMeta['name']] = $fieldMeta['type'];
-        }
-
-        return $this->metadataFieldTypesCache[$cleanType] = $types;
+        return null !== $this->fieldMetadataResolver
+            ? $this->fieldMetadataResolver->resolveFieldTypeMap($blockType)
+            : [];
     }
 
     private function detectValueFieldType(mixed $value, ?string $field = null): ?string

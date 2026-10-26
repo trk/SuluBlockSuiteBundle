@@ -1,0 +1,7 @@
+{% set summary = summary|default(block._summary|default(null)) %}
+{% set summary_position = summary_position|default(summary.position|default('top')) %}
+{% if summary is iterable and summary.formatted_summary|default('') != '' %}
+    <div role="status" aria-live="polite" data-summary-position="{{ summary_position }}" data-summary-filtered="{{ summary.is_filtered|default(false) ? 'true' : 'false' }}">
+        <p>{{ summary.formatted_summary }}</p>
+    </div>
+{% endif %}

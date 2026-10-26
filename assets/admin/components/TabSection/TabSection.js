@@ -16,7 +16,7 @@ const TAB_ICONS: {[string]: string} = {
     style: 'su-paint',
     layout: 'su-columns',
     general: 'su-cog',
-    dynamic_content: 'su-sync',
+    dynamic_content: 'su-flash',
     advanced: 'su-code',
     overview: 'su-document',
     cabins: 'su-user',
@@ -187,15 +187,23 @@ export default class TabSection extends React.Component<Props> {
             const tabChildren = child.props.children;
             const errorCount = countElementErrors(tabChildren);
             const icon = resolveTabIcon(tabKey, tabSchema);
+            const iconOnly = tabKey === 'dynamic_content';
 
             tabs.push({
                 key: tabKey,
                 label: tabLabel,
                 icon,
+                iconOnly,
                 errorCount,
                 children: tabChildren,
             });
         });
+
+        const dynamicIndex = tabs.findIndex((t) => t.key === 'dynamic_content');
+        if (dynamicIndex !== -1 && dynamicIndex !== tabs.length - 1) {
+            const [dynamicTab] = tabs.splice(dynamicIndex, 1);
+            tabs.push(dynamicTab);
+        }
 
         return tabs;
     }
@@ -262,6 +270,7 @@ export default class TabSection extends React.Component<Props> {
                             const panelId = `${this.instanceId}-panel-${tab.key}`;
                             const btnClasses = [
                                 styles.tabButton,
+                                tab.iconOnly ? styles.tabButtonIconOnly : '',
                                 isActive ? styles.tabButtonActive : '',
                                 hasError ? styles.tabButtonError : '',
                             ]
@@ -271,6 +280,7 @@ export default class TabSection extends React.Component<Props> {
                             return (
                                 <button
                                     aria-controls={panelId}
+                                    aria-label={tab.label}
                                     aria-selected={isActive}
                                     className={btnClasses}
                                     id={tabId}
@@ -282,12 +292,13 @@ export default class TabSection extends React.Component<Props> {
                                     }}
                                     role="tab"
                                     tabIndex={isActive ? 0 : -1}
+                                    title={tab.label}
                                     type="button"
                                 >
                                     <span className={styles.tabIcon}>
                                         <Icon name={tab.icon} />
                                     </span>
-                                    <span>{tab.label}</span>
+                                    {!tab.iconOnly && <span>{tab.label}</span>}
                                     {hasError && (
                                         <span className={styles.errorBadge}>
                                             {tab.errorCount}

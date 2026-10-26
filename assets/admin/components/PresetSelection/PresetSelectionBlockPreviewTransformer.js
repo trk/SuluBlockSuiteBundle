@@ -1,5 +1,6 @@
 // @flow
 import React from 'react';
+import {isArrayLike} from 'mobx';
 import Icon from 'sulu-admin-bundle/components/Icon';
 import {translate} from 'sulu-admin-bundle/utils';
 import type {Node} from 'react';
@@ -63,9 +64,9 @@ export default class PresetSelectionBlockPreviewTransformer implements BlockPrev
             }
             if (typeof value.dynamic_source === 'string' && value.dynamic_source.trim() !== '' && value.dynamic_source !== 'none') {
                 dynamicSource = value.dynamic_source.trim();
-                if (Array.isArray(value.dynamic_mapping) && value.dynamic_mapping.length > 0) {
+                if (isArrayLike(value.dynamic_mapping) && value.dynamic_mapping.length > 0) {
                     const pairs = [];
-                    value.dynamic_mapping.forEach((m) => {
+                    Array.from(value.dynamic_mapping).forEach((m) => {
                         if (m && typeof m === 'object' && typeof m.target_field === 'string' && typeof m.source_field === 'string') {
                             const tf = m.target_field.trim();
                             const sf = m.source_field.trim();

@@ -1,0 +1,6 @@
+{% set empty_state = empty_state|default(block._empty_state|default(null)) %}
+{% if empty_state is iterable and empty_state.message|default('') != '' %}
+    <div role="status" aria-live="polite" data-empty-state="true" data-empty-state-filtered="{{ empty_state.is_filtered|default(false) ? 'true' : 'false' }}">
+        <p>{{ empty_state.message }}</p>
+    </div>
+{% endif %}

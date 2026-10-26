@@ -16,7 +16,8 @@ use Symfony\Contracts\Service\ResetInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\AbstractDynamicContentSourceProvider;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
-use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentHydrator;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentQueryFilterNormalizer;
+use Totoglu\SuluBlockSuiteBundle\DynamicContent\SuluContentDimensionExtractor;
 
 /**
  * Built-in Dynamic Content source provider for Sulu 3 Articles (Single & Collection).
@@ -26,6 +27,8 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
     /** @var array<string, array<string, mixed>|null> */
     private array $resolvedEntityCache = [];
 
+    private readonly DynamicContentQueryFilterNormalizer $queryFilterNormalizer;
+
     public function __construct(
         private readonly ?ArticleRepositoryInterface $articleRepository = null,
         private readonly ?ContentResolverInterface $contentResolver = null,
@@ -34,8 +37,10 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
         private readonly ?ContentAggregatorInterface $contentAggregator = null,
         private readonly ?SuluSmartContentQueryBridge $smartContentBridge = null,
         ?TranslatorInterface $translator = null,
+        ?DynamicContentQueryFilterNormalizer $queryFilterNormalizer = null,
     ) {
         $this->translator = $translator;
+        $this->queryFilterNormalizer = $queryFilterNormalizer ?? new DynamicContentQueryFilterNormalizer();
     }
 
     public function reset(): void
@@ -113,7 +118,7 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
 
     public function resolveSourceFields(string $locale = 'en', array $context = []): array
     {
-        $fields = $this->getSourceFields($locale);
+        $fields = parent::resolveSourceFields($locale, $context);
 
         $articleId = $context['article_id'] ?? ($context['id'] ?? ($context['uuid'] ?? null));
         if (\is_string($articleId) && '' !== \trim($articleId) && null !== $this->articleRepository) {
@@ -214,10 +219,8 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             ? \array_merge($config, $config['query'])
             : $config;
 
-        $uuids = $this->normalizeStringList($query['article_ids'] ?? ($query['uuids'] ?? ($query['ids'] ?? null)));
-        $rawCategories = $query['category_keys'] ?? ($query['categories'] ?? null);
-        $hasStringCategoryKeys = [] === $this->normalizeIntList($query['category_ids'] ?? $rawCategories)
-            && [] !== $this->normalizeStringList($rawCategories);
+        $uuids = $this->queryFilterNormalizer->normalizeStringList($query['article_ids'] ?? ($query['uuids'] ?? ($query['ids'] ?? null)));
+        $hasStringCategoryKeys = $this->queryFilterNormalizer->hasStringCategoryKeys($query);
 
         if (
             [] === $uuids
@@ -225,19 +228,14 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             && null !== $this->smartContentBridge
             && $this->smartContentBridge->hasProvider('articles')
         ) {
-            $excludedIds = $this->normalizeStringList($query['exclude_ids'] ?? ($query['exclude_id'] ?? null));
-            $rawLimit = isset($query['limit']) && \is_numeric($query['limit']) ? (int) $query['limit'] : 10;
-            $limit = \max(1, \min(100, $rawLimit));
+            $smartPlan = $this->queryFilterNormalizer->buildSmartContentQuery($query);
 
-            $bridgeQuery = $query;
-            if ([] !== $excludedIds) {
-                $bridgeQuery['limit'] = \min(100, $limit + \count($excludedIds));
-            }
-
-            $flatIds = $this->smartContentBridge->queryFlatIds('articles', $bridgeQuery, $resolvedLocale);
-            $filteredIds = [] !== $excludedIds
-                ? \array_slice(\array_values(\array_diff($flatIds, $excludedIds)), 0, $limit)
-                : \array_slice($flatIds, 0, $limit);
+            $flatIds = $this->smartContentBridge->queryFlatIds('articles', $smartPlan['bridgeQuery'], $resolvedLocale);
+            $filteredIds = $this->queryFilterNormalizer->sliceSmartContentIds(
+                $flatIds,
+                $smartPlan['excludedIds'],
+                $smartPlan['limit'],
+            );
 
             if ([] === $filteredIds) {
                 return [];
@@ -265,71 +263,15 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             return [];
         }
 
-        /** @var array<string, mixed> $filters */
-        $filters = [
-            'locale' => $resolvedLocale,
-            'stage' => DimensionContentInterface::STAGE_LIVE,
-        ];
-
-        if ([] !== $uuids) {
-            $filters['uuids'] = $uuids;
-        }
-
-        $templateKeys = $this->normalizeStringList($query['template_keys'] ?? ($query['templates'] ?? ($query['template'] ?? null)));
-        if ([] !== $templateKeys) {
-            $filters['templateKeys'] = $templateKeys;
-        }
-
-        $tagIds = $this->normalizeIntList($query['tag_ids'] ?? null);
-        $rawTags = $query['tag_names'] ?? ($query['tags'] ?? ($query['tag'] ?? null));
-        if ([] === $tagIds && null !== $rawTags) {
-            $tagIds = $this->normalizeIntList($rawTags);
-        }
-        if ([] !== $tagIds) {
-            $filters['tagIds'] = $tagIds;
-        } else {
-            $tagNames = $this->normalizeStringList($rawTags);
-            if ([] !== $tagNames) {
-                $filters['tagNames'] = $tagNames;
-            }
-        }
-
-        $categoryIds = $this->normalizeIntList($query['category_ids'] ?? null);
-        $rawCategories = $query['category_keys'] ?? ($query['categories'] ?? null);
-        if ([] === $categoryIds && null !== $rawCategories) {
-            $categoryIds = $this->normalizeIntList($rawCategories);
-        }
-        if ([] !== $categoryIds) {
-            $filters['categoryIds'] = $categoryIds;
-        } else {
-            $categoryKeys = $this->normalizeStringList($rawCategories);
-            if ([] !== $categoryKeys) {
-                $filters['categoryKeys'] = $categoryKeys;
-            }
-        }
-
-        $offset = isset($query['offset']) && \is_numeric($query['offset'])
-            ? \max(0, \min(500, (int) $query['offset']))
-            : 0;
-        $excludedIds = $this->normalizeStringList($query['exclude_ids'] ?? ($query['exclude_id'] ?? null));
-
-        $rawLimit = isset($query['limit']) && \is_numeric($query['limit']) ? (int) $query['limit'] : 10;
-        $limit = \max(1, \min(100, $rawLimit));
-        $filters['limit'] = $limit + $offset + \count($excludedIds);
-
-        /** @var array<string, 'asc'|'desc'> $sortBy */
-        $sortBy = ['created' => 'desc'];
-        if (isset($query['sort_by']) && \is_string($query['sort_by']) && '' !== \trim($query['sort_by'])) {
-            $rawOrder = $query['sort_order'] ?? 'desc';
-            $order = (\is_string($rawOrder) && 'asc' === \strtolower($rawOrder)) ? 'asc' : 'desc';
-            $sortField = \trim($query['sort_by']);
-            if ('published' === $sortField) {
-                $sortField = 'workflowPublished';
-            }
-            if (\in_array($sortField, ['id', 'uuid', 'title', 'authored', 'workflowPublished', 'created', 'changed'], true)) {
-                $sortBy = [$sortField => $order];
-            }
-        }
+        $queryPlan = $this->queryFilterNormalizer->buildRepositoryQueryPlan(
+            criteria: $query,
+            locale: $resolvedLocale,
+        );
+        $filters = $queryPlan['filters'];
+        $sortBy = $queryPlan['sortBy'];
+        $limit = $queryPlan['limit'];
+        $offset = $queryPlan['offset'];
+        $excludedIds = $queryPlan['excludedIds'];
 
         try {
             /**
@@ -413,94 +355,13 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             $this->referenceStore?->add($uuid, ArticleInterface::RESOURCE_KEY);
         }
 
-        if (null !== $this->contentResolver) {
-            try {
-                $resolved = $this->contentResolver->resolve($dimensionContent);
-                /** @var array<string, mixed> $articleData */
-                $articleData = $resolved['content'];
-                $articleData['id'] = $uuid;
-                $articleData['uuid'] = $uuid;
+        $enriched = SuluContentDimensionExtractor::normalizeDimensionContent(
+            $uuid,
+            $dimensionContent,
+            $this->contentResolver,
+            includeAuthorName: false,
+        );
 
-                $title = $dimensionContent->getTitle();
-                if (null !== $title) {
-                    $articleData['title'] = $title;
-                }
-                $articleData['headline'] = $this->firstNonEmptyString($articleData['headline'] ?? null, $articleData['title'] ?? null);
-
-                /** @var mixed $excerptDesc */
-                $excerptDesc = null;
-                /** @var mixed $excerptImage */
-                $excerptImage = null;
-                $excerpt = $resolved['extension']['excerpt'] ?? null;
-                if (\is_array($excerpt)) {
-                    $excerptDesc = $excerpt['description'] ?? null;
-                    $excerptImage = $excerpt['image'] ?? null;
-                }
-
-                $rawSummary = $articleData['summary'] ?? null;
-                $rawDescription = $articleData['description'] ?? null;
-                $rawBodyContent = $this->firstNonEmptyString($articleData['content'] ?? null, $articleData['article'] ?? null);
-                if (null !== $rawBodyContent && !isset($articleData['content'])) {
-                    $articleData['content'] = $rawBodyContent;
-                }
-
-                $articleData['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, $excerptDesc, $rawBodyContent);
-                $articleData['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, $excerptDesc, $rawBodyContent);
-                $articleData['image'] = $this->firstNonEmptyMedia($articleData['image'] ?? null, $excerptImage);
-
-                if (isset($resolved['view']['url']) && \is_string($resolved['view']['url'])) {
-                    $articleData['url'] = $resolved['view']['url'];
-                    $articleData['link'] = $resolved['view']['url'];
-                }
-
-                if (null !== $dimensionContent->getAuthored()) {
-                    $articleData['authored'] = $dimensionContent->getAuthored()->format('c');
-                    $articleData['date'] = $articleData['authored'];
-                }
-
-                $enriched = $this->enrichArticleMetadata($articleData, $dimensionContent);
-                if (null !== $cacheKey) {
-                    $this->resolvedEntityCache[$cacheKey] = $enriched;
-                }
-
-                return $enriched;
-            } catch (\Throwable) {
-                // Fallback to direct entity getters
-            }
-        }
-
-        /** @var array<string, mixed> $articleData */
-        $articleData = $dimensionContent->getTemplateData();
-        $articleData['id'] = $uuid;
-        $articleData['uuid'] = $uuid;
-        $entityTitle = $dimensionContent->getTitle();
-        $articleData['title'] = $entityTitle;
-        $articleData['headline'] = $this->firstNonEmptyString($articleData['headline'] ?? null, $entityTitle);
-
-        $excerptDesc = $dimensionContent->getExcerptDescription();
-        $rawSummary = $articleData['summary'] ?? null;
-        $rawDescription = $articleData['description'] ?? null;
-        $rawBodyContent = $this->firstNonEmptyString($articleData['content'] ?? null, $articleData['article'] ?? null);
-        if (null !== $rawBodyContent && !isset($articleData['content'])) {
-            $articleData['content'] = $rawBodyContent;
-        }
-
-        $articleData['summary'] = $this->resolveSummaryWithContentFallback($rawSummary, $rawDescription, $excerptDesc, $rawBodyContent);
-        $articleData['description'] = $this->resolveSummaryWithContentFallback($rawDescription, $rawSummary, $excerptDesc, $rawBodyContent);
-        $articleData['image'] = $this->firstNonEmptyMedia($articleData['image'] ?? null, $dimensionContent->getExcerptImage());
-
-        $route = $dimensionContent->getRoute();
-        if (null !== $route) {
-            $articleData['url'] = $route->getSlug();
-            $articleData['link'] = $route->getSlug();
-        }
-
-        if (null !== $dimensionContent->getAuthored()) {
-            $articleData['authored'] = $dimensionContent->getAuthored()->format('c');
-            $articleData['date'] = $articleData['authored'];
-        }
-
-        $enriched = $this->enrichArticleMetadata($articleData, $dimensionContent);
         if (null !== $cacheKey) {
             $this->resolvedEntityCache[$cacheKey] = $enriched;
         }
@@ -508,164 +369,19 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
         return $enriched;
     }
 
-    /**
-     * @param array<string, mixed> $articleData
-     *
-     * @return array<string, mixed>
-     */
-    private function enrichArticleMetadata(array $articleData, ArticleDimensionContentInterface $dimensionContent): array
-    {
-        $templateKey = $dimensionContent->getTemplateKey();
-        if (null !== $templateKey && '' !== $templateKey) {
-            $articleData['template'] ??= $templateKey;
-        }
-
-        $tagNames = $dimensionContent->getExcerptTagNames();
-        if ([] !== $tagNames) {
-            $articleData['tags'] ??= \array_values($tagNames);
-            $articleData['badge'] ??= $tagNames[\array_key_first($tagNames)];
-        }
-
-        $categoryIds = $dimensionContent->getExcerptCategoryIds();
-        if ([] !== $categoryIds) {
-            $articleData['categories'] ??= \array_values($categoryIds);
-        }
-
-        return $articleData;
-    }
-
     private function extractDimensionContent(ArticleInterface $article, string $locale): ?ArticleDimensionContentInterface
     {
-        $isPreview = $this->isPreviewContext();
-
-        if (null !== $this->contentAggregator) {
-            try {
-                /** @var ArticleDimensionContentInterface $aggregated */
-                $aggregated = $this->contentAggregator->aggregate($article, [
-                    'locale' => $locale,
-                    'stage' => DimensionContentInterface::STAGE_LIVE,
-                ]);
-
-                return $aggregated;
-            } catch (\Throwable) {
-                if ($isPreview) {
-                    try {
-                        /** @var ArticleDimensionContentInterface $aggregatedDraft */
-                        $aggregatedDraft = $this->contentAggregator->aggregate($article, [
-                            'locale' => $locale,
-                            'stage' => DimensionContentInterface::STAGE_DRAFT,
-                        ]);
-
-                        return $aggregatedDraft;
-                    } catch (\Throwable) {
-                        // Fallback to direct dimension iteration
-                    }
-                }
-            }
-        }
-
-        /** @var iterable<ArticleDimensionContentInterface> $dimensionContents */
-        $dimensionContents = $article->getDimensionContents();
-
-        $draftFallback = null;
-        foreach ($dimensionContents as $content) {
-            if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion()) {
-                continue;
-            }
-            if ($content->getLocale() === $locale) {
-                $stage = $content->getStage();
-                if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
-                    return $content;
-                }
-                if ($isPreview && DimensionContentInterface::STAGE_DRAFT === $stage) {
-                    $draftFallback ??= $content;
-                }
-            }
-        }
-
-        if (null !== $draftFallback) {
-            return $draftFallback;
-        }
-
-        foreach ($dimensionContents as $content) {
-            if (DimensionContentInterface::CURRENT_VERSION !== $content->getVersion() || null !== $content->getLocale()) {
-                continue;
-            }
-            if (null === $content->getTitle() && [] === $content->getTemplateData()) {
-                continue;
-            }
-            $stage = $content->getStage();
-            if (DimensionContentInterface::STAGE_LIVE === $stage || '' === $stage) {
-                return $content;
-            }
-            if ($isPreview && DimensionContentInterface::STAGE_DRAFT === $stage) {
-                $draftFallback ??= $content;
-            }
-        }
-
-        return $draftFallback;
+        return SuluContentDimensionExtractor::extractDimensionContent(
+            $article,
+            $locale,
+            $this->contentAggregator,
+            $this->isPreviewContext(),
+        );
     }
 
     private function isPreviewContext(): bool
     {
-        $request = $this->requestStack?->getCurrentRequest();
-        if (null === $request) {
-            return false;
-        }
-
-        return $request->attributes->getBoolean('preview')
-            || $request->attributes->getBoolean('_sulu_preview');
-    }
-
-    private function firstNonEmptyString(mixed ...$candidates): ?string
-    {
-        foreach ($candidates as $candidate) {
-            if (\is_string($candidate) && '' !== \trim($candidate)) {
-                return $candidate;
-            }
-        }
-
-        return null;
-    }
-
-    private function resolveSummaryWithContentFallback(
-        mixed $summary,
-        mixed $description,
-        mixed $excerptDescription,
-        mixed $content,
-    ): ?string {
-        $resolved = $this->firstNonEmptyString($summary, $description, $excerptDescription);
-        if (null !== $resolved) {
-            return $resolved;
-        }
-
-        if (\is_string($content) && '' !== \trim($content)) {
-            $truncated = DynamicContentHydrator::truncatePlainText($content, 160);
-            if ('' !== $truncated) {
-                return $truncated;
-            }
-        }
-
-        return null;
-    }
-
-    private function firstNonEmptyMedia(mixed ...$candidates): mixed
-    {
-        foreach ($candidates as $candidate) {
-            if (null === $candidate) {
-                continue;
-            }
-            if (\is_string($candidate) && '' === \trim($candidate)) {
-                continue;
-            }
-            if (\is_array($candidate) && [] === $candidate) {
-                continue;
-            }
-
-            return $candidate;
-        }
-
-        return null;
+        return SuluContentDimensionExtractor::isPreviewContext($this->requestStack);
     }
 
     /**

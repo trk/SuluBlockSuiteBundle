@@ -236,6 +236,42 @@ final class AbstractBlockComponentTest extends TestCase
             ['class' => 'w-full', 'data-foo' => 'bar'],
             $component->initializeBlockComponent(['title' => 'Hi', 'class' => 'w-full', 'data-foo' => 'bar']),
         );
+
+        // Preview data-block-id from _attributes on block or data item is forwarded to HTML root attributes
+        self::assertSame(
+            ['data-block-id' => 'sulu9999'],
+            $component->initializeBlockComponent([
+                'block' => [
+                    'title' => 'Preview Headline',
+                    '_sulu_block_id' => 'sulu9999',
+                    '_attributes' => ['data-block-id' => 'sulu9999'],
+                ],
+            ]),
+        );
+        self::assertArrayNotHasKey('_sulu_block_id', $component->props());
+        self::assertSame(['data-block-id' => 'sulu9999'], $component->props()['_attributes'] ?? null);
+
+        self::assertSame(
+            ['data-block-id' => 'item8888'],
+            $component->initializeBlockComponent([
+                'data' => [
+                    'title' => 'Preview Sub-Item',
+                    '_sulu_block_id' => 'item8888',
+                    '_attributes' => ['data-block-id' => 'item8888'],
+                ],
+            ]),
+        );
+
+        self::assertSame(
+            ['data-block-id' => 'row7777'],
+            $component->initializeBlockComponent([
+                'props' => [
+                    'layout' => 'halves',
+                    '_sulu_block_id' => 'row7777',
+                    '_attributes' => ['data-block-id' => 'row7777'],
+                ],
+            ]),
+        );
     }
 
     public function testStringTransformsAndClassAndItemHelpers(): void

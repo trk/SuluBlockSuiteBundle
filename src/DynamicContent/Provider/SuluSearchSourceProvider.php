@@ -112,6 +112,19 @@ final class SuluSearchSourceProvider extends AbstractDynamicContentSourceProvide
         return $normalized;
     }
 
+    public function resolveCollectionMeta(array $config, string|object|array|null $contextPage = null, ?string $locale = null): array
+    {
+        $query = $this->extractSearchQuery($contextPage);
+        $hits = $this->extractSearchHits($contextPage);
+        $count = \count($hits);
+
+        return [
+            'unfiltered_total' => $count,
+            'filtered_total' => $count,
+            'is_filtered' => '' !== $query,
+        ];
+    }
+
     /**
      * @param string|object|array<mixed, mixed>|null $contextPage
      */

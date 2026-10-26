@@ -99,7 +99,7 @@ final class BlockTransformPipeline implements BlockTransformPipelineInterface
                         foreach ($transformed['_expanded_blocks'] as $expanded) {
                             if (\is_array($expanded)) {
                                 /** @var array<string, mixed> $expanded */
-                                if ($transformer instanceof DynamicContentTransformer) {
+                                if (!empty($transformed['_dynamic_content_resolved'])) {
                                     $expanded['_dynamic_content_resolved'] = true;
                                 }
                                 unset($expanded['_expanded_blocks']);

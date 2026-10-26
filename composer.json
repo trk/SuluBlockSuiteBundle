@@ -74,7 +74,18 @@
         "symfony": {
             "allow-contrib": false,
             "require": "7.4.*"
+        },
+        "ai-mate": {
+            "scan-dirs": [
+                "src/Mcp"
+            ],
+            "instructions": "INSTRUCTIONS.md"
         }
+    },
+    "suggest": {
+        "sulu/mcp-bundle": "Enables Sulu Block Suite MCP tools (sulu_block_suite_blocks, sulu_block_suite_presets, sulu_block_suite_compose_block) for AI content management",
+        "sulu/sulu-mate-extension": "Enables Symfony AI Mate auto-discovery of Block Suite instructions and MCP tools",
+        "trk/sulu-multi-webspace-bundle": "Enables multi-webspace permission filtering and content override integration for Page Layouts, Reusable Blocks, and Block Presets"
     },
     "scripts": {
         "test": "vendor/bin/phpunit",

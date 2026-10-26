@@ -218,8 +218,12 @@ final class BlockSuiteAdmin extends Admin
                 ->setParent($viewPrefix . '.add'),
         );
 
+        $editContentViewBuilder = \in_array($snippetType, [TemplateKeys::PAGE_LAYOUT, TemplateKeys::REUSABLE_BLOCK], true)
+            ? $this->viewBuilderFactory->createPreviewFormViewBuilder($viewPrefix . '.edit.content', '/content')
+            : $this->viewBuilderFactory->createFormViewBuilder($viewPrefix . '.edit.content', '/content');
+
         $viewCollection->add(
-            $this->viewBuilderFactory->createFormViewBuilder($viewPrefix . '.edit.content', '/content')
+            $editContentViewBuilder
                 ->setResourceKey(SnippetInterface::RESOURCE_KEY)
                 ->setFormKey('snippet')
                 ->setTabTitle('sulu_content.content')

@@ -49,7 +49,24 @@
             </meta>
         </property>
 
-        <property name="preview_image" type="single_media_selection">
+        <property name="webspace" type="single_webspace_select" mandatory="false" colspan="6" multilingual="false">
+            <meta>
+                <title lang="en">Webspace</title>
+                <title lang="tr">Web Alanı (Webspace)</title>
+                <title lang="de">Webspace</title>
+                <title lang="ru">Веб-пространство</title>
+                <title lang="es">Espacio Web</title>
+                <title lang="fr">Espace Web</title>
+                <info_text lang="en">Restrict this preset to a specific webspace or keep it Global for all webspaces.</info_text>
+                <info_text lang="tr">Bu hazır şablonu belirli bir webspace ile sınırlandırın veya tüm webspace'ler için Genel (Global) bırakın.</info_text>
+                <info_text lang="de">Beschränken Sie diese Vorlage auf einen bestimmten Webspace oder belassen Sie sie Global für alle Webspaces.</info_text>
+            </meta>
+            <params>
+                <param name="include_global" value="true"/>
+            </params>
+        </property>
+
+        <property name="preview_image" type="single_media_selection" colspan="6">
             <meta>
                 <title lang="en">Preview Image</title>
                 <title lang="tr">Önizleme Görseli</title>

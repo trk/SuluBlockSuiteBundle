@@ -49,6 +49,8 @@
     "sulu_block_suite.dynamic_filter_tags_desc": "Select tags to filter items.",
     "sulu_block_suite.dynamic_filter_template": "Filter by Template Key",
     "sulu_block_suite.dynamic_filter_template_desc": "Comma-separated template keys.",
+    "sulu_block_suite.dynamic_is_template": "Use as Dynamic Content Template",
+    "sulu_block_suite.dynamic_is_template_info": "Mark this item as the visual template for dynamic content items at this position. Unchecked items are rendered as normal static items.",
     "sulu_block_suite.dynamic_limit": "Items Limit",
     "sulu_block_suite.dynamic_limit_desc": "Maximum number of items to generate from the collection.",
     "sulu_block_suite.dynamic_media_selection": "Specific Media",
@@ -105,6 +107,7 @@
     "sulu_block_suite.no_presets_found": "No presets found matching your query.",
     "sulu_block_suite.no_reusable_block_selected": "No reusable block selected",
     "sulu_block_suite.open_in_new_tab": "Edit in New Tab",
+    "sulu_block_suite.page_layout_duplicate_webspace_template": "A Page Layout for webspace \"%webspace%\" and template \"%template%\" already exists (\"%title%\"). Each template can only be assigned once per webspace.",
     "sulu_block_suite.preset_desc_label": "Description",
     "sulu_block_suite.preset_gallery_title": "Preset Style Gallery",
     "sulu_block_suite.preset_title_label": "Preset Name",
@@ -120,9 +123,9 @@
     "sulu_block_suite.reusable_block_not_in_use": "Not in use yet",
     "sulu_block_suite.reusable_block_resources": "resources",
     "sulu_block_suite.reusable_block_search_placeholder": "Search by title or description...",
-    "sulu_block_suite.reusable_block_select_prompt": "Select a shared section from Block Suite. Updates will sync automatically across all pages.",
+    "sulu_block_suite.reusable_block_select_prompt": "Select a shared section from Blocks. Updates will sync automatically across all pages.",
     "sulu_block_suite.reusable_block_used_in": "Used in",
-    "sulu_block_suite.reusable_blocks": "Reusable Blocks",
+    "sulu_block_suite.reusable_blocks": "Reusable",
     "sulu_block_suite.reusable_desc_label": "Description",
     "sulu_block_suite.reusable_title_label": "Reusable Block Title",
     "sulu_block_suite.save_as_preset": "Save as Preset",
@@ -137,5 +140,6 @@
     "sulu_block_suite.search_presets": "Search presets...",
     "sulu_block_suite.select_reusable_block": "Select Reusable Block",
     "sulu_block_suite.tab_content": "Content",
-    "sulu_block_suite.title": "Block Suite"
+    "sulu_block_suite.template_selection_none": "— None (Custom Layout) —",
+    "sulu_block_suite.title": "Blocks"
 }

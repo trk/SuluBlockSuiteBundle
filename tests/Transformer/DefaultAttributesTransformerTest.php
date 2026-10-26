@@ -354,4 +354,103 @@ final class DefaultAttributesTransformerTest extends TestCase
         $this->assertSame('#', $comp->get('cta_link'));
         $this->assertSame('#', $comp->get('media_trick'));
     }
+
+    public function testPreservesSuluBlockIdAsDataBlockIdInPreviewModeEvenWithCustomElementId(): void
+    {
+        $transformer = new DefaultAttributesTransformer();
+
+        $block = [
+            'type' => 'grid',
+            '_id' => 'sulu1234',
+            'props' => [
+                'id' => 'custom-dom-id',
+            ],
+            'items' => [
+                [
+                    'type' => 'grid_item',
+                    '_id' => 'item5678',
+                    'title' => 'First Card',
+                ],
+            ],
+        ];
+
+        // 1. Normal website render (not preview): no data-block-id injected
+        $publicResult = $transformer->transform($block, []);
+        $this->assertSame('sulu1234', $publicResult['_sulu_block_id']);
+        $this->assertSame('custom-dom-id', $publicResult['_id']);
+        $this->assertIsArray($publicResult['_attributes']);
+        $this->assertArrayNotHasKey('data-block-id', $publicResult['_attributes']);
+
+        // 2. Sulu Preview render (context['preview'] = true): data-block-id injected on root and sub-items
+        $previewResult = $transformer->transform($block, ['preview' => true]);
+        $this->assertSame('sulu1234', $previewResult['_sulu_block_id']);
+        $this->assertSame('custom-dom-id', $previewResult['_id']);
+        $this->assertIsArray($previewResult['_attributes']);
+        $this->assertSame('sulu1234', $previewResult['_attributes']['data-block-id']);
+        $this->assertIsString($previewResult['_attributes_string']);
+        $this->assertStringContainsString('data-block-id="sulu1234"', $previewResult['_attributes_string']);
+
+        $this->assertIsArray($previewResult['items']);
+        $this->assertIsArray($previewResult['items'][0]);
+        $this->assertSame('item5678', $previewResult['items'][0]['_sulu_block_id']);
+        $this->assertIsArray($previewResult['items'][0]['_attributes']);
+        $this->assertSame('item5678', $previewResult['items'][0]['_attributes']['data-block-id']);
+
+        // 3. Nested section > rows > columns > blocks > items hierarchy in preview mode
+        $sectionBlock = [
+            'type' => 'section',
+            '_id' => 'sec1111',
+            'rows' => [
+                [
+                    'type' => 'row_item',
+                    '_id' => 'row2222',
+                    'columns' => [
+                        [
+                            'type' => 'column_item',
+                            '_id' => 'col3333',
+                            'blocks' => [
+                                [
+                                    'type' => 'grid',
+                                    '_id' => 'blk4444',
+                                    'items' => [
+                                        [
+                                            'type' => 'grid_item',
+                                            '_id' => 'itm5555',
+                                            'title' => 'Nested Item',
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $previewSection = $transformer->transform($sectionBlock, ['preview' => true]);
+        $this->assertIsArray($previewSection['_attributes']);
+        $this->assertSame('sec1111', $previewSection['_attributes']['data-block-id']);
+        /** @var list<array{_attributes: array<string, mixed>, columns: list<array{_attributes: array<string, mixed>, blocks: list<array{_attributes: array<string, mixed>, items: list<array{_attributes: array<string, mixed>}>}>}>}> $rows */
+        $rows = $previewSection['rows'];
+        $this->assertSame('row2222', $rows[0]['_attributes']['data-block-id']);
+        $this->assertSame('col3333', $rows[0]['columns'][0]['_attributes']['data-block-id']);
+        $this->assertSame('blk4444', $rows[0]['columns'][0]['blocks'][0]['_attributes']['data-block-id']);
+        $this->assertSame('itm5555', $rows[0]['columns'][0]['blocks'][0]['items'][0]['_attributes']['data-block-id']);
+
+        // 4. Blocks inside PageLayoutProvider (_in_page_layout = true) do not emit data-block-id on page preview
+        $layoutPreview = $transformer->transform($sectionBlock, ['preview' => true, '_in_page_layout' => true]);
+        $this->assertIsArray($layoutPreview['_attributes']);
+        $this->assertArrayNotHasKey('data-block-id', $layoutPreview['_attributes']);
+
+        // 5. Expanded reusable blocks keep parent reusable block ID on root and skip inner snippet IDs
+        $reusableExpanded = $sectionBlock;
+        $reusableExpanded['_sulu_block_id'] = 'reusable_parent_99';
+        $reusableExpanded['_reusable_parent_block_id'] = 'reusable_parent_99';
+        $reusablePreview = $transformer->transform($reusableExpanded, ['preview' => true]);
+        $this->assertIsArray($reusablePreview['_attributes']);
+        $this->assertSame('reusable_parent_99', $reusablePreview['_attributes']['data-block-id']);
+        $this->assertIsArray($reusablePreview['rows']);
+        $this->assertIsArray($reusablePreview['rows'][0]);
+        $this->assertArrayNotHasKey('_attributes', $reusablePreview['rows'][0]);
+    }
 }

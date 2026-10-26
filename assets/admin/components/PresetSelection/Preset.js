@@ -36,6 +36,7 @@ type SavePresetDialogProps = {
     onSuccess: (createdPreset: PresetItem) => void,
     open: boolean,
     propsValues: Object,
+    webspace?: ?string,
 };
 
 @observer
@@ -79,7 +80,7 @@ export class SavePresetDialog extends React.Component<SavePresetDialogProps> {
             return;
         }
 
-        const {componentType, contentValues, locale, onSuccess, propsValues} = this.props;
+        const {componentType, contentValues, locale, onSuccess, propsValues, webspace} = this.props;
         if (!componentType || componentType === 'general') {
             return;
         }
@@ -102,6 +103,7 @@ export class SavePresetDialog extends React.Component<SavePresetDialogProps> {
             description: this.description.trim() || null,
             block_type: componentType,
             locale,
+            webspace: webspace || '_global',
             props: currentProps,
             values: valuesPayload,
         };
