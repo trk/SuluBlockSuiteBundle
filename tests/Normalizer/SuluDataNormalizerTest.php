@@ -294,4 +294,46 @@ final class SuluDataNormalizerTest extends TestCase
         $this->assertSame('uuid-4', SuluDataNormalizer::extractSnippetUuid(['view' => ['snippet' => ['id' => 'uuid-4']]]));
         $this->assertNull(SuluDataNormalizer::extractSnippetUuid(['type' => 'text']));
     }
+
+    public function testExtractInitialsHandlesUnicodeAndExplicitOverrides(): void
+    {
+        $this->assertNull(SuluDataNormalizer::extractInitials(null));
+        $this->assertNull(SuluDataNormalizer::extractInitials('   '));
+        $this->assertSame('AB', SuluDataNormalizer::extractInitials('Alice Bob'));
+        $this->assertSame('İT', SuluDataNormalizer::extractInitials('İskender Totoğlu'));
+        $this->assertSame('AL', SuluDataNormalizer::extractInitials('Alice'));
+        $this->assertSame('VIP', SuluDataNormalizer::extractInitials('Alice Bob', ' vip-extra '));
+    }
+
+    public function testNormalizeItemMediaAndLinksHydratesMediaIconAndLinkFields(): void
+    {
+        $item = [
+            'image' => ['url' => '/media/1.jpg', 'focusPoint' => ['x' => 10, 'y' => 90]],
+            'secondary_image' => ['url' => '/media/2.jpg'],
+            'video' => ['url' => '/media/v.mp4'],
+            'icon' => 'rocket',
+            'link' => [
+                'href' => '/docs',
+                'target' => '_blank',
+                'title' => ' Read Docs ',
+            ],
+        ];
+
+        $normalized = SuluDataNormalizer::normalizeItemMediaAndLinks(
+            $item,
+            ['image', 'secondary_image'],
+            ['video'],
+        );
+
+        $this->assertSame('/media/1.jpg', $normalized['image_url']);
+        $this->assertSame('object-position: 10% 90%;', $normalized['image_focus_style']);
+        $this->assertSame('/media/2.jpg', $normalized['secondary_image_url']);
+        $this->assertSame('/media/v.mp4', $normalized['video_url']);
+        $this->assertSame('ti ti-rocket', $normalized['icon_class']);
+        $this->assertSame('ti ti-rocket', $normalized['icon']);
+        $this->assertSame('/docs', $normalized['link_href']);
+        $this->assertSame('/docs', $normalized['link_url']);
+        $this->assertSame('_blank', $normalized['link_target']);
+        $this->assertSame('Read Docs', $normalized['link_title']);
+    }
 }

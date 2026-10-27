@@ -175,6 +175,18 @@ services:
     Totoglu\SuluBlockSuiteBundle\Content\Type\HotspotPickerPropertyResolver:
         tags: ['sulu.content.property_resolver']
 
+    Totoglu\SuluBlockSuiteBundle\Content\PropertyResolver\TablerIconPropertyResolver:
+        decorates: Manuxi\SuluAdminExtrasBundle\Content\Type\IconSelectionPropertyResolver
+        decoration_on_invalid: null
+        arguments:
+            $inner: '@.inner'
+            $projectDir: '%kernel.project_dir%'
+        tags:
+            - { name: 'sulu_content.property_resolver', type: 'single_icon_selection', alias: 'single_icon_selection', priority: 20 }
+
+    Totoglu\SuluBlockSuiteBundle\Transformer\SectionFlattener:
+        tags: ['sulu_block_suite.nested_block_flattener']
+
     Totoglu\SuluBlockSuiteBundle\Controller\Admin\ReusableBlockUsageController:
         arguments:
             $referenceRepository: '@?sulu_reference.reference_repository'

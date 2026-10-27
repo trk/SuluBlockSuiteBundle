@@ -21,6 +21,7 @@ import {
 } from './fieldEnhancers/withBlockFieldOptions';
 import initPreviewBlockFocus from './previewBlockFocus/initPreviewBlockFocus';
 import presetWireframeRegistry from './registries/presetWireframeRegistry';
+import tabIconRegistry from './registries/tabIconRegistry';
 
 // 1. Enable inline horizontal `<TabSection>` for `<section name="__tabs">`
 Form.Section = TabSection;
@@ -94,6 +95,7 @@ export {
     enhanceFieldRegistryWithBlockOptions,
     initPreviewBlockFocus,
     presetWireframeRegistry,
+    tabIconRegistry,
     withBlockFieldOptions,
 };
 export default PresetSelection;

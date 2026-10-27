@@ -336,6 +336,119 @@ final class AbstractBlockComponentTest extends TestCase
         self::assertSame(75.5, $component->itemFloat($item, 'x'));
         self::assertSame(['url' => 'https://example.com'], $component->itemArray($item, 'nested'));
     }
+
+    public function testUniversalAdvancedMediaLinkAndDynamicHelpers(): void
+    {
+        $component = new DummyHeadlineComponent();
+        $component->load(
+            data: [
+                'title' => 'Hero Title',
+                'image' => [
+                    'url' => '/media/1/hero.jpg',
+                    'alt' => 'Hero Image Alt',
+                    'formats' => ['640w' => '/media/1/hero-640.webp'],
+                    'focalPoint' => ['x' => 30, 'y' => 70],
+                ],
+                'video' => ['url' => '/media/2/intro.mp4'],
+                'link' => ['url' => '/en/services/consulting', 'title' => 'Consulting', 'target' => '_blank'],
+                '_summary' => ['formatted_summary' => '3 items loaded'],
+                '_empty_state' => ['message' => ''],
+                'items' => [
+                    ['title' => 'Item A', 'tags' => ['Cloud Native', 'DevOps']],
+                    ['title' => 'Item B', 'tag' => 'AI, Cloud Native'],
+                ],
+            ],
+            props: [
+                'id' => 'hero-section',
+                'css_classes' => 'custom-wrapper',
+                'custom_css' => '.el-element { color: red; }',
+                'attributes' => "data-track=\"hero\"\naria-expanded",
+                '_attributes' => ['data-block-id' => 'blk-1'],
+                'current_path' => '/en/services/consulting/strategy',
+                'root_url' => '/en',
+            ],
+        );
+
+        self::assertSame('hero-section', $component->getElementId());
+        self::assertSame('hero-section', $component->getComponentUid());
+        self::assertSame('custom-wrapper', $component->getCustomClass());
+        self::assertSame('#hero-section { color: red; }', $component->getScopedCss());
+        self::assertSame([
+            'data-block-id' => 'blk-1',
+            'data-track' => 'hero',
+            'aria-expanded' => true,
+        ], $component->getCustomAttributes());
+
+        self::assertSame('/media/1/hero.jpg', $component->getImageUrl());
+        self::assertStringContainsString('/media/1/hero-640.webp 640w', (string) $component->getImageSrcSet());
+        self::assertSame('object-position: 30% 70%;', $component->getImageFocusPointStyle());
+        self::assertSame('Hero Image Alt', $component->getImageAlt());
+        self::assertSame('/media/2/intro.mp4', $component->getVideoUrl());
+
+        self::assertSame('/en/services/consulting', $component->getLinkUrl());
+        self::assertSame('_blank', $component->getLinkTarget());
+        self::assertSame('Consulting', $component->getLinkTitle());
+        self::assertTrue($component->isInternalUrlActive('/en/services/consulting'));
+        self::assertFalse($component->isInternalUrlActive('/en/about'));
+
+        self::assertTrue($component->hasSummary());
+        self::assertFalse($component->hasEmptyState());
+        self::assertTrue($component->hasSummaryOrEmptyState());
+
+        self::assertSame([
+            'cloud-native' => 'Cloud Native',
+            'devops' => 'DevOps',
+            'ai' => 'AI',
+        ], $component->getFilterTags());
+        self::assertSame('cloud-native devops', $component->getItemTagSlugs(['tags' => ['Cloud Native', 'DevOps']]));
+    }
+
+    public function testResolveItemImageUrlAndSrcSet(): void
+    {
+        $component = new DummyGridComponent();
+        $component->load(props: ['media_source' => 'media']);
+
+        $mediaItem = [
+            'image' => [
+                'url' => '/uploads/media/gallery-1.jpg',
+                'thumbnails' => [
+                    'sulu-400x400' => '/uploads/media/400/gallery-1.webp',
+                    'sulu-800x800' => '/uploads/media/800/gallery-1.webp',
+                ],
+            ],
+            'image_url' => 'https://example.com/fallback.jpg',
+        ];
+        self::assertSame('/uploads/media/gallery-1.jpg', $component->resolveItemImageUrl($mediaItem));
+
+        $urlOverrideItem = [
+            'media_source' => 'url',
+            'image' => ['url' => '/uploads/media/gallery-1.jpg'],
+            'image_url' => 'https://example.com/override.jpg',
+        ];
+        self::assertSame('https://example.com/override.jpg', $component->resolveItemImageUrl($urlOverrideItem));
+        self::assertNull($component->resolveItemImageSrcSet(['image' => null]));
+    }
+
+    public function testIconAndContentAccessors(): void
+    {
+        $component = new DummyCardComponent();
+        $component->load(
+            data: [
+                'title' => 'Card Title',
+                'subtitle' => 'Card Subtitle',
+                'meta' => '2026-10',
+                'summary' => '<p>Summary text</p>',
+                'image' => ['url' => '/media/main.jpg'],
+                'icon' => 'star',
+            ],
+        );
+
+        self::assertSame('Card Title', $component->getTitle());
+        self::assertSame('Card Subtitle', $component->getSubtitle());
+        self::assertSame('2026-10', $component->getMeta());
+        self::assertSame('<p>Summary text</p>', $component->getResolvedContent());
+        self::assertSame('ti ti-star', $component->getIconClass());
+    }
 }
 
 final class DummyHeadlineComponent extends AbstractBlockComponent

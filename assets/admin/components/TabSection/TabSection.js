@@ -8,27 +8,8 @@ import Icon from 'sulu-admin-bundle/components/Icon';
 import OriginalSection from 'sulu-admin-bundle/components/Form/Section';
 import gridStyles from 'sulu-admin-bundle/components/Form/grid.scss';
 import conditionDataProviderRegistry from 'sulu-admin-bundle/containers/Form/registries/conditionDataProviderRegistry';
+import tabIconRegistry from '../../registries/tabIconRegistry';
 import styles from './tabSection.scss';
-
-const TAB_ICONS: {[string]: string} = {
-    content: 'su-document',
-    settings: 'su-brush',
-    style: 'su-paint',
-    layout: 'su-columns',
-    general: 'su-cog',
-    dynamic_content: 'su-flash',
-    advanced: 'su-code',
-    overview: 'su-document',
-    cabins: 'su-user',
-    technical: 'su-cog',
-    rates: 'su-tag',
-    media: 'su-image',
-    itinerary: 'su-map',
-    general_and_units_section: 'su-cog',
-    yacht_scope_section: 'fa-anchor',
-    destination_scope_section: 'su-web',
-    route_scope_section: 'su-map-pin',
-};
 
 let instanceCounter = 0;
 
@@ -109,7 +90,7 @@ function resolveTabIcon(tabKey: string, tabSchema: Object): string {
         }
     }
 
-    return TAB_ICONS[tabKey] || 'su-cog';
+    return tabIconRegistry.get(tabKey, 'su-cog');
 }
 
 type Props = {

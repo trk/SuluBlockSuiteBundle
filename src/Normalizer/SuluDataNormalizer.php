@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Totoglu\SuluBlockSuiteBundle\Normalizer;
 
+use Totoglu\SuluBlockSuiteBundle\Content\PropertyResolver\TablerIconPropertyResolver;
+
 /**
  * UI-framework-agnostic normalizer for raw Sulu CMS data structures
  * (block props JSON, Sulu Media arrays/objects, Sulu Link payloads, and icon selections).
@@ -423,6 +425,206 @@ final class SuluDataNormalizer
         }
 
         return $raw;
+    }
+
+    /**
+     * Resolves a Sulu icon value into a normalized CSS icon class string (e.g. `ti ti-rocket`).
+     */
+    public static function resolveIconClass(mixed $icon): ?string
+    {
+        $raw = self::resolveIcon($icon);
+        if (null === $raw || '' === $raw) {
+            return null;
+        }
+
+        if (
+            \str_starts_with($raw, 'su-')
+            || \str_starts_with($raw, 'bi-')
+            || \str_starts_with($raw, 'fa-')
+            || \str_starts_with($raw, 'ri-')
+            || \str_starts_with($raw, 'lucide-')
+            || (\str_contains($raw, ' ') && !\str_starts_with(\strtolower($raw), 'ti '))
+        ) {
+            return $raw;
+        }
+
+        $normalized = TablerIconPropertyResolver::normalizeTablerIconName($raw);
+        if (null !== $normalized) {
+            return 'ti ti-' . $normalized;
+        }
+
+        if (\str_starts_with($raw, 'ti ')) {
+            return $raw;
+        }
+
+        if (\str_starts_with($raw, 'ti-')) {
+            return 'ti ' . $raw;
+        }
+
+        if (\str_starts_with($raw, 'tabler-')) {
+            return 'ti ti-' . \substr($raw, 7);
+        }
+
+        return 'ti ti-' . $raw;
+    }
+
+    /**
+     * Sanitizes a map location query, embed URL, or `<iframe>` snippet into a safe HTTPS
+     * Google Maps or OpenStreetMap embed URL.
+     */
+    public static function sanitizeMapEmbedUrl(?string $query, int $zoom = 14): string
+    {
+        if (null === $query || '' === \trim($query)) {
+            return '';
+        }
+
+        $cleanQuery = \trim($query);
+        $fromIframe = false;
+
+        if (\str_contains($cleanQuery, '<iframe')) {
+            if (1 !== \preg_match('/src="([^"]+)"/i', $cleanQuery, $matches)) {
+                return '';
+            }
+            $cleanQuery = \trim(\html_entity_decode($matches[1], \ENT_QUOTES | \ENT_HTML5, 'UTF-8'));
+            $fromIframe = true;
+        }
+
+        if ($fromIframe || 1 === \preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:/', $cleanQuery) || \str_starts_with($cleanQuery, '//')) {
+            $parts = \parse_url($cleanQuery);
+            if (!\is_array($parts)) {
+                return '';
+            }
+
+            $scheme = \strtolower((string) ($parts['scheme'] ?? ''));
+            $host = \strtolower((string) ($parts['host'] ?? ''));
+            $path = (string) ($parts['path'] ?? '');
+
+            if ('https' !== $scheme) {
+                return '';
+            }
+
+            $isGoogleMaps = \in_array($host, ['www.google.com', 'maps.google.com', 'google.com'], true)
+                && \str_starts_with($path, '/maps');
+            $isOpenStreetMap = \in_array($host, ['www.openstreetmap.org', 'openstreetmap.org'], true);
+
+            return ($isGoogleMaps || $isOpenStreetMap) ? $cleanQuery : '';
+        }
+
+        $clampedZoom = \max(1, \min(20, $zoom));
+
+        return 'https://maps.google.com/maps?q=' . \rawurlencode($cleanQuery) . '&z=' . $clampedZoom . '&output=embed';
+    }
+
+    /**
+     * Resolves a Sulu `date` / `datetime` field value (`\DateTimeInterface` or date string)
+     * into an ISO-8601 (`\DateTimeInterface::ATOM`) string, falling back to `$defaultOffsetSeconds` from now.
+     */
+    public static function resolveIsoDate(mixed $date, int $defaultOffsetSeconds = 604800): string
+    {
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format(\DateTimeInterface::ATOM);
+        }
+
+        if (\is_string($date)) {
+            $trimmed = \trim($date);
+            if ('' !== $trimmed) {
+                $parsed = \strtotime($trimmed);
+                if (false !== $parsed) {
+                    return \date(\DateTimeInterface::ATOM, $parsed);
+                }
+
+                return $trimmed;
+            }
+        }
+
+        return \date(\DateTimeInterface::ATOM, \time() + $defaultOffsetSeconds);
+    }
+
+    /**
+     * Extracts uppercase Unicode initials from an explicit initials string (up to 3 chars)
+     * or a single/multi-word display name (up to 2 chars).
+     */
+    public static function extractInitials(?string $name, ?string $explicitInitials = null): ?string
+    {
+        if (null !== $explicitInitials && '' !== \trim($explicitInitials)) {
+            return \mb_strtoupper(\mb_substr(\trim($explicitInitials), 0, 3));
+        }
+
+        if (null === $name || '' === \trim($name)) {
+            return null;
+        }
+
+        $cleaned = \preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $name);
+        $parts = \preg_split('/\s+/u', \trim(\is_string($cleaned) ? $cleaned : $name), -1, \PREG_SPLIT_NO_EMPTY);
+        if (!\is_array($parts) || [] === $parts) {
+            return null;
+        }
+
+        if (1 === \count($parts)) {
+            return \mb_strtoupper(\mb_substr($parts[0], 0, 2));
+        }
+
+        $first = \mb_substr($parts[0], 0, 1);
+        $last = \mb_substr($parts[\count($parts) - 1], 0, 1);
+
+        return \mb_strtoupper($first . $last);
+    }
+
+    /**
+     * Hydrates Sulu media (`$imageKeys` and `$videoKeys`), `icon`, and `link` / `url`
+     * fields inside a collection item array into resolved URLs, srcsets, focal-point styles, icon classes,
+     * and link targets/titles.
+     *
+     * @param array<string, mixed> $item
+     * @param list<string> $imageKeys
+     * @param list<string> $videoKeys
+     *
+     * @return array<string, mixed>
+     */
+    public static function normalizeItemMediaAndLinks(
+        array $item,
+        array $imageKeys = ['image'],
+        array $videoKeys = ['video'],
+    ): array {
+        foreach ($imageKeys as $imageKey) {
+            if (isset($item[$imageKey])) {
+                $item[$imageKey . '_url'] = self::resolveImageUrl($item[$imageKey]);
+                $item[$imageKey . '_srcset'] = self::resolveSrcSet($item[$imageKey]);
+                $item[$imageKey . '_focus_style'] = self::resolveFocusPointStyle($item[$imageKey]);
+            }
+        }
+
+        foreach ($videoKeys as $videoKey) {
+            if (isset($item[$videoKey])) {
+                $item[$videoKey . '_url'] = self::resolveImageUrl($item[$videoKey]);
+            }
+        }
+
+        if (isset($item['icon'])) {
+            $resolvedIcon = self::resolveIconClass($item['icon']);
+            $item['icon_class'] = $resolvedIcon;
+            if (null !== $resolvedIcon) {
+                $item['icon'] = $resolvedIcon;
+            }
+        }
+
+        if (isset($item['link'])) {
+            $item['link_href'] = self::resolveUrl($item['link']);
+            $item['link_url'] = $item['link_href'];
+            if (\is_array($item['link'])) {
+                if (!isset($item['link_target']) && '_blank' === ($item['link']['target'] ?? null)) {
+                    $item['link_target'] = '_blank';
+                }
+                if (!isset($item['link_title']) && \is_string($item['link']['title'] ?? null) && '' !== \trim($item['link']['title'])) {
+                    $item['link_title'] = \trim($item['link']['title']);
+                }
+            }
+        } elseif (isset($item['url'])) {
+            $item['link_href'] = self::resolveUrl($item['url']);
+            $item['link_url'] = $item['link_href'];
+        }
+
+        return $item;
     }
 
     /**
