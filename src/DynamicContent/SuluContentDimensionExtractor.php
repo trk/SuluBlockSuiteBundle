@@ -307,7 +307,7 @@ final class SuluContentDimensionExtractor
         }
 
         if (\is_string($content) && '' !== \trim($content)) {
-            $truncated = DynamicContentHydrator::truncatePlainText($content, 160);
+            $truncated = DynamicContentMappingApplier::truncatePlainText($content, 160);
             if ('' !== $truncated) {
                 return $truncated;
             }

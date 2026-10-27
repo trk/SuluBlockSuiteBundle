@@ -138,7 +138,7 @@ export class SaveReusableDialog extends React.Component<SaveReusableDialogProps>
         this.error = null;
 
         const currentProps = {...toJS(propsValues)};
-        delete currentProps._preset;
+        delete currentProps.preset;
 
         const payloadBlockData = {
             ...(blockData ? toJS(blockData) : {}),

@@ -18,18 +18,22 @@ class DynamicContentTwigExtensionTest extends TestCase
         $extension = new DynamicContentTwigExtension($pipeline);
 
         $functionNames = \array_map(static fn ($f) => $f->getName(), $extension->getFunctions());
-        $this->assertContains('sulu_block_suite_hydrate_blocks', $functionNames);
-        $this->assertContains('hydrate_blocks', $functionNames);
-        $this->assertContains('sulu_block_suite_transform_block', $functionNames);
-        $this->assertContains('block_transform', $functionNames);
-        $this->assertContains('sulu_user_loggedin_and_preview', $functionNames);
-        $this->assertContains('sulu_preview_block_focus_script', $functionNames);
+        $this->assertSame([
+            'hydrate_blocks',
+            'hydrate_block_tree',
+            'block_transform',
+            'block_render',
+            'blocks_render',
+            'sulu_user_loggedin_and_preview',
+            'sulu_preview_block_focus_script',
+        ], $functionNames);
 
         $filterNames = \array_map(static fn ($f) => $f->getName(), $extension->getFilters());
-        $this->assertContains('sulu_block_suite_hydrate_blocks', $filterNames);
-        $this->assertContains('hydrate_blocks', $filterNames);
-        $this->assertContains('sulu_block_suite_transform_block', $filterNames);
-        $this->assertContains('block_transform', $filterNames);
+        $this->assertSame([
+            'hydrate_blocks',
+            'hydrate_block_tree',
+            'block_transform',
+        ], $filterNames);
     }
 
     public function testHydrateBlocksDelegatesToPipeline(): void

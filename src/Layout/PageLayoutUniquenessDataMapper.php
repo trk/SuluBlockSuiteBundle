@@ -60,9 +60,7 @@ final readonly class PageLayoutUniquenessDataMapper implements DataMapperInterfa
 
         $rawTargetTemplate = \array_key_exists('target_template', $data)
             ? $data['target_template']
-            : (\array_key_exists('page_template', $data)
-                ? $data['page_template']
-                : ($existingData['target_template'] ?? $existingData['page_template'] ?? null));
+            : ($existingData['target_template'] ?? null);
 
         $targetTemplate = \is_string($rawTargetTemplate) ? \trim($rawTargetTemplate) : '';
 
@@ -215,7 +213,7 @@ final readonly class PageLayoutUniquenessDataMapper implements DataMapperInterfa
 
         $webspace = SnippetScopeResolver::extractWebspace($merged);
 
-        $rawTemplate = $merged['target_template'] ?? $merged['page_template'] ?? null;
+        $rawTemplate = $merged['target_template'] ?? null;
         $targetTemplate = \is_string($rawTemplate) ? \trim($rawTemplate) : '';
 
         $rawTitle = $merged['title'] ?? null;

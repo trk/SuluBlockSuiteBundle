@@ -24,7 +24,7 @@ final class PageLayoutProviderTest extends TestCase
         self::assertNull($provider->getLayout('   '));
     }
 
-    public function testGetLayoutMatchesByKey(): void
+    public function testGetLayoutMatchesByTargetTemplate(): void
     {
         $snippet = $this->createStub(SnippetInterface::class);
         $snippet->method('getUuid')->willReturn('snippet-uuid-1');
@@ -33,7 +33,7 @@ final class PageLayoutProviderTest extends TestCase
         $content->method('getTemplateKey')->willReturn('page_layout');
         $content->method('getTitle')->willReturn('Default Layout');
         $content->method('getTemplateData')->willReturn([
-            'key' => 'default',
+            'target_template' => 'default',
             'blocks' => [
                 ['type' => 'headline', 'title' => 'Hello World'],
             ],
@@ -52,7 +52,7 @@ final class PageLayoutProviderTest extends TestCase
 
         self::assertNotNull($layout);
         self::assertSame('snippet-uuid-1', $layout['id']);
-        self::assertSame('default', $layout['key']);
+        self::assertSame('default', $layout['target_template']);
         self::assertSame('Default Layout', $layout['title']);
         self::assertIsArray($layout['blocks']);
         self::assertCount(1, $layout['blocks']);
@@ -158,7 +158,7 @@ final class PageLayoutProviderTest extends TestCase
         $content->method('getTemplateKey')->willReturn('page_layout');
         $content->method('getTitle')->willReturn('Default');
         $content->method('getTemplateData')->willReturn([
-            'key' => 'default',
+            'target_template' => 'default',
             'blocks' => [['type' => 'text', 'content' => '<p>Hello</p>']],
         ]);
 
@@ -281,7 +281,7 @@ final class PageLayoutProviderTest extends TestCase
         $defaultContent->method('getTemplateKey')->willReturn('page_layout');
         $defaultContent->method('getTitle')->willReturn('Default');
         $defaultContent->method('getTemplateData')->willReturn([
-            'key' => 'default',
+            'target_template' => 'default',
             'blocks' => [['type' => 'headline', 'title' => 'Default Header']],
         ]);
         $defaultSnippet->method('getDimensionContents')->willReturn(new ArrayCollection([$defaultContent]));
@@ -293,7 +293,7 @@ final class PageLayoutProviderTest extends TestCase
         $searchContent->method('getTemplateKey')->willReturn('page_layout');
         $searchContent->method('getTitle')->willReturn('Search');
         $searchContent->method('getTemplateData')->willReturn([
-            'key' => 'search',
+            'target_template' => 'search',
             'blocks' => [['type' => 'headline', 'title' => 'Search Header']],
         ]);
         $searchSnippet->method('getDimensionContents')->willReturn(new ArrayCollection([$searchContent]));

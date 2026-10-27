@@ -350,10 +350,10 @@ class SuluPageSourceResolverTest extends TestCase
         $resolver = new SuluPageSourceResolver($pageRepositoryMock);
 
         $results = $resolver->resolveQuery([
-            'template' => 'article, service',
-            'tags' => 'featured, cloud',
-            'categories' => 'tech',
-            'exclude_id' => 'page-1',
+            'template_keys' => 'article, service',
+            'tag_names' => 'featured, cloud',
+            'category_keys' => 'tech',
+            'exclude_ids' => 'page-1',
             'limit' => 5,
         ], 'en');
 

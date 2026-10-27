@@ -28,21 +28,13 @@ final class LayoutTwigExtension extends AbstractExtension
     public function getFunctions(): array
     {
         return [
-            new TwigFunction('sulu_layout_classes', [$this, 'getClasses']),
             new TwigFunction('layout_classes', [$this, 'getClasses']),
-            new TwigFunction('sulu_layout_class', [$this, 'getClass']),
             new TwigFunction('layout_class', [$this, 'getClass']),
-            new TwigFunction('sulu_layout_attributes', [$this, 'getAttributes'], ['is_safe' => ['html']]),
             new TwigFunction('layout_attributes', [$this, 'getAttributes'], ['is_safe' => ['html']]),
-            new TwigFunction('sulu_layout_load', [$this, 'loadLayout']),
             new TwigFunction('layout_load', [$this, 'loadLayout']),
-            new TwigFunction('sulu_layout_exists', [$this, 'hasLayout']),
             new TwigFunction('layout_exists', [$this, 'hasLayout']),
-            new TwigFunction('sulu_layout_has_block', [$this, 'hasBlock']),
             new TwigFunction('layout_has_block', [$this, 'hasBlock']),
-            new TwigFunction('sulu_layout_render', [$this, 'renderLayout'], ['is_safe' => ['html']]),
             new TwigFunction('layout_render', [$this, 'renderLayout'], ['is_safe' => ['html']]),
-            new TwigFunction('sulu_reusable_block_load', [$this, 'loadReusableBlock']),
             new TwigFunction('reusable_block_load', [$this, 'loadReusableBlock']),
         ];
     }

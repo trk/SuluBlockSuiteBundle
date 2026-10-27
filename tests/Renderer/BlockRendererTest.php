@@ -61,7 +61,6 @@ final class BlockRendererTest extends TestCase
         $renderer = new BlockRenderer(
             $twig,
             $pipeline,
-            ['blocks', '@SuluBlockSuite/blocks'],
         );
 
         // Active block with props JSON
@@ -98,7 +97,6 @@ final class BlockRendererTest extends TestCase
         $renderer = new BlockRenderer(
             $twig,
             $pipeline,
-            ['@SuluBlockSuite/blocks'],
         );
         $renderer->setCollectionRenderer(new DefaultBlockCollectionRenderer($renderer));
 
@@ -142,7 +140,6 @@ final class BlockRendererTest extends TestCase
         $renderer = new BlockRenderer(
             $twig,
             $pipeline,
-            ['@SuluBlockSuite/blocks'],
         );
 
         $html = $renderer->renderBlock([
@@ -197,7 +194,7 @@ final class BlockRendererTest extends TestCase
             '@SuluBlockSuite/blocks/_empty_state.html.twig' => '<div class="empty-state">{{ empty_state.message }}</div>',
         ]);
         $twig = new Environment($loader);
-        $renderer = new BlockRenderer($twig, null, ['@SuluBlockSuite/blocks']);
+        $renderer = new BlockRenderer($twig);
 
         $withSummary = $renderer->renderBlock([
             'type' => 'grid',
@@ -240,7 +237,7 @@ final class BlockRendererTest extends TestCase
         ]);
         $twig = new Environment($loader);
         $pipeline = new BlockTransformPipeline([new DefaultAttributesTransformer()]);
-        $renderer = new BlockRenderer($twig, $pipeline, ['@SuluBlockSuite/blocks']);
+        $renderer = new BlockRenderer($twig, $pipeline);
 
         $blocks = [
             ['type' => 'hero', '_id' => 'blk11111', 'title' => 'Hero'],

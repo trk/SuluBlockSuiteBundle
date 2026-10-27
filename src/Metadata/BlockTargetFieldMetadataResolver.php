@@ -55,7 +55,6 @@ final class BlockTargetFieldMetadataResolver
         'props',
         'dynamic_source',
         'is_dynamic_template',
-        'is_template',
         'target_block',
         'reusable_snippet',
         'snippet',
@@ -320,7 +319,7 @@ final class BlockTargetFieldMetadataResolver
 
         $formMetadata = $this->getBlockFormMetadata($cleanType, $locale);
         if (null !== $formMetadata) {
-            foreach ($this->flattenFieldItems($formMetadata->getItems()) as $item) {
+            foreach (self::collectContentFields($formMetadata->getItems()) as $item) {
                 $fieldName = $item->getName();
                 $fieldType = $item->getType();
 
@@ -336,7 +335,7 @@ final class BlockTargetFieldMetadataResolver
                         if (null === $defaultItemType && \is_string($typeKey) && '' !== $typeKey) {
                             $defaultItemType = $typeKey;
                         }
-                        foreach ($this->flattenFieldItems($childFormMetadata->getItems()) as $childItem) {
+                        foreach (self::collectContentFields($childFormMetadata->getItems()) as $childItem) {
                             $childFieldName = $childItem->getName();
                             $childFieldType = $childItem->getType();
                             if (
@@ -402,17 +401,17 @@ final class BlockTargetFieldMetadataResolver
      * Collects FieldMetadata items exclusively from root fields and `content`/`media` sections
      * (including `__tabs -> content`), skipping `settings`, `style`, `layout`, `general`, `dynamic_content`, and `advanced`.
      *
-     * @param array<ItemMetadata> $items
+     * @param array<array-key, ItemMetadata> $items
      *
      * @return list<FieldMetadata>
      */
-    private function flattenFieldItems(array $items): array
+    public static function collectContentFields(array $items): array
     {
         if (isset($items['__tabs']) && $items['__tabs'] instanceof SectionMetadata) {
             $contentTab = $items['__tabs']->getItems()['content'] ?? null;
 
             return $contentTab instanceof SectionMetadata
-                ? $this->flattenFieldItems($contentTab->getItems())
+                ? self::collectContentFields($contentTab->getItems())
                 : [];
         }
 
@@ -421,7 +420,7 @@ final class BlockTargetFieldMetadataResolver
             if ($item instanceof FieldMetadata) {
                 $fields[] = $item;
             } elseif ($item instanceof SectionMetadata && \in_array($item->getName(), ['content', 'media'], true)) {
-                foreach ($this->flattenFieldItems($item->getItems()) as $nested) {
+                foreach (self::collectContentFields($item->getItems()) as $nested) {
                     $fields[] = $nested;
                 }
             }

@@ -191,13 +191,13 @@ final class SuluSmartContentQueryBridge
             : 0;
 
         $categories = $this->extractCategoryIds(
-            $config['category_ids'] ?? ($config['categories'] ?? ($config['category_keys'] ?? ($config['category'] ?? null))),
+            $config['category_ids'] ?? ($config['category_keys'] ?? null),
         );
         $tags = $this->extractTagIds(
-            $config['tag_ids'] ?? ($config['tags'] ?? ($config['tag_names'] ?? ($config['tag'] ?? null))),
+            $config['tag_ids'] ?? ($config['tag_names'] ?? null),
         );
         $templateKeys = $this->extractStringList(
-            $config['template_keys'] ?? ($config['templates'] ?? ($config['template'] ?? ($config['types'] ?? null))),
+            $config['template_keys'] ?? null,
         );
 
         $resolvedDataSource = $dataSource;

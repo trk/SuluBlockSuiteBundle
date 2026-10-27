@@ -283,7 +283,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
             return $this->resolveCurrentPage($context, $locale);
         }
 
-        // 3. Request attributes from Sulu 3 / Sulu 2 Website routing
+        // 3. Request attributes from Sulu 3 Website routing
         $object = $request->attributes->get('object');
         if ($object instanceof PageInterface || $object instanceof PageDimensionContentInterface) {
             return $this->resolvePage($object, $locale);
@@ -292,11 +292,6 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
         $resource = $request->attributes->get('resource');
         if ($resource instanceof PageInterface || $resource instanceof PageDimensionContentInterface) {
             return $this->resolvePage($resource, $locale);
-        }
-
-        $structure = $request->attributes->get('structure');
-        if ($structure instanceof PageInterface || $structure instanceof PageDimensionContentInterface) {
-            return $this->resolvePage($structure, $locale);
         }
 
         $uuid = $request->attributes->get('uuid') ?? $request->attributes->get('id');
@@ -436,7 +431,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
         ]);
 
         if ($excludeCurrent && null !== $currentUuid && '' !== $currentUuid) {
-            $criteria['exclude_id'] = $currentUuid;
+            $criteria['exclude_ids'] = [$currentUuid];
         }
 
         return $this->resolveQuery($criteria, $resolvedLocale);
@@ -451,75 +446,12 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
      */
     public function resolveChildren(string|object|array $parent, ?string $locale = null, int $limit = 50): array
     {
-        if (null === $this->pageRepository && null === $this->smartContentBridge) {
-            return [];
-        }
-
-        $resolvedLocale = $this->resolveLocale($locale);
-        $parentId = $this->resolvePageUuid($parent);
-        if (null === $parentId || '' === $parentId) {
-            $currentData = $this->resolveFromRequest($resolvedLocale);
-            if (null !== $currentData && isset($currentData['id']) && \is_string($currentData['id'])) {
-                $parentId = $currentData['id'];
-            }
-        }
-
-        if (null === $parentId || '' === $parentId) {
-            return [];
-        }
-
-        $limit = \max(1, \min(100, $limit > 0 ? $limit : 50));
-
-        if (null !== $this->smartContentBridge && $this->smartContentBridge->hasProvider('pages')) {
-            $flatIds = $this->smartContentBridge->queryFlatIds(
-                providerType: 'pages',
-                config: ['limit' => $limit, 'sort_by' => 'created', 'sort_order' => 'desc'],
-                locale: $resolvedLocale,
-                dataSource: $parentId,
-                includeSubFolders: false,
-            );
-
-            return $this->loadAndNormalizePagesByOrderedUuids($flatIds, $resolvedLocale);
-        }
-
-        if (null === $this->pageRepository) {
-            return [];
-        }
-
-        /** @var array{uuid?: string, uuids?: list<string>, locale?: string, stage?: string, parentId?: string, descendantOfId?: string, webspaceKey?: string, limit?: int} $filters */
-        $filters = [
-            'parentId' => $parentId,
-            'locale' => $resolvedLocale,
-            'stage' => DimensionContentInterface::STAGE_LIVE,
-        ];
-
-        $webspaceKey = $this->resolveCurrentWebspaceKey();
-        if (null !== $webspaceKey) {
-            $filters['webspaceKey'] = $webspaceKey;
-        }
-
-        $filters['limit'] = $limit;
-
-        try {
-            /** @var iterable<PageInterface> $pages */
-            $pages = $this->pageRepository->findBy(
-                $filters,
-                ['created' => 'desc'],
-                [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
-            );
-
-            $result = [];
-            foreach ($pages as $page) {
-                $data = $this->normalizePageEntity($page, $resolvedLocale);
-                if (null !== $data) {
-                    $result[] = $data;
-                }
-            }
-
-            return $result;
-        } catch (\Throwable) {
-            return [];
-        }
+        return $this->resolveQuery([
+            'parent_id' => $parent,
+            'limit' => \max(1, \min(100, $limit > 0 ? $limit : 50)),
+            'sort_by' => 'created',
+            'sort_order' => 'desc',
+        ], $locale);
     }
 
     /**
@@ -540,7 +472,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
         /** @var array<string, mixed> $baseFilters */
         $baseFilters = [];
 
-        $uuids = $this->queryFilterNormalizer->normalizeStringList($criteria['uuids'] ?? ($criteria['ids'] ?? null));
+        $uuids = $this->queryFilterNormalizer->normalizeStringList($criteria['uuids'] ?? null);
         if ([] !== $uuids) {
             $baseFilters['uuids'] = $uuids;
         }
@@ -570,7 +502,7 @@ class SuluPageSourceResolver implements PageSourceResolverInterface, ResetInterf
         }
 
         $hasStringCategoryKeys = $this->queryFilterNormalizer->hasStringCategoryKeys($criteria);
-        $navigationContexts = $this->queryFilterNormalizer->normalizeStringList($criteria['navigation_contexts'] ?? ($criteria['navigation_context'] ?? null));
+        $navigationContexts = $this->queryFilterNormalizer->normalizeStringList($criteria['navigation_contexts'] ?? null);
         $hasCustomDepth = isset($criteria['depth']) && \is_numeric($criteria['depth']) && (int) $criteria['depth'] > 0;
         $bridgeDataSource = $resolvedParentUuid ?? $descendantOfId;
 

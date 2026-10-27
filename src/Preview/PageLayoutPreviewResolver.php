@@ -179,7 +179,7 @@ final class PageLayoutPreviewResolver
         string $fallbackWebspaceKey,
         PageRepositoryInterface $pageRepository,
     ): ?PageInterface {
-        $rawTargetTemplate = $rawTemplateData['target_template'] ?? ($rawTemplateData['page_template'] ?? null);
+        $rawTargetTemplate = $rawTemplateData['target_template'] ?? null;
         $targetTemplate = \is_string($rawTargetTemplate) ? \trim($rawTargetTemplate) : '';
 
         $rawWebspace = $rawTemplateData['webspace'] ?? null;

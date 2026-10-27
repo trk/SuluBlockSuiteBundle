@@ -9,12 +9,12 @@
     <main id="main-content">
         {% block content %}
             {% if _is_page_layout_preview|default(false) %}
-                {{ sulu_layout_render(layout|default(content.layout|default(null)), _context) }}
+                {{ layout_render(layout|default(content.layout|default(null)), _context) }}
                 {% if content.blocks|default([]) is iterable and content.blocks|default([]) is not empty %}
-                    {{ sulu_blocks_render(content.blocks, _context|merge({_in_page_layout: true})) }}
+                    {{ blocks_render(content.blocks, _context|merge({_in_page_layout: true})) }}
                 {% endif %}
             {% else %}
-                {{ sulu_blocks_render(content.blocks|default([]), _context) }}
+                {{ blocks_render(content.blocks|default([]), _context) }}
             {% endif %}
         {% endblock %}
     </main>

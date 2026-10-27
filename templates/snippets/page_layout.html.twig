@@ -1,5 +1,5 @@
 {% if content.blocks|default([]) is iterable %}
-    {{ sulu_blocks_render(content.blocks|default([]), _context|merge({
+    {{ blocks_render(content.blocks|default([]), _context|merge({
         page: page|default(null),
         resource: resource|default(_context.resource|default(null)),
         object: object|default(_context.object|default(null)),

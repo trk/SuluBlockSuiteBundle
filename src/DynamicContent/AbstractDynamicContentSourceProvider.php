@@ -408,7 +408,7 @@ abstract class AbstractDynamicContentSourceProvider implements ConfigurableDynam
 
         if ($includeTemplateFilter) {
             $fields[] = [
-                'name' => 'template',
+                'name' => 'template_keys',
                 'label' => 'sulu_block_suite.dynamic_filter_template',
                 'description' => 'sulu_block_suite.dynamic_filter_template_desc',
                 'type' => 'text',

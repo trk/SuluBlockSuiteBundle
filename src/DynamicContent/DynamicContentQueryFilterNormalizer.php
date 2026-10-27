@@ -84,7 +84,7 @@ final class DynamicContentQueryFilterNormalizer
      */
     public function hasStringCategoryKeys(array $criteria): bool
     {
-        $rawCategories = $criteria['category_keys'] ?? ($criteria['categories'] ?? null);
+        $rawCategories = $criteria['category_keys'] ?? null;
 
         return [] === $this->normalizeIntList($criteria['category_ids'] ?? $rawCategories)
             && [] !== $this->normalizeStringList($rawCategories);
@@ -101,7 +101,7 @@ final class DynamicContentQueryFilterNormalizer
      */
     public function buildSmartContentQuery(array $criteria): array
     {
-        $excludedIds = $this->normalizeStringList($criteria['exclude_ids'] ?? ($criteria['exclude_id'] ?? null));
+        $excludedIds = $this->normalizeStringList($criteria['exclude_ids'] ?? null);
         $rawLimit = isset($criteria['limit']) && \is_numeric($criteria['limit']) ? (int) $criteria['limit'] : 10;
         $limit = \max(1, \min(100, $rawLimit));
 
@@ -151,19 +151,19 @@ final class DynamicContentQueryFilterNormalizer
         ], $baseFilters);
 
         if (!isset($filters['uuids'])) {
-            $uuids = $this->normalizeStringList($criteria['article_ids'] ?? ($criteria['uuids'] ?? ($criteria['ids'] ?? null)));
+            $uuids = $this->normalizeStringList($criteria['uuids'] ?? null);
             if ([] !== $uuids) {
                 $filters['uuids'] = $uuids;
             }
         }
 
-        $templateKeys = $this->normalizeStringList($criteria['template_keys'] ?? ($criteria['templates'] ?? ($criteria['template'] ?? null)));
+        $templateKeys = $this->normalizeStringList($criteria['template_keys'] ?? null);
         if ([] !== $templateKeys) {
             $filters['templateKeys'] = $templateKeys;
         }
 
         $tagIds = $this->normalizeIntList($criteria['tag_ids'] ?? null);
-        $rawTags = $criteria['tag_names'] ?? ($criteria['tags'] ?? ($criteria['tag'] ?? null));
+        $rawTags = $criteria['tag_names'] ?? null;
         if ([] === $tagIds && null !== $rawTags) {
             $tagIds = $this->normalizeIntList($rawTags);
         }
@@ -177,7 +177,7 @@ final class DynamicContentQueryFilterNormalizer
         }
 
         $categoryIds = $this->normalizeIntList($criteria['category_ids'] ?? null);
-        $rawCategories = $criteria['category_keys'] ?? ($criteria['categories'] ?? null);
+        $rawCategories = $criteria['category_keys'] ?? null;
         if ([] === $categoryIds && null !== $rawCategories) {
             $categoryIds = $this->normalizeIntList($rawCategories);
         }
@@ -190,7 +190,7 @@ final class DynamicContentQueryFilterNormalizer
             }
         }
 
-        $navigationContexts = $this->normalizeStringList($criteria['navigation_contexts'] ?? ($criteria['navigation_context'] ?? null));
+        $navigationContexts = $this->normalizeStringList($criteria['navigation_contexts'] ?? null);
         if ([] !== $navigationContexts) {
             $filters['navigationContexts'] = $navigationContexts;
         }
@@ -202,7 +202,7 @@ final class DynamicContentQueryFilterNormalizer
         $offset = isset($criteria['offset']) && \is_numeric($criteria['offset'])
             ? \max(0, \min(500, (int) $criteria['offset']))
             : 0;
-        $excludedIds = $this->normalizeStringList($criteria['exclude_ids'] ?? ($criteria['exclude_id'] ?? null));
+        $excludedIds = $this->normalizeStringList($criteria['exclude_ids'] ?? null);
 
         $rawLimit = isset($criteria['limit']) && \is_numeric($criteria['limit']) ? (int) $criteria['limit'] : 10;
         $limit = \max(1, \min(100, $rawLimit));

@@ -181,25 +181,18 @@ final class PageLayoutProvider implements PageLayoutProviderInterface, ResetInte
 
                     $targetTemplate = isset($templateData['target_template']) && \is_scalar($templateData['target_template'])
                         ? \strtolower(\trim((string) $templateData['target_template']))
-                        : (isset($templateData['page_template']) && \is_scalar($templateData['page_template'])
-                            ? \strtolower(\trim((string) $templateData['page_template']))
-                            : null);
-
-                    $key = isset($templateData['key']) && \is_scalar($templateData['key'])
-                        ? \strtolower(\trim((string) $templateData['key']))
                         : null;
+
                     $title = $targetContent->getTitle();
                     $titleNorm = null !== $title ? \strtolower(\trim($title)) : null;
                     $titleSlug = null !== $titleNorm ? \str_replace([' ', '-'], '_', $titleNorm) : null;
 
                     $matchesTemplate = null !== $targetTemplate && '' !== $targetTemplate
                         && ($targetTemplate === $normalizedId || $targetTemplate === $sluggedId);
-                    $matchesKeyOrTitle = $key === $normalizedId
-                        || $key === $sluggedId
-                        || (null === $targetTemplate || '' === $targetTemplate)
+                    $matchesTitle = (null === $targetTemplate || '' === $targetTemplate)
                         && ($titleNorm === $normalizedId || $titleSlug === $sluggedId);
 
-                    if (!$matchesTemplate && !$matchesKeyOrTitle) {
+                    if (!$matchesTemplate && !$matchesTitle) {
                         continue;
                     }
 

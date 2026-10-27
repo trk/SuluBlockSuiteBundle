@@ -1148,7 +1148,7 @@ final class DynamicContentHydratorTest extends TestCase
 
     public function testExtractValueSupportsPipeFallbacksAndLengthModifier(): void
     {
-        $hydrator = new DynamicContentHydrator();
+        $applier = new \Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentMappingApplier();
 
         $longHtml = '<p><strong>Sulu 3 Enterprise CMS</strong> delivers structured content management with Preline UI 5 and Tailwind CSS 4 for high-performance digital experiences across every channel and device worldwide.</p>';
 
@@ -1161,10 +1161,10 @@ final class DynamicContentHydratorTest extends TestCase
 
         self::assertSame(
             'Page Navigation Title',
-            $hydrator->extractValue($dataWithEmptyHeadlineAndSummary, 'headline|title'),
+            $applier->extractValue($dataWithEmptyHeadlineAndSummary, 'headline|title'),
         );
 
-        $truncated = $hydrator->extractValue($dataWithEmptyHeadlineAndSummary, 'summary|content:length=160');
+        $truncated = $applier->extractValue($dataWithEmptyHeadlineAndSummary, 'summary|content:length=160');
         self::assertIsString($truncated);
         self::assertLessThanOrEqual(160, \mb_strlen($truncated, 'UTF-8'));
         self::assertStringStartsWith('Sulu 3 Enterprise CMS delivers structured content management', $truncated);
@@ -1181,11 +1181,11 @@ final class DynamicContentHydratorTest extends TestCase
 
         self::assertSame(
             'Custom Hero Display Headline',
-            $hydrator->extractValue($dataWithExplicitHeadlineAndSummary, 'headline|title'),
+            $applier->extractValue($dataWithExplicitHeadlineAndSummary, 'headline|title'),
         );
         self::assertSame(
             'Concise custom summary.',
-            $hydrator->extractValue($dataWithExplicitHeadlineAndSummary, 'summary|content:length=160'),
+            $applier->extractValue($dataWithExplicitHeadlineAndSummary, 'summary|content:length=160'),
         );
     }
 
@@ -1262,14 +1262,14 @@ final class DynamicContentHydratorTest extends TestCase
 
     public function testExtractValueWithStripHtmlIgnoresNonScalarValueAndUsesFallback(): void
     {
-        $hydrator = new DynamicContentHydrator();
+        $applier = new \Totoglu\SuluBlockSuiteBundle\DynamicContent\DynamicContentMappingApplier();
 
         $source = [
             'summary' => ['nested' => 'array_value'],
             'title' => '<strong>Clean Scalar Title</strong>',
         ];
 
-        $extracted = $hydrator->extractValue($source, 'summary:plain|title:plain');
+        $extracted = $applier->extractValue($source, 'summary:plain|title:plain');
         self::assertSame('Clean Scalar Title', $extracted);
     }
 

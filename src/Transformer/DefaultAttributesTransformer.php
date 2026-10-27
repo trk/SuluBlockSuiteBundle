@@ -354,55 +354,14 @@ final class DefaultAttributesTransformer implements BlockTransformerInterface
                 return null;
             }
 
-            // Pre-normalize string to detect obfuscated schemes (decode numeric/HTML entities, strip ASCII control entities 0-31/127, clean UTF-8, strip controls/whitespace)
-            $decoded = $trimmed;
-            for ($i = 0; $i < 2; ++$i) {
-                $prev = $decoded;
-                $numericDecoded = \preg_replace_callback(
-                    '/&#(?:x([0-9a-f]+)|([0-9]+));?/i',
-                    static function (array $m): string {
-                        $code = '' !== $m[1] ? (int) \hexdec($m[1]) : (int) $m[2];
-                        if ($code <= 31 || 127 === $code) {
-                            return '';
-                        }
-
-                        return (string) \mb_chr($code, 'UTF-8');
-                    },
-                    $decoded,
-                );
-                if (null === $numericDecoded || \PREG_NO_ERROR !== \preg_last_error()) {
-                    return 'link';
-                }
-
-                $decoded = \html_entity_decode($numericDecoded, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
-                if ($decoded === $prev) {
-                    break;
-                }
-            }
-
-            $cleanUtf8 = \mb_convert_encoding($decoded, 'UTF-8', 'UTF-8');
-            $cleanStr = (string) \preg_replace('/[\x00-\x20\p{C}\p{Z}]+/u', '', $cleanUtf8);
-
-            // If a dangerous scheme is detected, it MUST NEVER be classified as media; classify as link so it gets sanitized
-            if (1 === \preg_match('/^(?:javascript|vbscript|data|file|blob):/i', $cleanStr)) {
+            $inspected = SuluDataNormalizer::inspectUrlScheme($trimmed);
+            // If decoding failed or a dangerous scheme is detected, classify as link so it gets sanitized
+            if (null === $inspected || $inspected['is_dangerous_scheme']) {
                 return 'link';
             }
 
-            // Check if scheme colon is present before any path/query/fragment delimiter
-            $firstColonPos = \strpos($cleanStr, ':');
-            $firstSlashPos = \strpos($cleanStr, '/');
-            $firstQuestionPos = \strpos($cleanStr, '?');
-            $firstHashPos = false;
-            if (1 === \preg_match('/(?<!&)#/', $cleanStr, $matches, \PREG_OFFSET_CAPTURE)) {
-                $firstHashPos = (int) $matches[0][1];
-            }
-            $delims = \array_filter(
-                [$firstSlashPos, $firstQuestionPos, $firstHashPos],
-                static fn ($pos) => false !== $pos,
-            );
-            $firstDelimiter = !empty($delims) ? \min($delims) : false;
-            $hasSchemeColon = false !== $firstColonPos && (false === $firstDelimiter || $firstColonPos < $firstDelimiter);
-
+            $cleanStr = $inspected['normalized'];
+            $hasSchemeColon = $inspected['has_scheme_colon'];
             $isMediaFile = 1 === \preg_match('/\.(?:jpe?g|png|webp|gif|avif|svg|bmp|ico|mp4|webm|ogg|mov|m4v|mp3|wav|pdf)(?:[?#].*)?$/i', $trimmed);
 
             if (null !== $field && ('link' === $field || \str_ends_with($field, '_link') || 'url' === $field || \str_ends_with($field, '_url'))) {

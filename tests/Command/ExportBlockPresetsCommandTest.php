@@ -73,7 +73,6 @@ final class ExportBlockPresetsCommandTest extends TestCase
                         'card_style' => 'card-primary',
                         'card_padding' => 'large',
                         'preset' => 'should_be_stripped_native',
-                        '_preset' => 'should_be_stripped_legacy',
                     ],
                 ],
             ],

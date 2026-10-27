@@ -87,7 +87,7 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
     {
         return [
             $this->createSelectionField(
-                name: 'article_ids',
+                name: 'uuids',
                 type: 'article_selection',
                 label: 'sulu_block_suite.dynamic_article_selection',
                 description: 'sulu_block_suite.dynamic_article_selection_desc',
@@ -219,7 +219,7 @@ final class SuluArticleSourceProvider extends AbstractDynamicContentSourceProvid
             ? \array_merge($config, $config['query'])
             : $config;
 
-        $uuids = $this->queryFilterNormalizer->normalizeStringList($query['article_ids'] ?? ($query['uuids'] ?? ($query['ids'] ?? null)));
+        $uuids = $this->queryFilterNormalizer->normalizeStringList($query['uuids'] ?? null);
         $hasStringCategoryKeys = $this->queryFilterNormalizer->hasStringCategoryKeys($query);
 
         if (

@@ -206,7 +206,7 @@ final class BlockPresetControllerTest extends TestCase
             'title' => 'Special Card',
             'description' => 'Test preset desc',
             'locale' => 'en',
-            'props' => ['variant' => 'bordered', '_preset' => 'old_id', 'preset' => 'old_id'],
+            'props' => ['variant' => 'bordered', 'preset' => 'old_id'],
             'values' => ['title' => 'Sample Heading', 'type' => 'card'],
         ]));
 
@@ -220,7 +220,6 @@ final class BlockPresetControllerTest extends TestCase
         $this->assertSame('snippet_snippet-uuid-1234', $data['id']);
         $this->assertSame('Special Card', $data['title']);
         $this->assertSame('Test preset desc', $data['description']);
-        $this->assertArrayNotHasKey('_preset', $data['props']);
         $this->assertArrayNotHasKey('preset', $data['props']);
         $this->assertSame('bordered', $data['props']['variant']);
         $this->assertSame('card', $data['values']['type']);
@@ -333,8 +332,8 @@ final class BlockPresetControllerTest extends TestCase
             'locale' => 'en',
             'block' => [
                 'type' => 'headline',
-                '_preset' => 'old_preset',
-                'props' => ['level' => 'h2', '_preset' => 'old_preset', 'preset' => 'old_preset'],
+                'preset' => 'old_preset',
+                'props' => ['level' => 'h2', 'preset' => 'old_preset'],
                 'content' => 'Welcome',
             ],
         ]));

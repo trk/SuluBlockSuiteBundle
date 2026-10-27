@@ -37,11 +37,9 @@ final class BlockSuiteFormMetadataVisitor implements FormMetadataVisitorInterfac
 
     private const DEFAULT_PREVIEW_EXCLUDED_FIELDS = [
         'preset',
-        '_preset',
         'dynamic_source',
         'dynamic_mapping',
         'is_dynamic_template',
-        'is_template',
         'image_url',
         'video_url',
         'link_title',

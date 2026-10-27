@@ -231,7 +231,7 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
             : 'custom_query';
 
         if ('page_selection' === $sourceType) {
-            $rawIds = $config['page_ids'] ?? ($config['uuids'] ?? ($config['ids'] ?? null));
+            $rawIds = $config['uuids'] ?? null;
             $queryOptions = $this->extractQueryOptions($config);
             $queryOptions['uuids'] = $rawIds;
             if (isset($config['limit']) && \is_numeric($config['limit'])) {
@@ -330,24 +330,17 @@ final class SuluPageSourceProvider extends AbstractDynamicContentSourceProvider
             'sort_by',
             'sort_order',
             'offset',
-            'template',
-            'templates',
             'template_keys',
-            'tag',
-            'tags',
             'tag_names',
             'tag_ids',
-            'category',
-            'categories',
             'category_keys',
             'category_ids',
+            'navigation_contexts',
+            'depth',
             'webspace_key',
             'descendant_of_id',
-            'exclude_id',
             'exclude_ids',
             'uuids',
-            'ids',
-            'page_ids',
         ];
 
         foreach ($allowedKeys as $key) {

@@ -130,19 +130,7 @@ final class BlockPresetController extends AbstractController
     #[Route('/admin/api/block-presets', name: 'sulu_block_suite_save_preset', methods: ['POST'])]
     public function savePreset(Request $request): JsonResponse
     {
-        /** @var array<string, mixed> $data */
-        $data = [];
-        $content = $request->getContent();
-        if ('' !== $content) {
-            /** @var mixed $decoded */
-            $decoded = \json_decode($content, true);
-            if (\is_array($decoded)) {
-                $data = $decoded;
-            }
-        }
-        if ([] === $data) {
-            $data = $request->request->all();
-        }
+        $data = $this->extractRequestPayload($request);
 
         $blockType = isset($data['block_type']) && \is_string($data['block_type']) ? \trim($data['block_type']) : '';
         if ('' === $blockType || 1 !== \preg_match('/^[a-z0-9_-]+$/i', $blockType)) {
@@ -172,7 +160,7 @@ final class BlockPresetController extends AbstractController
 
         /** @var array<string, mixed> $rawProps */
         $rawProps = isset($data['props']) && \is_array($data['props']) ? $data['props'] : [];
-        unset($rawProps['_preset'], $rawProps['preset']);
+        unset($rawProps['preset']);
 
         /** @var array<string, mixed> $props */
         $props = [];
@@ -184,7 +172,7 @@ final class BlockPresetController extends AbstractController
 
         /** @var array<string, mixed> $rawValues */
         $rawValues = isset($data['values']) && \is_array($data['values']) ? $data['values'] : [];
-        unset($rawValues['type'], $rawValues['props'], $rawValues['_preset'], $rawValues['preset']);
+        unset($rawValues['type'], $rawValues['props'], $rawValues['preset']);
 
         $blockEntry = \array_merge(
             $rawValues,
@@ -194,9 +182,7 @@ final class BlockPresetController extends AbstractController
             ],
         );
 
-        $webspace = $this->multiWebspaceEnabled && isset($data['webspace']) && \is_string($data['webspace']) && '' !== \trim($data['webspace'])
-            ? \trim($data['webspace'])
-            : '_global';
+        $webspace = $this->resolvePayloadWebspace($data);
 
         /** @var array<string, mixed> $snippetData */
         $snippetData = [
@@ -207,29 +193,10 @@ final class BlockPresetController extends AbstractController
             'webspace' => $webspace,
             'block' => [$blockEntry],
         ];
-
-        if (
-            isset($data['preview_image'])
-            && (\is_int($data['preview_image']) || (\is_array($data['preview_image']) && isset($data['preview_image']['id']) && \is_numeric($data['preview_image']['id'])))
-        ) {
-            $snippetData['preview_image'] = $data['preview_image'];
-        }
+        $this->attachPreviewImageIfValid($snippetData, $data);
 
         try {
-            $message = new CreateSnippetMessage($snippetData);
-            /** @var SnippetInterface $snippet */
-            $snippet = $this->handle(new Envelope($message, [new EnableFlushStamp()]));
-            $uuid = $snippet->getUuid();
-
-            $canPublish = $this->securityChecker?->hasPermission($securityCondition, PermissionTypes::LIVE) ?? false;
-            if ($canPublish) {
-                $transitionMessage = new ApplyWorkflowTransitionSnippetMessage(
-                    ['uuid' => $uuid],
-                    $locale,
-                    WorkflowInterface::WORKFLOW_TRANSITION_PUBLISH,
-                );
-                $this->handle(new Envelope($transitionMessage, [new EnableFlushStamp()]));
-            }
+            $uuid = $this->createAndPublishSnippet($snippetData, $locale, $securityCondition);
         } catch (\Throwable $e) {
             $this->logger?->error('Failed to save block preset.', [
                 'block_type' => $blockType,
@@ -308,19 +275,7 @@ final class BlockPresetController extends AbstractController
     #[Route('/admin/api/reusable-blocks', name: 'sulu_block_suite_save_reusable_block', methods: ['POST'])]
     public function saveReusableBlock(Request $request): JsonResponse
     {
-        /** @var array<string, mixed> $data */
-        $data = [];
-        $content = $request->getContent();
-        if ('' !== $content) {
-            /** @var mixed $decoded */
-            $decoded = \json_decode($content, true);
-            if (\is_array($decoded)) {
-                $data = $decoded;
-            }
-        }
-        if ([] === $data) {
-            $data = $request->request->all();
-        }
+        $data = $this->extractRequestPayload($request);
 
         $title = isset($data['title']) && \is_string($data['title']) ? \trim($data['title']) : '';
         if ('' === $title) {
@@ -354,14 +309,12 @@ final class BlockPresetController extends AbstractController
             return new JsonResponse(['error' => 'Message bus is not configured.'], JsonResponse::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        unset($block['_preset'], $block['preset']);
+        unset($block['preset']);
         if (isset($block['props']) && \is_array($block['props'])) {
-            unset($block['props']['_preset'], $block['props']['preset']);
+            unset($block['props']['preset']);
         }
 
-        $webspace = $this->multiWebspaceEnabled && isset($data['webspace']) && \is_string($data['webspace']) && '' !== \trim($data['webspace'])
-            ? \trim($data['webspace'])
-            : '_global';
+        $webspace = $this->resolvePayloadWebspace($data);
 
         /** @var array<string, mixed> $snippetData */
         $snippetData = [
@@ -372,29 +325,10 @@ final class BlockPresetController extends AbstractController
             'webspace' => $webspace,
             'blocks' => [$block],
         ];
-
-        if (
-            isset($data['preview_image'])
-            && (\is_int($data['preview_image']) || (\is_array($data['preview_image']) && isset($data['preview_image']['id']) && \is_numeric($data['preview_image']['id'])))
-        ) {
-            $snippetData['preview_image'] = $data['preview_image'];
-        }
+        $this->attachPreviewImageIfValid($snippetData, $data);
 
         try {
-            $message = new CreateSnippetMessage($snippetData);
-            /** @var SnippetInterface $snippet */
-            $snippet = $this->handle(new Envelope($message, [new EnableFlushStamp()]));
-            $uuid = $snippet->getUuid();
-
-            $canPublish = $this->securityChecker?->hasPermission($securityCondition, PermissionTypes::LIVE) ?? false;
-            if ($canPublish) {
-                $transitionMessage = new ApplyWorkflowTransitionSnippetMessage(
-                    ['uuid' => $uuid],
-                    $locale,
-                    WorkflowInterface::WORKFLOW_TRANSITION_PUBLISH,
-                );
-                $this->handle(new Envelope($transitionMessage, [new EnableFlushStamp()]));
-            }
+            $uuid = $this->createAndPublishSnippet($snippetData, $locale, $securityCondition);
         } catch (\Throwable $e) {
             $this->logger?->error('Failed to save reusable block.', [
                 'locale' => $locale,
@@ -510,6 +444,77 @@ final class BlockPresetController extends AbstractController
         $this->securityChecker->checkPermission($condition, $permission);
 
         return $condition;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractRequestPayload(Request $request): array
+    {
+        $content = $request->getContent();
+        if ('' !== $content) {
+            /** @var mixed $decoded */
+            $decoded = \json_decode($content, true);
+            if (\is_array($decoded)) {
+                /** @var array<string, mixed> $decoded */
+                return $decoded;
+            }
+        }
+
+        /** @var array<string, mixed> $all */
+        $all = $request->request->all();
+
+        return $all;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function resolvePayloadWebspace(array $data): string
+    {
+        return $this->multiWebspaceEnabled && isset($data['webspace']) && \is_string($data['webspace']) && '' !== \trim($data['webspace'])
+            ? \trim($data['webspace'])
+            : '_global';
+    }
+
+    /**
+     * @param array<string, mixed> $snippetData
+     * @param array<string, mixed> $data
+     */
+    private function attachPreviewImageIfValid(array &$snippetData, array $data): void
+    {
+        if (
+            isset($data['preview_image'])
+            && (\is_int($data['preview_image']) || (\is_array($data['preview_image']) && isset($data['preview_image']['id']) && \is_numeric($data['preview_image']['id'])))
+        ) {
+            $snippetData['preview_image'] = $data['preview_image'];
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $snippetData
+     */
+    private function createAndPublishSnippet(
+        array $snippetData,
+        string $locale,
+        SecurityCondition $securityCondition,
+    ): string {
+        $message = new CreateSnippetMessage($snippetData);
+        /** @var SnippetInterface $snippet */
+        $snippet = $this->handle(new Envelope($message, [new EnableFlushStamp()]));
+        $uuid = $snippet->getUuid();
+
+        $canPublish = $this->securityChecker?->hasPermission($securityCondition, PermissionTypes::LIVE) ?? false;
+        if ($canPublish) {
+            $transitionMessage = new ApplyWorkflowTransitionSnippetMessage(
+                ['uuid' => $uuid],
+                $locale,
+                WorkflowInterface::WORKFLOW_TRANSITION_PUBLISH,
+            );
+            $this->handle(new Envelope($transitionMessage, [new EnableFlushStamp()]));
+        }
+
+        return $uuid;
     }
 
     private function isValidLocale(string $locale): bool

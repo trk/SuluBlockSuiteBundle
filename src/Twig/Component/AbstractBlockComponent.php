@@ -943,16 +943,6 @@ abstract class AbstractBlockComponent
     }
 
     /**
-     * Alias for `props()` used across existing Twig templates.
-     *
-     * @return array<string, mixed>
-     */
-    public function getResolvedProps(): array
-    {
-        return $this->props;
-    }
-
-    /**
      * @return array<string, mixed>
      */
     public function context(): array

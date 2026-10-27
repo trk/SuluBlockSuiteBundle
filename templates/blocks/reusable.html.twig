@@ -13,10 +13,10 @@
     {% if _nested_block|default(false) %}
         {% for inner_block in inner_blocks|hydrate_blocks(_context) %}
             {% if inner_block.type is defined and inner_block.type != 'reusable' %}
-                {{ sulu_block_render(inner_block, _context) }}
+                {{ block_render(inner_block, _context) }}
             {% endif %}
         {% endfor %}
     {% else %}
-        {{ sulu_blocks_render(inner_blocks, _context) }}
+        {{ blocks_render(inner_blocks, _context) }}
     {% endif %}
 {% endif %}

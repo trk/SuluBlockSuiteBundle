@@ -89,13 +89,11 @@ export class SavePresetDialog extends React.Component<SavePresetDialogProps> {
         this.error = null;
 
         const currentProps = {...toJS(propsValues)};
-        delete currentProps._preset;
         delete currentProps.preset;
 
         const valuesPayload = this.includeValues && contentValues ? {...toJS(contentValues)} : {};
         delete valuesPayload.props;
         delete valuesPayload.type;
-        delete valuesPayload._preset;
         delete valuesPayload.preset;
 
         const payload = {

@@ -7,6 +7,7 @@ namespace Totoglu\SuluBlockSuiteBundle\Twig;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
+use Totoglu\SuluBlockSuiteBundle\Preview\PreviewBlockFocusScript;
 use Totoglu\SuluBlockSuiteBundle\Renderer\BlockRenderer;
 use Totoglu\SuluBlockSuiteBundle\Transformer\BlockTransformPipelineInterface;
 use Twig\Extension\AbstractExtension;
@@ -25,15 +26,11 @@ final class DynamicContentTwigExtension extends AbstractExtension
     public function getFunctions(): array
     {
         return [
-            new TwigFunction('sulu_block_suite_hydrate_blocks', [$this, 'hydrateBlocks']),
             new TwigFunction('hydrate_blocks', [$this, 'hydrateBlocks']),
-            new TwigFunction('sulu_block_suite_transform_block', [$this, 'transformBlock']),
-            new TwigFunction('block_transform', [$this, 'transformBlock']),
-            new TwigFunction('sulu_block_render', [$this, 'renderBlock'], ['is_safe' => ['html']]),
-            new TwigFunction('block_render', [$this, 'renderBlock'], ['is_safe' => ['html']]),
-            new TwigFunction('sulu_blocks_render', [$this, 'renderBlocks'], ['is_safe' => ['html']]),
-            new TwigFunction('blocks_render', [$this, 'renderBlocks'], ['is_safe' => ['html']]),
             new TwigFunction('hydrate_block_tree', [$this, 'hydrateBlockTree']),
+            new TwigFunction('block_transform', [$this, 'transformBlock']),
+            new TwigFunction('block_render', [$this, 'renderBlock'], ['is_safe' => ['html']]),
+            new TwigFunction('blocks_render', [$this, 'renderBlocks'], ['is_safe' => ['html']]),
             new TwigFunction('sulu_user_loggedin_and_preview', [$this, 'isUserLoggedInAndPreview']),
             new TwigFunction('sulu_preview_block_focus_script', [$this, 'renderPreviewBlockFocusScript'], ['is_safe' => ['html']]),
         ];
@@ -42,10 +39,8 @@ final class DynamicContentTwigExtension extends AbstractExtension
     public function getFilters(): array
     {
         return [
-            new TwigFilter('sulu_block_suite_hydrate_blocks', [$this, 'hydrateBlocks']),
             new TwigFilter('hydrate_blocks', [$this, 'hydrateBlocks']),
             new TwigFilter('hydrate_block_tree', [$this, 'hydrateBlockTree']),
-            new TwigFilter('sulu_block_suite_transform_block', [$this, 'transformBlock']),
             new TwigFilter('block_transform', [$this, 'transformBlock']),
         ];
     }
@@ -252,7 +247,7 @@ final class DynamicContentTwigExtension extends AbstractExtension
      */
     public function renderPreviewBlockFocusScript(): string
     {
-        return BlockRenderer::getPreviewBlockFocusScript();
+        return PreviewBlockFocusScript::render();
     }
 
     /**

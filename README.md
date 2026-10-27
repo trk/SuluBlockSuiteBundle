@@ -194,28 +194,28 @@ When a block passes through `BlockTransformPipeline` (`ReusableBlockTransformer`
 
 ### Block Rendering & Transformation (`DynamicContentTwigExtension`)
 
-| Function / Filter | Alias(es) | Description |
+| Function / Filter | Kind | Description |
 | --- | --- | --- |
-| `sulu_block_render(block, context = [])` | `block_render` | Runs the block through `BlockTransformPipeline`, resolves the highest-priority template from `rendering.template_namespaces` (`{namespace}/{type}.html.twig`), injects `data-block-id` on the root HTML element in Live Preview, and prepends `_scoped_css` + optional `_summary` / `_empty_state` output. |
-| `sulu_blocks_render(blocks, context = [])` | `blocks_render` | Renders a list of blocks sequentially through `BlockCollectionRendererInterface` (`BlockRenderer::renderBlocks()`). |
-| `sulu_block_suite_transform_block(block, context = [])` | `block_transform` *(fn & filter)* | Runs a single block array through `BlockTransformPipeline` and returns the normalized array (`?array`). |
-| `sulu_block_suite_hydrate_blocks(blocks, context = [])` | `hydrate_blocks` *(fn & filter)* | Hydrates a flat list of blocks through `BlockTransformPipeline` (skipping suppressed `null` blocks). |
-| `hydrate_block_tree(blocks, context = [])` | *(fn & filter)* | Recursively transforms a block tree and its nested `blocks` children through `BlockTransformPipeline`. |
-| `sulu_user_loggedin_and_preview()` | — | Returns `true` when rendering inside Sulu Admin Live Preview (`attributes.preview == true` or request preview flag). |
-| `sulu_preview_block_focus_script()` | — | Returns the idempotent `<script>` + `<style>` snippet for Live Preview click-to-focus and highlight animations (automatically appended once at depth 1 by `BlockRenderer`). |
+| `block_render(block, context = [])` | Function | Runs the block through `BlockTransformPipeline`, resolves the highest-priority template from `rendering.template_namespaces` (`{namespace}/{type}.html.twig`), injects `data-block-id` on the root HTML element in Live Preview, and prepends `_scoped_css` + optional `_summary` / `_empty_state` output. |
+| `blocks_render(blocks, context = [])` | Function | Renders a list of blocks sequentially through `BlockCollectionRendererInterface` (`BlockRenderer::renderBlocks()`). |
+| `block_transform(block, context = [])` | Function & Filter | Runs a single block array through `BlockTransformPipeline` and returns the normalized array (`?array`). |
+| `hydrate_blocks(blocks, context = [])` | Function & Filter | Hydrates a flat list of blocks through `BlockTransformPipeline` (skipping suppressed `null` blocks). |
+| `hydrate_block_tree(blocks, context = [])` | Function & Filter | Recursively transforms a block tree and its nested `blocks` children through `BlockTransformPipeline`. |
+| `sulu_user_loggedin_and_preview()` | Function | Returns `true` when rendering inside Sulu Admin Live Preview (`attributes.preview == true` or request preview flag). |
+| `sulu_preview_block_focus_script()` | Function | Returns the idempotent `<script>` snippet for Live Preview click-to-focus and highlight indicators (automatically appended once at depth 1 by `BlockRenderer`). |
 
 ### Layouts & Reusable Blocks (`LayoutTwigExtension`)
 
-| Function | Alias(es) | Description |
-| --- | --- | --- |
-| `sulu_layout_render(layoutKey = 'default', context = [])` | `layout_render` | Resolves a `page_layout` CMS snippet or YAML layout definition (supporting pipe-delimited fallback chains like `'article|default'`) and renders its `blocks`. Automatically marks layout blocks with `_in_page_layout: true` so they do not emit page-level `data-block-id` attributes. |
-| `sulu_layout_load(layoutKey = 'default', locale = null)` | `layout_load` | Loads the raw block array for the first matching layout in a pipe-delimited fallback chain (`list<array<string, mixed>>`). |
-| `sulu_layout_exists(layoutKey = 'default', locale = null)` | `layout_exists` | Returns `true` if any layout in the fallback chain exists and contains at least one block. |
-| `sulu_layout_has_block(blockType, layoutKey = 'default', locale = null)` | `layout_has_block` | Recursively checks whether the resolved layout contains a block of the given `blockType` (inspecting nested `rows`, `columns`, `blocks`, `items`, and referenced `reusable` snippets). |
-| `sulu_layout_classes(settings = [], groups = null)` | `layout_classes` | Resolves layout settings through `LayoutResolverInterface::resolveClasses()` into a space-separated CSS class string. |
-| `sulu_layout_class(group, value = null)` | `layout_class` | Resolves a single layout setting group/value through `LayoutResolverInterface::resolveClass()`. |
-| `sulu_layout_attributes(settings = [])` | `layout_attributes` | Resolves `data-layout-*` HTML attributes (`data-layout-sidebar`, `data-layout-header-variant`, etc.) from layout settings. |
-| `sulu_reusable_block_load(uuid, locale = null)` | `reusable_block_load` | Loads the blocks from a published `reusable_block` snippet by UUID and registers its reference in Sulu's HTTP cache `ReferenceStoreInterface`. |
+| Function | Description |
+| --- | --- |
+| `layout_render(layoutKey = 'default', context = [])` | Resolves a `page_layout` CMS snippet or YAML layout definition (supporting pipe-delimited fallback chains like `'article|default'`) and renders its `blocks`. Automatically marks layout blocks with `_in_page_layout: true` so they do not emit page-level `data-block-id` attributes. |
+| `layout_load(layoutKey = 'default', locale = null)` | Loads the raw block array for the first matching layout in a pipe-delimited fallback chain (`list<array<string, mixed>>`). |
+| `layout_exists(layoutKey = 'default', locale = null)` | Returns `true` if any layout in the fallback chain exists and contains at least one block. |
+| `layout_has_block(blockType, layoutKey = 'default', locale = null)` | Recursively checks whether the resolved layout contains a block of the given `blockType` (inspecting nested `rows`, `columns`, `blocks`, `items`, and referenced `reusable` snippets). |
+| `layout_classes(settings = [], groups = null)` | Resolves layout settings through `LayoutResolverInterface::resolveClasses()` into a space-separated CSS class string. |
+| `layout_class(group, value = null)` | Resolves a single layout setting group/value through `LayoutResolverInterface::resolveClass()`. |
+| `layout_attributes(settings = [])` | Resolves `data-layout-*` HTML attributes (`data-layout-sidebar`, `data-layout-header-variant`, etc.) from layout settings. |
+| `reusable_block_load(uuid, locale = null)` | Loads the blocks from a published `reusable_block` snippet by UUID and registers its reference in Sulu's HTTP cache `ReferenceStoreInterface`. |
 
 ---
 

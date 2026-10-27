@@ -98,12 +98,24 @@ final class SuluDataNormalizer
     public static function sanitizeUrl(string $url, string $fallback = '#'): string
     {
         $trimmed = \trim($url);
-        if ('' === $trimmed) {
+        $inspected = self::inspectUrlScheme($trimmed);
+        if (null === $inspected || !$inspected['is_safe']) {
             return $fallback;
         }
 
-        if (!\mb_check_encoding($trimmed, 'UTF-8')) {
-            return $fallback;
+        return $trimmed;
+    }
+
+    /**
+     * Decodes numeric/HTML entities, strips control characters/whitespace, and inspects the URL scheme.
+     *
+     * @return array{normalized: string, has_scheme_colon: bool, scheme: ?string, is_dangerous_scheme: bool, is_safe: bool}|null
+     */
+    public static function inspectUrlScheme(string $url): ?array
+    {
+        $trimmed = \trim($url);
+        if ('' === $trimmed || !\mb_check_encoding($trimmed, 'UTF-8')) {
+            return null;
         }
 
         // Generic decoding of numeric character references (decimal and hex, with or without trailing semicolon)
@@ -124,7 +136,7 @@ final class SuluDataNormalizer
                 $decoded,
             );
             if (null === $numericDecoded || \PREG_NO_ERROR !== \preg_last_error()) {
-                return $fallback;
+                return null;
             }
 
             $decoded = \html_entity_decode($numericDecoded, \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
@@ -139,13 +151,10 @@ final class SuluDataNormalizer
         // Strip ASCII control characters/spaces as well as Unicode control and separator characters
         $normalized = \preg_replace('/[\x00-\x20\p{C}\p{Z}]+/u', '', $cleanUtf8);
         if (null === $normalized || \PREG_NO_ERROR !== \preg_last_error()) {
-            return $fallback;
+            return null;
         }
 
-        // Reject explicit dangerous schemes
-        if (1 === \preg_match('/^(?:javascript|vbscript|data|file|blob):/i', $normalized)) {
-            return $fallback;
-        }
+        $isDangerousScheme = 1 === \preg_match('/^(?:javascript|vbscript|data|file|blob):/i', $normalized);
 
         // Enforce safe scheme allowlist on any leading colon in first path segment before '/', '?', or '#'
         // Ensure '#' is only treated as a URL fragment delimiter if it is NOT part of an HTML entity ('&#')
@@ -164,14 +173,17 @@ final class SuluDataNormalizer
         );
         $firstDelimiter = !empty($delims) ? \min($delims) : false;
 
-        if (false !== $firstColonPos && (false === $firstDelimiter || $firstColonPos < $firstDelimiter)) {
-            $scheme = \strtolower(\substr($normalized, 0, $firstColonPos));
-            if (!\in_array($scheme, ['http', 'https', 'mailto', 'tel', 'sms'], true)) {
-                return $fallback;
-            }
-        }
+        $hasSchemeColon = false !== $firstColonPos && (false === $firstDelimiter || $firstColonPos < $firstDelimiter);
+        $scheme = $hasSchemeColon ? \strtolower(\substr($normalized, 0, $firstColonPos)) : null;
+        $isSafe = !$isDangerousScheme && (!$hasSchemeColon || \in_array($scheme, ['http', 'https', 'mailto', 'tel', 'sms'], true));
 
-        return $trimmed;
+        return [
+            'normalized' => $normalized,
+            'has_scheme_colon' => $hasSchemeColon,
+            'scheme' => $scheme,
+            'is_dangerous_scheme' => $isDangerousScheme,
+            'is_safe' => $isSafe,
+        ];
     }
 
     /**
@@ -482,5 +494,26 @@ final class SuluDataNormalizer
         }
 
         return null;
+    }
+
+    /**
+     * Recursively unwraps Sulu `ContentView` objects (or any wrapper exposing `getContent()`) into raw values.
+     */
+    public static function unwrapContentViews(mixed $value): mixed
+    {
+        if (\is_object($value) && \method_exists($value, 'getContent')) {
+            return self::unwrapContentViews($value->getContent());
+        }
+
+        if (\is_array($value)) {
+            $unwrapped = [];
+            foreach ($value as $k => $v) {
+                $unwrapped[$k] = self::unwrapContentViews($v);
+            }
+
+            return $unwrapped;
+        }
+
+        return $value;
     }
 }

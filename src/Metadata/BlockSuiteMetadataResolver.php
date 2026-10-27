@@ -11,6 +11,7 @@ use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Content\Application\ContentResolver\Value\ContentView;
 use Sulu\Content\Application\MetadataResolver\MetadataResolver;
 use Sulu\Content\Application\PropertyResolver\PropertyResolverProviderInterface;
+use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 
 /**
  * Decorates Sulu's MetadataResolver so that:
@@ -52,7 +53,7 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
         if ([] !== $propsItems || (isset($hydratedData['props']) && \is_array($hydratedData['props']))) {
             /** @var array<string, mixed> $mergedPropsContent */
             $mergedPropsContent = isset($hydratedData['props']) && \is_array($hydratedData['props'])
-                ? $this->unwrapContentViews($hydratedData['props'])
+                ? SuluDataNormalizer::unwrapContentViews($hydratedData['props'])
                 : [];
             /** @var array<string, mixed> $mergedPropsView */
             $mergedPropsView = [];
@@ -60,7 +61,7 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
             if ([] !== $propsItems) {
                 $resolvedProps = parent::resolveItems($propsItems, $hydratedData, $locale);
                 if (isset($resolvedProps['props'])) {
-                    $resolvedPropsContent = $this->unwrapContentViews($resolvedProps['props']->getContent());
+                    $resolvedPropsContent = SuluDataNormalizer::unwrapContentViews($resolvedProps['props']->getContent());
                     if (\is_array($resolvedPropsContent)) {
                         /** @var array<string, mixed> $resolvedPropsContent */
                         $mergedPropsContent = \array_replace_recursive($mergedPropsContent, $resolvedPropsContent);
@@ -75,13 +76,13 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
                         }
 
                         if (isset($resolvedProps[$propPath])) {
-                            $val = $this->unwrapContentViews($resolvedProps[$propPath]->getContent());
+                            $val = SuluDataNormalizer::unwrapContentViews($resolvedProps[$propPath]->getContent());
                             $viewVal = $resolvedProps[$propPath]->getView();
                             if ([] !== $viewVal) {
                                 $this->writeValueByPath($mergedPropsView, $subPath, $viewVal);
                             }
                         } else {
-                            $val = $this->unwrapContentViews($this->readValueByPath($hydratedData, $propPath));
+                            $val = SuluDataNormalizer::unwrapContentViews($this->readValueByPath($hydratedData, $propPath));
                         }
                         $this->writeValueByPath($mergedPropsContent, $subPath, $val);
                     }
@@ -224,24 +225,6 @@ final class BlockSuiteMetadataResolver extends MetadataResolver
                 $this->writeValueByPath($data, $storageKey, $defaultValue);
             }
         }
-    }
-
-    private function unwrapContentViews(mixed $value): mixed
-    {
-        if ($value instanceof ContentView) {
-            return $this->unwrapContentViews($value->getContent());
-        }
-
-        if (\is_array($value)) {
-            $unwrapped = [];
-            foreach ($value as $k => $v) {
-                $unwrapped[$k] = $this->unwrapContentViews($v);
-            }
-
-            return $unwrapped;
-        }
-
-        return $value;
     }
 
     private function normalizeDefaultValue(string $fieldType, mixed $rawValue): mixed

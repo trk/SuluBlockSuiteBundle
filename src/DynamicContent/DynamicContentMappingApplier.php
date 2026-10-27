@@ -61,7 +61,7 @@ final class DynamicContentMappingApplier
         foreach ($hydrated as $fieldKey => $fieldValue) {
             if (
                 isset($mappedTargets[$fieldKey])
-                || \in_array($fieldKey, ['type', 'props', 'id', 'items', 'settings', 'is_dynamic_template', 'is_template'], true)
+                || \in_array($fieldKey, ['type', 'props', 'id', 'items', 'settings', 'is_dynamic_template'], true)
                 || \str_starts_with($fieldKey, '_')
             ) {
                 continue;
@@ -373,7 +373,7 @@ final class DynamicContentMappingApplier
         }
 
         foreach (\array_keys($block) as $key) {
-            if (\in_array($key, ['type', 'props', 'id', 'items', 'settings', 'is_dynamic_template', 'is_template'], true) || \str_starts_with($key, '_')) {
+            if (\in_array($key, ['type', 'props', 'id', 'items', 'settings', 'is_dynamic_template'], true) || \str_starts_with($key, '_')) {
                 continue;
             }
             if (!\array_key_exists($key, $targetFields)) {

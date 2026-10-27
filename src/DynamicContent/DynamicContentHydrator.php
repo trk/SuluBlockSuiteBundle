@@ -11,6 +11,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Totoglu\SuluBlockSuiteBundle\DynamicContent\Bridge\SuluSmartContentQueryBridge;
 use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
+use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
 
 final class DynamicContentHydrator implements DynamicContentHydratorInterface
 {
@@ -484,7 +485,7 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
             }
         }
 
-        $props = $this->unwrapContentViews($props);
+        $props = SuluDataNormalizer::unwrapContentViews($props);
         if (!\is_array($props)) {
             $props = [];
         }
@@ -560,13 +561,14 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
                 ? \trim($props['dynamic_hydrate_mode'])
                 : 'auto',
             'hide_if_empty' => $this->isTruthy($props['dynamic_hide_if_empty'] ?? null),
-            'page_id' => $props['dynamic_page_id'] ?? ($props['dynamic_page'] ?? null),
+            'page_id' => $props['dynamic_page_id'] ?? null,
             'parent_id' => 'sulu_categories' === $sourceType
                 ? ($props['dynamic_parent_id'] ?? null)
-                : ($props['dynamic_parent_page'] ?? ($props['dynamic_page_id'] ?? ($props['dynamic_parent_id'] ?? null))),
-            'uuids' => $props['dynamic_uuids'] ?? null,
+                : ($props['dynamic_page_id'] ?? ($props['dynamic_parent_id'] ?? null)),
+            'uuids' => 'sulu_articles' === $sourceType
+                ? ($props['dynamic_article_ids'] ?? ($props['dynamic_uuids'] ?? null))
+                : ($props['dynamic_uuids'] ?? null),
             'article_id' => $props['dynamic_article_id'] ?? null,
-            'article_ids' => $props['dynamic_article_ids'] ?? null,
             'category_id' => $props['dynamic_category_id'] ?? null,
             'category_ids' => $props['dynamic_category_ids'] ?? null,
             'media_id' => $props['dynamic_media_id'] ?? null,
@@ -680,46 +682,6 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         return $enriched;
     }
 
-    private function unwrapContentViews(mixed $value): mixed
-    {
-        if (\is_object($value) && \method_exists($value, 'getContent')) {
-            return $this->unwrapContentViews($value->getContent());
-        }
-
-        if (\is_array($value)) {
-            $unwrapped = [];
-            foreach ($value as $k => $v) {
-                $unwrapped[$k] = $this->unwrapContentViews($v);
-            }
-
-            return $unwrapped;
-        }
-
-        return $value;
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     */
-    public function extractValue(array $data, string $path): mixed
-    {
-        return $this->mappingApplier->extractValue($data, $path);
-    }
-
-    public static function truncatePlainText(string $value, int $maxLength = 160): string
-    {
-        return DynamicContentMappingApplier::truncatePlainText($value, $maxLength);
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     * @param array<string, mixed> $condition
-     */
-    public function evaluateCondition(array $data, array $condition): bool
-    {
-        return $this->mappingApplier->evaluateCondition($data, $condition);
-    }
-
     private function isTruthy(mixed $value): bool
     {
         return true === $value || 1 === $value || 'true' === $value || '1' === $value;
@@ -730,13 +692,13 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
      */
     private function isTemplateSubItem(array $subItem): bool
     {
-        if ($this->isTruthy($subItem['is_dynamic_template'] ?? ($subItem['is_template'] ?? false))) {
+        if ($this->isTruthy($subItem['is_dynamic_template'] ?? false)) {
             return true;
         }
 
         $props = $subItem['props'] ?? null;
         if (\is_array($props)) {
-            return $this->isTruthy($props['is_dynamic_template'] ?? ($props['is_template'] ?? false));
+            return $this->isTruthy($props['is_dynamic_template'] ?? false);
         }
 
         return false;
@@ -753,15 +715,9 @@ final class DynamicContentHydrator implements DynamicContentHydratorInterface
         if (\array_key_exists('is_dynamic_template', $cleaned)) {
             $cleaned['is_dynamic_template'] = false;
         }
-        if (\array_key_exists('is_template', $cleaned)) {
-            $cleaned['is_template'] = false;
-        }
         if (isset($cleaned['props']) && \is_array($cleaned['props'])) {
             if (\array_key_exists('is_dynamic_template', $cleaned['props'])) {
                 $cleaned['props']['is_dynamic_template'] = false;
-            }
-            if (\array_key_exists('is_template', $cleaned['props'])) {
-                $cleaned['props']['is_template'] = false;
             }
         }
 

@@ -8,14 +8,14 @@ use CmsIg\Seal\Converter\HtmlToTextConverter;
 use Doctrine\ORM\QueryBuilder;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
-use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\ItemMetadata;
-use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderRegistry;
 use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Page\Infrastructure\Sulu\Search\Visitor\WebsitePageReindexProviderEnhancerInterface;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
+use Totoglu\SuluBlockSuiteBundle\Metadata\BlockTargetFieldMetadataResolver;
 use Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer;
+use Totoglu\SuluBlockSuiteBundle\Snippet\SnippetScopeResolver;
 
 /**
  * Enhances Sulu 3 Website Page search documents (CMS-IG Seal) by recursively extracting
@@ -135,7 +135,7 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
         array &$document,
         bool $isRootPage = false,
     ): void {
-        $fields = $this->collectContentFields($formMetadata->getItems());
+        $fields = BlockTargetFieldMetadataResolver::collectContentFields($formMetadata->getItems());
 
         foreach ($fields as $field) {
             $fieldName = $field->getName();
@@ -390,38 +390,6 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
         return $this->typedFormsCache[$cacheKey] = [];
     }
 
-    /**
-     * Collects content FieldMetadata items from a form, skipping non-content sections
-     * (`settings`, `style`, `layout`, `general`, `dynamic_content`, `advanced`).
-     *
-     * @param array<array-key, ItemMetadata> $items
-     *
-     * @return list<FieldMetadata>
-     */
-    private function collectContentFields(array $items): array
-    {
-        if (isset($items['__tabs']) && $items['__tabs'] instanceof SectionMetadata) {
-            $contentTab = $items['__tabs']->getItems()['content'] ?? null;
-
-            return $contentTab instanceof SectionMetadata
-                ? $this->collectContentFields($contentTab->getItems())
-                : [];
-        }
-
-        $fields = [];
-        foreach ($items as $item) {
-            if ($item instanceof FieldMetadata) {
-                $fields[] = $item;
-            } elseif ($item instanceof SectionMetadata && \in_array($item->getName(), ['content', 'media'], true)) {
-                foreach ($this->collectContentFields($item->getItems()) as $subField) {
-                    $fields[] = $subField;
-                }
-            }
-        }
-
-        return $fields;
-    }
-
     private function getFieldType(FieldMetadata $field): string
     {
         try {
@@ -459,30 +427,12 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
                 return;
             }
 
-            $matchedContent = null;
-            foreach ($snippet->getDimensionContents() as $content) {
-                if (
-                    DimensionContentInterface::CURRENT_VERSION === $content->getVersion()
-                    && $content->getLocale() === $locale
-                    && (DimensionContentInterface::STAGE_LIVE === $content->getStage() || '' === $content->getStage())
-                ) {
-                    $matchedContent = $content;
-                    break;
-                }
-            }
-
-            if (null === $matchedContent) {
-                foreach ($snippet->getDimensionContents() as $content) {
-                    if (
-                        DimensionContentInterface::CURRENT_VERSION === $content->getVersion()
-                        && null === $content->getLocale()
-                        && (DimensionContentInterface::STAGE_LIVE === $content->getStage() || '' === $content->getStage())
-                    ) {
-                        $matchedContent = $content;
-                        break;
-                    }
-                }
-            }
+            $matchedContent = SnippetScopeResolver::findDimensionContent(
+                $snippet,
+                null,
+                $locale,
+                DimensionContentInterface::STAGE_LIVE,
+            );
 
             if (null !== $matchedContent) {
                 $templateData = $matchedContent->getTemplateData();
@@ -533,23 +483,16 @@ final class BlockSuitePageReindexEnhancer implements WebsitePageReindexProviderE
         if (isset($block['_hidden']) && true === $block['_hidden']) {
             return true;
         }
-        if ($this->isTruthyFlag($block['is_dynamic_template'] ?? ($block['is_template'] ?? null))) {
+        if ($this->isTruthyFlag($block['is_dynamic_template'] ?? null)) {
             return true;
         }
 
-        $props = $block['props'] ?? null;
-        if (\is_string($props) && '' !== \trim($props)) {
-            $decoded = \json_decode($props, true);
-            if (\is_array($decoded)) {
-                $props = $decoded;
-            }
-        }
-
-        if (\is_array($props)) {
+        $props = SuluDataNormalizer::extractProps($block);
+        if ([] !== $props) {
             if (isset($props['status']) && 'disabled' === $props['status']) {
                 return true;
             }
-            if ($this->isTruthyFlag($props['is_dynamic_template'] ?? ($props['is_template'] ?? null))) {
+            if ($this->isTruthyFlag($props['is_dynamic_template'] ?? null)) {
                 return true;
             }
         }

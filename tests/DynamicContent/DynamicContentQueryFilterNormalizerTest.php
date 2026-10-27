@@ -32,10 +32,10 @@ final class DynamicContentQueryFilterNormalizerTest extends TestCase
 
     public function testHasStringCategoryKeysDistinguishesNumericIdsFromKeys(): void
     {
-        self::assertTrue($this->normalizer->hasStringCategoryKeys(['categories' => 'tech,design']));
+        self::assertTrue($this->normalizer->hasStringCategoryKeys(['category_keys' => 'tech,design']));
         self::assertTrue($this->normalizer->hasStringCategoryKeys(['category_keys' => ['tech']]));
-        self::assertFalse($this->normalizer->hasStringCategoryKeys(['categories' => '10,20']));
-        self::assertFalse($this->normalizer->hasStringCategoryKeys(['category_ids' => [10], 'categories' => 'tech']));
+        self::assertFalse($this->normalizer->hasStringCategoryKeys(['category_keys' => '10,20']));
+        self::assertFalse($this->normalizer->hasStringCategoryKeys(['category_ids' => [10], 'category_keys' => 'tech']));
         self::assertFalse($this->normalizer->hasStringCategoryKeys([]));
     }
 
@@ -64,10 +64,10 @@ final class DynamicContentQueryFilterNormalizerTest extends TestCase
     public function testBuildRepositoryQueryPlanNormalizesTaxonomiesTemplatesPaginationAndSort(): void
     {
         $criteria = [
-            'templates' => 'article_default, news',
-            'tags' => 'featured, breaking',
-            'categories' => '12, 15',
-            'navigation_context' => 'main, footer',
+            'template_keys' => 'article_default, news',
+            'tag_names' => 'featured, breaking',
+            'category_keys' => '12, 15',
+            'navigation_contexts' => 'main, footer',
             'depth' => '2',
             'limit' => 5,
             'offset' => 2,

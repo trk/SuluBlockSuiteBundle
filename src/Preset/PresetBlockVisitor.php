@@ -72,7 +72,7 @@ final readonly class PresetBlockVisitor implements BlockVisitorInterface, BlockT
             $props = \array_merge($props, $block['props']);
         }
         $rawPresetId = $props['preset']
-            ?? ($props['_preset'] ?? ($block['props/preset'] ?? ($block['preset'] ?? null)));
+            ?? ($block['props/preset'] ?? ($block['preset'] ?? null));
         if (\is_string($rawPresetId) && '' !== \trim($rawPresetId)) {
             $presetId = \trim($rawPresetId);
             $preset = $this->findPreset($blockType, $presetId, $resolvedLocale, $resolvedWebspace);

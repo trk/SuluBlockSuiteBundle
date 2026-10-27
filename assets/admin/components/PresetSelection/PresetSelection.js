@@ -281,7 +281,7 @@ export default class PresetSelection extends React.Component<Props> {
             const previousPreset = this.presets.find((p) => p.id === previousPresetId);
             if (previousPreset && previousPreset.props && typeof previousPreset.props === 'object') {
                 Object.keys(previousPreset.props).forEach((prevPropKey) => {
-                    if (prevPropKey !== '_preset' && prevPropKey !== 'preset') {
+                    if (prevPropKey !== 'preset') {
                         changes[`${blockPath}/props/${prevPropKey}`] = undefined;
                     }
                 });
@@ -290,7 +290,7 @@ export default class PresetSelection extends React.Component<Props> {
 
         if (preset && preset.props && typeof preset.props === 'object') {
             Object.keys(preset.props).forEach((propKey) => {
-                if (propKey !== '_preset' && propKey !== 'preset') {
+                if (propKey !== 'preset') {
                     changes[`${blockPath}/props/${propKey}`] = preset.props[propKey];
                 }
             });
@@ -298,7 +298,7 @@ export default class PresetSelection extends React.Component<Props> {
 
         if (preset && includeContentValues && preset.values && typeof preset.values === 'object') {
             Object.keys(preset.values).forEach((fieldKey) => {
-                if (fieldKey !== 'type' && fieldKey !== 'props' && fieldKey !== '_preset' && fieldKey !== 'preset') {
+                if (fieldKey !== 'type' && fieldKey !== 'props' && fieldKey !== 'preset') {
                     changes[`${blockPath}/${fieldKey}`] = preset.values[fieldKey];
                 }
             });

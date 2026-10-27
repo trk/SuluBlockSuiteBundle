@@ -6,7 +6,6 @@ namespace Totoglu\SuluBlockSuiteBundle\Metadata;
 
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
-use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\ItemMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\OptionMetadata;
 use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\SectionMetadata;
 use Symfony\Contracts\Translation\TranslatorInterface;
@@ -27,7 +26,6 @@ final class DynamicSectionFormBuilder
         'props' => true,
         'dynamic_source' => true,
         'is_dynamic_template' => true,
-        'is_template' => true,
         'target_block' => true,
         'reusable_snippet' => true,
         'snippet' => true,
@@ -346,13 +344,13 @@ final class DynamicSectionFormBuilder
         /** @var array<string, array{name: string, label: string}> $fieldsByName */
         $fieldsByName = [];
 
-        foreach ($this->collectContentFieldMetadata($contentSection->getItems()) as $field) {
+        foreach (BlockTargetFieldMetadataResolver::collectContentFields($contentSection->getItems()) as $field) {
             $fieldName = $field->getName();
             $fieldType = $this->getFieldType($field);
 
             if ('items' === $fieldName && 'block' === $fieldType) {
                 foreach ($field->getTypes() as $childForm) {
-                    foreach ($this->collectContentFieldMetadata($childForm->getItems()) as $childField) {
+                    foreach (BlockTargetFieldMetadataResolver::collectContentFields($childForm->getItems()) as $childField) {
                         $childName = $childField->getName();
                         $childType = $this->getFieldType($childField);
                         if (
@@ -435,38 +433,6 @@ final class DynamicSectionFormBuilder
                 'label' => $badgeLabel,
             ];
         }
-    }
-
-    /**
-     * Collects FieldMetadata items exclusively from root fields and `content`/`media` sections
-     * (including `__tabs -> content`), skipping `settings`, `style`, `layout`, `general`, `dynamic_content`, and `advanced`.
-     *
-     * @param array<array-key, ItemMetadata> $items
-     *
-     * @return list<FieldMetadata>
-     */
-    private function collectContentFieldMetadata(array $items): array
-    {
-        if (isset($items[BlockSuiteFormMetadataVisitor::TABS_SECTION_NAME]) && $items[BlockSuiteFormMetadataVisitor::TABS_SECTION_NAME] instanceof SectionMetadata) {
-            $contentTab = $items[BlockSuiteFormMetadataVisitor::TABS_SECTION_NAME]->getItems()['content'] ?? null;
-
-            return $contentTab instanceof SectionMetadata
-                ? $this->collectContentFieldMetadata($contentTab->getItems())
-                : [];
-        }
-
-        $fields = [];
-        foreach ($items as $item) {
-            if ($item instanceof FieldMetadata) {
-                $fields[] = $item;
-            } elseif ($item instanceof SectionMetadata && \in_array($item->getName(), ['content', 'media'], true)) {
-                foreach ($this->collectContentFieldMetadata($item->getItems()) as $subField) {
-                    $fields[] = $subField;
-                }
-            }
-        }
-
-        return $fields;
     }
 
     /**
