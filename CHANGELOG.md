@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-10-27
+
+### Changed
+- **Canonical Zero-BC Architecture**: Removed legacy fallback keys (`page_template`, `key`, `_preset`, `is_template`, `dynamic_page`), Sulu 2 `structure` request attribute checks, `AbstractBlockComponent::getResolvedProps()` alias, and non-canonical Twig function/filter aliases (`sulu_block_suite_*` and `preline_*`), standardizing on the 13 canonical `block_suite_*` Twig APIs and snake_case query criteria (`uuids`, `category_ids`, `category_keys`, `tag_ids`, `tag_names`, `template_keys`, `parent_id`, `exclude_ids`).
+- **Deepened Module Boundaries**: Extracted `PreviewBlockFocusScript` from `BlockRenderer`, centralized `SuluDataNormalizer::inspectUrlScheme()` and `SuluDataNormalizer::unwrapContentViews()`, unified content field discovery via `BlockTargetFieldMetadataResolver::collectContentFields()`, and delegated `SuluPageSourceResolver::resolveChildren()` to `resolveQuery()`.
+
 ## [0.2.2] - 2026-10-26
 
 ### Added
