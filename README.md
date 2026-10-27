@@ -1,6 +1,6 @@
 # Sulu Block Suite Bundle
 
-[![Latest Version](https://img.shields.io/badge/version-0.2.2-blue.svg)](https://github.com/trk/SuluBlockSuiteBundle)
+[![Latest Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/trk/SuluBlockSuiteBundle)
 [![PHP Version](https://img.shields.io/badge/PHP-%3E%3D%208.3%20%7C%208.5-8892BF.svg)](https://php.net)
 [![Sulu CMS](https://img.shields.io/badge/Sulu%20CMS-%5E3.0-orange.svg)](https://sulu.io)
 [![Symfony](https://img.shields.io/badge/Symfony-%5E7.4-black.svg)](https://symfony.com)

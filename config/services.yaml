@@ -176,10 +176,7 @@ services:
         tags: ['sulu.content.property_resolver']
 
     Totoglu\SuluBlockSuiteBundle\Content\PropertyResolver\TablerIconPropertyResolver:
-        decorates: Manuxi\SuluAdminExtrasBundle\Content\Type\IconSelectionPropertyResolver
-        decoration_on_invalid: null
         arguments:
-            $inner: '@.inner'
             $projectDir: '%kernel.project_dir%'
         tags:
             - { name: 'sulu_content.property_resolver', type: 'single_icon_selection', alias: 'single_icon_selection', priority: 20 }

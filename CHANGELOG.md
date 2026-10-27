@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-27
+
+### Added
+- **Flat-Flow Break-Block Layout Engine (`FlatFlowLayoutGrouper`, `SectionFlattener`)**: Added framework-agnostic flat-flow state machine converting `section_break`, `row_break` / `row`, and `column_break` control blocks into hierarchical `sections -> rows -> columns -> blocks` structures.
+- **Sulu Webspace Navigation & Active URL Engine (`SuluNavigationTreeNormalizer`, `ActiveUrlMatcher`)**: Added recursive Sulu Webspace navigation tree normalization, breadcrumb/page UUID extraction, and active URL / nested entry matching.
+- **XML Block Schema & AI/MCP Infrastructure (`BlockXmlSchemaExtractor`, `AbstractXmlBlockAiCatalog`, `McpToolRegistrar`)**: Added reusable Sulu XML block schema extraction, technical prop preservation across AI translations (`preserveTechnicalProps`), and optional MCP tool/resource DI registration.
+- **Responsive Slot Width & Media/Form Deepening (`ResponsiveWidth`, `TablerIconPropertyResolver`, `AbstractBlockComponent`, `SuluDataNormalizer`, `PropReader`)**: Added responsive slot width cascade/sizing (`ResponsiveWidth`), `tabler_icon_selection` property resolver, Sulu FormBundle `FormView` re-render cloning (`resolveReusableFormView`), lightbox configuration helpers, collection item media/icon/link hydration (`normalizeItemMediaAndLinks`, `resolveItemImageUrl`, `resolveItemImageSrcSet`), map embed URL sanitization (`sanitizeMapEmbedUrl`), ISO-8601 date resolution (`resolveIsoDate`), Unicode initials extraction (`extractInitials`), and extensible `tabIconRegistry` in Admin.
+
 ## [0.2.3] - 2026-10-27
 
 ### Changed
