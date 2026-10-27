@@ -16,7 +16,8 @@ A **100% UI-framework-agnostic block infrastructure engine** for **Sulu CMS 3.x*
 4. **Dynamic Content / Smart Content Engine & Mixed Static/Dynamic Sub-Items**: Bind any block or repeater block to live CMS data sources (`pages`, `articles`, `categories`, `media_collection`, `search`, SmartContent providers, or custom `ConfigurableDynamicContentSourceProviderInterface` services) with canonical field-type auto-mapping, `{{field}}` inline token interpolation, custom/computed outputs, mixed static & dynamic sub-items (`is_dynamic_template`), and collection summary/empty-state/pagination rendering.
 5. **Two-Way Live Preview Block Focus & Sibling Auto-Collapse (`initPreviewBlockFocus`)**: Click any rendered block (including deeply nested `section > rows > columns > blocks > items` hierarchies and `reusable` blocks) in the Sulu Live Preview iframe to expand its ancestor tabs/accordions, scroll to and highlight the block in the Admin form, or click a block in the Admin form to scroll and pulse-highlight it in the Live Preview iframe.
 6. **Preset Gallery, Wireframe Registry & Reusable Global Blocks**: Browse YAML and CMS-managed presets in a visual gallery (`preset_selection`), register custom React wireframe previews via `presetWireframeRegistry`, save blocks as presets or reusable snippets directly from the `Advanced` tab, and render central page layouts (`layout_render()`) with automatic Sulu HTTP cache reference invalidation.
-7. **Full Internationalization (i18n)**: 6 admin languages supported out of the box (`en`, `tr`, `de`, `ru`, `es`, `fr`).
+7. **Deep Core Modules for Layout, Navigation, Media & AI/MCP (`FlatFlowLayoutGrouper`, `SuluNavigationTreeNormalizer`, `ResponsiveWidth`, `AbstractXmlBlockAiCatalog`, `BlockXmlSchemaExtractor`, `McpToolRegistrar`)**: Framework-agnostic flat-flow layout grouping (`section_break` / `row` / `column_break`), Sulu Webspace navigation tree normalization, responsive slot-width and `<img sizes>` calculation, Sulu FormBundle `FormView` re-render cloning, `tabler_icon_selection` property resolution, and 3-tier AI/MCP block schema extraction.
+8. **Full Internationalization (i18n)**: 6 admin languages supported out of the box (`en`, `tr`, `de`, `ru`, `es`, `fr`).
 
 ---
 
@@ -48,11 +49,11 @@ A **100% UI-framework-agnostic block infrastructure engine** for **Sulu CMS 3.x*
 
 ## Architecture & Responsibility Boundaries
 
-| Layer | Responsibility | Does NOT Contain |
+| Layer | Responsibility (Deep Modules & Seams) | Outside This Seam |
 | --- | --- | --- |
-| **`sulu-block-suite-bundle` (Core)** | Transform pipeline, metadata-driven media/link/search/dynamic resolution, inline field option enhancer (`withBlockFieldOptions`), two-way Live Preview block focus (`initPreviewBlockFocus`), preset/reusable/layout engines, admin field types (`preset_selection`, `single_reusable_block_selection`, `hotspot_picker`), security utilities (`AttributeSanitizer`, `CssScoper`), tab/props `BlockSuiteFormMetadataVisitor` & `BlockSuiteMetadataResolver` | UI block definitions (except `reusable`), framework styling fields (`margin_*`, `padding_*`), CSS framework class maps, framework translations, or snippet template auto-registration |
-| **Framework Package** (e.g. `sulu-preline-blocks-bundle`, Bootstrap, UIkit) | Block XML definitions, styling tabs (`general` via native `xi:include`), Twig components extending `AbstractBlockComponent`, CSS class maps, `NestedBlockFlattenerInterface` implementations, framework translations | Workflow, metadata resolution, or persistence logic already provided by Core |
-| **Project** (`./config`, `./templates`) | Sulu-native `<types><type ref="..."/></types>` block composition, project snippet XMLs (`page_layout`, `reusable_block`, `block_preset`), project-specific blocks (`header`, `footer`), responsive image `srcset_formats`, layout defaults, YAML presets | Core or framework infrastructure |
+| **`sulu-block-suite-bundle` (Core Engine)** | Transform pipeline (`BlockTransformPipeline`), flat-flow layout state machine (`FlatFlowLayoutGrouper`, `SectionFlattener`), Sulu Webspace navigation & active URL engine (`SuluNavigationTreeNormalizer`, `ActiveUrlMatcher`), responsive slot-width engine (`ResponsiveWidth`), base component engine (`AbstractBlockComponent`), data & prop normalizers (`SuluDataNormalizer`, `PropReader`), XML schema & AI/MCP engine (`BlockXmlSchemaExtractor`, `AbstractXmlBlockAiCatalog`, `McpToolRegistrar`), inline field option enhancer (`withBlockFieldOptions`), Live Preview block focus (`initPreviewBlockFocus`), preset/reusable/layout engines (`YamlBlockPresetProvider`, `PageLayoutProvider`), admin registries (`presetWireframeRegistry`, `tabIconRegistry`), property resolvers (`TablerIconPropertyResolver`, `SingleReusableBlockSelectionPropertyResolver`), security utilities (`AttributeSanitizer`, `CssScoper`), and `BlockSuiteFormMetadataVisitor` / `BlockSuiteMetadataResolver` | UI block XML definitions (except `reusable`), framework styling fields (`margin_*`, `padding_*`, `hover_image`, `hover_video`, `blend`, `parallax`), CSS framework token maps, or snippet template auto-registration |
+| **UI Framework Adapter** (e.g. `sulu-preline-blocks-bundle`) | Block XML schemas (`config/templates/blocks/*.xml`), styling tabs (`general` via native `xi:include`), Twig components extending `AbstractBlockComponent`, CSS token maps (`PrelineClassMap`, `PropsResolver`), thin collection/AI adapters (`PrelineBlockCollectionRenderer`, `PrelineBlocksAiCatalog`), framework translations | CMS workflow, metadata resolution, flat-flow grouping state machine, Sulu navigation tree walking, or persistence logic provided by Core |
+| **Project** (`./config`, `./templates`) | Sulu-native `<types><type ref="..."/></types>` block composition, project snippet XMLs (`page_layout`, `reusable_block`, `block_preset`), project-specific blocks, responsive image `srcset_formats`, layout defaults, YAML presets | Core or UI framework adapter internals |
 
 ---
 
@@ -240,13 +241,30 @@ When a block passes through `BlockTransformPipeline` (`ReusableBlockTransformer`
    - Autoconfigured via DI tag `sulu_block_suite.dynamic_source_provider`.
    - Extend `AbstractDynamicContentSourceProvider` to expose custom single or collection data sources, dynamic admin config fields (`getConfigFields()`, `getSingleConfigFields()`), custom/computed outputs (`registerCustomOutput()`), and collection metadata (`resolveCollectionMeta()`).
 4. **`AbstractBlockComponent` (`Totoglu\SuluBlockSuiteBundle\Twig\Component\AbstractBlockComponent`)**:
-   - Base class for Symfony UX Twig Components consuming block arrays via `BlockComponentPreRenderSubscriber`.
-   - Override `protected function defaults(): array`, `protected function dataKeys(): array`, and `protected function capabilities(): array`.
+   - Deep base module for Symfony UX Twig Components consuming block arrays via `BlockComponentPreRenderSubscriber`.
+   - Override `protected function defaults(): array`, `protected function dataKeys(): array`, `protected function capabilityMap(): array`, and `protected function capabilities(): array`.
    - Automatically forwards Live Preview `data-block-id`, `_id`, `_class`, `_attributes`, and `_scoped_css` to the component's root `ComponentAttributes` (`{{ attributes }}`).
-   - Provides type-safe helpers (`ClassList`, `PropReader`, `AttributeSanitizer`, `CssScoper`) for prop reading and HTML attribute/class assembly.
-5. **`presetWireframeRegistry` (Admin JS)**:
-   - Exported from `sulu-block-suite-bundle` (`assets/admin/registries/presetWireframeRegistry`).
-   - Register custom React wireframe preview components per block type (`presetWireframeRegistry.add('my_block', MyWireframeComponent)`); blocks without a custom wireframe automatically fall back to Core's generic wireframe preview.
+   - Built-in Sulu CMS capabilities:
+     - **Media & Focal Point**: `getImageUrl()`, `getImageSrcSet()`, `getImageFocusPointStyle()`, `getImageAlt()`, `getVideoUrl()`, `resolveItemImageUrl()`, `resolveItemImageSrcSet()`, `getImageLoading()`, `getImageFetchPriority()`, `getIntrinsicImageDimensions()`.
+     - **Responsive Slot Width (`ResponsiveWidth`)**: `getSlotWidth()`, `getMediaSlotWidth()`, `getImageSizes()`, `getChildContext()`.
+     - **Links & Active URL Matching (`ActiveUrlMatcher`)**: `getLinkUrl()`, `getLinkTarget()`, `getLinkRel()`, `isUrlActive()`, `isInternalUrlActive()`, `hasActiveNestedEntries()`, `getPageUuid()`.
+     - **Sulu FormBundle Re-Render Cloning**: `resolveReusableFormView()`, `getFormEntity()`, `isSubmitted()`, `getSuccessText()`.
+     - **Lightbox & Collection Tags**: `isLightboxEnabled()`, `getLightboxOptions()`, `getLightboxConfigJson()`, `getFilterTags()`, `getItemTagSlugs()`.
+     - **Content & Icon Accessors**: `getTitle()`, `getSubtitle()`, `getMeta()`, `getResolvedContent()`, `getIconClass()`.
+5. **`FlatFlowLayoutGrouper` (`Totoglu\SuluBlockSuiteBundle\Layout\FlatFlowLayoutGrouper`)**:
+   - Converts flat Sulu block arrays containing `section_break`, `row_break` / `row`, and `column_break` control blocks into structured `sections -> rows -> columns -> blocks` trees (`buildTopLevelEntries()`, `groupIntoSections()`, `extractRowColumns()`).
+   - UI framework collection renderers pass CSS class callbacks to `FlatFlowLayoutGrouper` while keeping all state-machine transitions centralized in Core.
+6. **`SuluDataNormalizer` & `PropReader` (`Totoglu\SuluBlockSuiteBundle\Normalizer\SuluDataNormalizer`, `Totoglu\SuluBlockSuiteBundle\Util\PropReader`)**:
+   - `SuluDataNormalizer`: Resolves Sulu media URLs/srcsets/focal points, links, snippet UUIDs, Tabler icons (`resolveIconClass()`), collection item media/icon/link fields (`normalizeItemMediaAndLinks()`), safe HTTPS Google Maps / OpenStreetMap embed URLs (`sanitizeMapEmbedUrl()`), ISO-8601 dates (`resolveIsoDate()`), and Unicode initials (`extractInitials()`).
+   - `PropReader`: Type-safe prop and collection-item readers (`string()`, `nullableString()`, `bool()`, `int()`, `float()`, `stringList()`, `itemValue()`, `itemString()`, `itemNullableString()`, `itemBool()`, `itemInheritedString()`).
+7. **`SuluNavigationTreeNormalizer` (`Totoglu\SuluBlockSuiteBundle\Navigation\SuluNavigationTreeNormalizer`)**:
+   - Normalizes raw Sulu Webspace navigation trees (`sulu_navigation_root_tree` / `sulu_navigation_flat`) into recursive link/children structures with active-trail detection.
+8. **`AbstractXmlBlockAiCatalog`, `BlockXmlSchemaExtractor` & `McpToolRegistrar`**:
+   - Extend `AbstractXmlBlockAiCatalog` in UI framework bundles to expose 3-tier AI block discovery (`listBlockTypes()`, `listPresets()`, `inspectBlockSchema()`, `composeBlockPayload()`, `preserveTechnicalProps()`).
+   - Use `McpToolRegistrar::registerOptionalTags()` in DI extensions to register MCP tools and resources without hard runtime dependencies on `mcp/sdk`.
+9. **`presetWireframeRegistry` & `tabIconRegistry` (Admin JS)**:
+   - Exported from `sulu-block-suite-bundle` (`assets/admin/registries/presetWireframeRegistry` and `assets/admin/registries/tabIconRegistry`).
+   - Register custom React wireframe preview components per block type (`presetWireframeRegistry.add('my_block', MyWireframeComponent)`) and custom Sulu Admin tab icons (`tabIconRegistry.registerPrefix('my_domain_', 'su-tag')`).
 
 ---
 
@@ -487,7 +505,8 @@ Include this list in your page templates, article templates, `reusable_block.xml
 <!-- config/templates/snippets/reusable_block.xml -->
 <property name="blocks" type="block" default-type="text">
     <types>
-        <type ref="section"/>
+        <type ref="section_break"/>
+        <type ref="row"/>
         <xi:include href="../includes/content_block_types.xml"
                     xpointer="xmlns(sulu=http://schemas.sulu.io/template/template)xpointer(/sulu:types/sulu:*)"/>
     </types>

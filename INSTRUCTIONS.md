@@ -23,8 +23,14 @@
    - Because `props/preset` uses field type `preset_selection`, query `sulu_block_suite_presets` (or `BlockSuiteSchemaInspector::listPresets()`) to discover available preset IDs and their default `props`/`values`.
 
 5. **AI Full-Content Translation Safety (`SuluAiPlatformBundle`)**
-   - Translate only human-readable content fields and `props/dynamic_empty_message`, `props/dynamic_summary_text`, `props/dynamic_filtered_summary_text`, `props/aria_label`, `props/alt` (`BlockSuiteSchemaInspector::isTranslatableField()`).
-   - Preserve technical props (`props/id`, `props/class`, `props/css`, `props/attributes`, `props/status`, `props/preset`, inline option enum values, and `props/dynamic_*` query parameters) verbatim via `BlockSuitePayloadComposer::preserveTechnicalProps()`.
+   - Translate only human-readable content fields and `props/dynamic_empty_message`, `props/dynamic_summary_text`, `props/dynamic_filtered_summary_text`, `props/aria_label`, `props/alt` (`BlockSuiteSchemaInspector::isTranslatableField()` / `AbstractXmlBlockAiCatalog::isTranslatableField()`).
+   - Preserve technical props (`props/id`, `props/class`, `props/css`, `props/attributes`, `props/status`, `props/preset`, inline option enum values, and `props/dynamic_*` query parameters) verbatim via `BlockSuitePayloadComposer::preserveTechnicalProps()` or `AbstractXmlBlockAiCatalog::preserveTechnicalProps()`.
+
+6. **Core Module Seams for UI Framework Adapters**
+   - Delegate flat-flow layout grouping (`section_break`, `row`, `column_break`) to `FlatFlowLayoutGrouper`.
+   - Delegate Sulu Webspace navigation tree normalization and active URL matching to `SuluNavigationTreeNormalizer` and `ActiveUrlMatcher`.
+   - Delegate media/srcset/focal-point, collection item media/icon/link hydration (`normalizeItemMediaAndLinks`), safe map embed URLs (`sanitizeMapEmbedUrl`), ISO-8601 dates (`resolveIsoDate`), Unicode initials (`extractInitials`), Sulu `FormView` cloning (`resolveReusableFormView`), and responsive slot widths (`ResponsiveWidth`) to `AbstractBlockComponent`, `SuluDataNormalizer`, and `PropReader`.
+   - Extend `AbstractXmlBlockAiCatalog` (backed by `BlockXmlSchemaExtractor`) and register optional MCP services via `McpToolRegistrar::registerOptionalTags()`.
 
 ## MCP Tools (Progressive Disclosure)
 

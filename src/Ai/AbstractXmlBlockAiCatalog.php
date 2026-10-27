@@ -792,6 +792,7 @@ abstract class AbstractXmlBlockAiCatalog
         }
 
         $candidates = [];
+        $candidates[] = \dirname($blocksXmlDir, 2) . '/blocks/presets';
         $cwd = \getcwd();
         if (false !== $cwd) {
             $candidates[] = $cwd . '/config/blocks/presets';
